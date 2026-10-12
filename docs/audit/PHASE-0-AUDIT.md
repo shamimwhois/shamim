@@ -352,4 +352,35 @@ From the audit itself:
 
 ---
 
+## 10. Post-audit findings — permission model gaps
+
+Added after writing `docs/API.md`, which forced a line-by-line comparison
+between the permission names the API needed and the names `AccountPermission`
+actually defines. Four gaps surfaced. All are recorded here rather than fixed
+silently, because each is a **policy decision**, not a typo:
+
+1. **No comment-creation ability.** Any authenticated account can comment; the
+   only comment permission is `comment:moderate`. There is no way to express
+   "this token may post comments but not moderate them".
+2. **No comment-ownership ability.** `comment:delete-own` does not exist, so
+   "delete my own comment" is currently expressed as a policy check rather than
+   a permission.
+3. **No profile ability.** Editing one's own name and e-mail is unpermissioned
+   — correct for the web app, but it means an API token cannot be restricted to
+   read-only.
+4. **`admin` is not assignable by anyone.** `AccountRole::assignableBy()`
+   deliberately omits `Admin` from every role's list, including `admin`. This
+   is a sound default (a compromised admin token cannot mint more admins) but
+   it means there is currently **no code path at all** that promotes an account
+   to `admin`. Promotion is performed by seeder or by direct database write.
+
+Finding 4 is the most consequential. The admin role is reachable only through
+`UserSeeder`; there is no in-application mechanism to create the first admin or
+to promote a second. On a fresh deployment that is a bootstrap problem, not a
+security one — but it needs a deliberate answer (an artisan command, a
+config-defined allow-list, or an explicit "admins are made in the database"
+policy) before the system is operated by anyone but its author.
+
+---
+
 *End of Phase 0. No application code was modified to produce this document.*
