@@ -47,19 +47,29 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal :name="$modalName" focusable class="max-w-lg">
+<x-modal
+    :name="$modalName"
+    :title="__('Cancel invitation')"
+    :description="__('Are you sure you want to cancel the invitation for :email?', ['email' => $invitationEmail])"
+    icon="envelope"
+    tone="danger"
+>
     <form wire:submit="cancelInvitation" class="space-y-6">
-        <div>
-            <flux:heading size="lg">{{ __('Cancel invitation') }}</flux:heading>
-            <flux:subheading>
-                {{ __('Are you sure you want to cancel the invitation for :email?', ['email' => $invitationEmail]) }}
-            </flux:subheading>
-        </div>
-        <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+        <x-modal.actions>
             <flux:modal.close>
-                <flux:button variant="filled">{{ __('Keep invitation') }}</flux:button>
+                <flux:button variant="filled" class="w-full sm:w-auto">
+                    {{ __('Keep invitation') }}
+                </flux:button>
             </flux:modal.close>
-            <flux:button variant="danger" type="submit" data-test="cancel-invitation-confirm">{{ __('Cancel invitation') }}</flux:button>
-        </div>
+
+            <flux:button
+                variant="danger"
+                type="submit"
+                class="w-full sm:w-auto"
+                data-test="cancel-invitation-confirm"
+            >
+                {{ __('Cancel invitation') }}
+            </flux:button>
+        </x-modal.actions>
     </form>
-</flux:modal>
+</x-modal>

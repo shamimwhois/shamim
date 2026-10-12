@@ -103,28 +103,33 @@ new class extends Component {
 
 <div>
     @if ($this->pendingInvitations->isNotEmpty())
-        <flux:modal name="pending-invitations" wire:model="showPendingInvitationsModal" focusable class="max-w-lg">
+        <x-modal
+            name="pending-invitations"
+            wire:model="showPendingInvitationsModal"
+            title="{{ __('Pending team invitations') }}"
+            :description="__('Accept or decline the teams you have been invited to join.')"
+            icon="envelope"
+        >
             <div data-test="pending-invitations-modal" class="space-y-6">
-                <div>
-                    <flux:heading size="lg">{{ __('Pending team invitations') }}</flux:heading>
-                    <flux:subheading>{{ __('Accept or decline the teams you have been invited to join.') }}</flux:subheading>
-                </div>
-
                 <div class="grid gap-4">
                     @foreach ($this->pendingInvitations as $invitation)
-                        <div data-test="pending-invitation-row" class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                        <div
+                            data-test="pending-invitation-row"
+                            class="rounded-lg border border-ink-200 p-4 dark:border-ink-700"
+                        >
                             <div class="space-y-1">
-                                <p class="font-medium">{{ $invitation['team_name'] }}</p>
-                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                                <p class="font-medium text-ink-900 dark:text-ink-50">{{ $invitation['team_name'] }}</p>
+                                <flux:text class="text-sm text-ink-500 dark:text-ink-400">
                                     {{ __(':inviter invited you to join this team.', ['inviter' => $invitation['inviter_name']]) }}
                                 </flux:text>
                             </div>
 
-                            <div class="mt-4 flex justify-end gap-2">
+                            <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                                 <flux:button
                                     variant="filled"
                                     wire:click="declineInvitation('{{ $invitation['code'] }}')"
                                     wire:loading.attr="disabled"
+                                    class="w-full sm:w-auto"
                                     data-test="pending-invitation-decline"
                                 >
                                     {{ __('Decline') }}
@@ -134,6 +139,7 @@ new class extends Component {
                                     variant="primary"
                                     wire:click="acceptInvitation('{{ $invitation['code'] }}')"
                                     wire:loading.attr="disabled"
+                                    class="w-full sm:w-auto"
                                     data-test="pending-invitation-accept"
                                 >
                                     {{ __('Accept') }}
@@ -143,6 +149,6 @@ new class extends Component {
                     @endforeach
                 </div>
             </div>
-        </flux:modal>
+        </x-modal>
     @endif
 </div>

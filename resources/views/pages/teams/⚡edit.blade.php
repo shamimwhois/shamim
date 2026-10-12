@@ -172,11 +172,11 @@ new class extends Component
                     </div>
 
                     @if ($this->permissions->canCreateInvitation)
-                        <flux:modal.trigger name="invite-member">
+                        <x-modal.trigger name="invite-member">
                             <flux:button variant="primary" icon="user-plus" data-test="invite-member-button">
                                 {{ __('Invite member') }}
                             </flux:button>
-                        </flux:modal.trigger>
+                        </x-modal.trigger>
                     @endif
                 </div>
 
@@ -215,7 +215,7 @@ new class extends Component
                                 @endif
 
                                 @if ($member['role'] !== 'owner' && $this->permissions->canRemoveMember)
-                                    <flux:modal.trigger name="remove-member-{{ $member['id'] }}">
+                                    <x-modal.trigger :name="'remove-member-'.$member['id']">
                                         <flux:tooltip :content="__('Remove member')">
                                             <flux:button
                                                 variant="ghost"
@@ -224,7 +224,7 @@ new class extends Component
                                                 data-test="member-remove-button"
                                             />
                                         </flux:tooltip>
-                                    </flux:modal.trigger>
+                                    </x-modal.trigger>
                                 @endif
                             </div>
                         </div>
@@ -263,7 +263,7 @@ new class extends Component
                                 </div>
 
                                 @if ($this->permissions->canCancelInvitation)
-                                    <flux:modal.trigger name="cancel-invitation-{{ $invitation['code'] }}">
+                                    <x-modal.trigger :name="'cancel-invitation-'.$invitation['code']">
                                         <flux:tooltip :content="__('Cancel invitation')">
                                             <flux:button
                                                 variant="ghost"
@@ -272,7 +272,7 @@ new class extends Component
                                                 data-test="invitation-cancel-button"
                                             />
                                         </flux:tooltip>
-                                    </flux:modal.trigger>
+                                    </x-modal.trigger>
                                 @endif
                             </div>
                             @if ($this->permissions->canCancelInvitation)
@@ -302,11 +302,11 @@ new class extends Component
                             <p class="text-sm">{{ __('Please proceed with caution, this cannot be undone.') }}</p>
                         </div>
 
-                        <flux:modal.trigger name="delete-team">
+                        <x-modal.trigger name="delete-team">
                             <flux:button variant="danger" data-test="delete-team-button">
                                 {{ __('Delete team') }}
                             </flux:button>
-                        </flux:modal.trigger>
+                        </x-modal.trigger>
                     </div>
                 </div>
             @endif

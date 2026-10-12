@@ -27,23 +27,35 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="create-team-switcher" :show="$errors->isNotEmpty()" focusable class="max-w-lg">
+<x-modal
+    name="create-team-switcher"
+    title="{{ __('Create a new team') }}"
+    :description="__('Give your team a name to get started.')"
+    icon="user-group"
+>
     <form wire:submit="createTeam" class="space-y-6">
-        <div>
-            <flux:heading size="lg">{{ __('Create a new team') }}</flux:heading>
-            <flux:subheading>{{ __('Give your team a name to get started.') }}</flux:subheading>
-        </div>
+        <flux:input
+            wire:model="teamName"
+            :label="__('Team name')"
+            type="text"
+            required
+            autofocus
+            data-test="switcher-create-team-name"
+        />
 
-        <flux:input wire:model="teamName" :label="__('Team name')" type="text" required autofocus data-test="switcher-create-team-name" />
-
-        <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+        <x-modal.actions :submit="__('Create team')">
             <flux:modal.close>
-                <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
+                <flux:button variant="filled" class="w-full sm:w-auto">{{ __('Cancel') }}</flux:button>
             </flux:modal.close>
 
-            <flux:button variant="primary" type="submit" data-test="switcher-create-team-submit">
+            <flux:button
+                variant="primary"
+                type="submit"
+                class="w-full sm:w-auto"
+                data-test="switcher-create-team-submit"
+            >
                 {{ __('Create team') }}
             </flux:button>
-        </div>
+        </x-modal.actions>
     </form>
-</flux:modal>
+</x-modal>

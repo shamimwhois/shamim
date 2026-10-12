@@ -58,15 +58,21 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="invite-member" :show="$errors->isNotEmpty()" focusable class="max-w-lg">
+<x-modal
+    name="invite-member"
+    title="{{ __('Invite a team member') }}"
+    :description="__('Send an invitation to join this team.')"
+    icon="user-plus"
+>
     <form wire:submit="createInvitation" class="space-y-6">
-        <div>
-            <flux:heading size="lg">{{ __('Invite a team member') }}</flux:heading>
-            <flux:subheading>{{ __('Send an invitation to join this team.') }}</flux:subheading>
-        </div>
-
         <div class="space-y-4">
-            <flux:input wire:model="inviteEmail" type="email" :label="__('Email address')" required data-test="invite-email" />
+            <flux:input
+                wire:model="inviteEmail"
+                type="email"
+                :label="__('Email address')"
+                required
+                data-test="invite-email"
+            />
 
             <flux:select wire:model="inviteRole" :label="__('Role')" data-test="invite-role">
                 @foreach ($this->availableRoles as $role)
@@ -75,11 +81,19 @@ new class extends Component {
             </flux:select>
         </div>
 
-        <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+        <x-modal.actions :submit="__('Send invitation')">
             <flux:modal.close>
-                <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
+                <flux:button variant="filled" class="w-full sm:w-auto">{{ __('Cancel') }}</flux:button>
             </flux:modal.close>
-            <flux:button variant="primary" type="submit" data-test="invite-submit">{{ __('Send invitation') }}</flux:button>
-        </div>
+
+            <flux:button
+                variant="primary"
+                type="submit"
+                class="w-full sm:w-auto"
+                data-test="invite-submit"
+            >
+                {{ __('Send invitation') }}
+            </flux:button>
+        </x-modal.actions>
     </form>
-</flux:modal>
+</x-modal>

@@ -75,11 +75,11 @@ new #[Title('Teams')] class extends Component {
 
     <x-pages::settings.layout :heading="__('Teams')" :subheading="__('Manage your teams and team memberships')">
         <div class="flex items-center justify-end">
-            <flux:modal.trigger name="create-team">
+            <x-modal.trigger name="create-team">
                 <flux:button variant="primary" icon="plus" x-data="" x-on:click.prevent="$dispatch('open-modal', 'create-team')" data-test="teams-new-team-button">
                     {{ __('New team') }}
                 </flux:button>
-            </flux:modal.trigger>
+            </x-modal.trigger>
         </div>
 
         <div class="mt-6 space-y-3">
@@ -99,7 +99,7 @@ new #[Title('Teams')] class extends Component {
 
                     <div class="flex items-center gap-1">
                         @if (! $team->isPersonal && $team->role !== 'owner')
-                            <flux:modal.trigger :name="'leave-team-'.$team->id">
+                            <x-modal.trigger :name="'leave-team-'.$team->id">
                                 <flux:tooltip :content="__('Leave team')">
                                     <flux:button
                                         variant="ghost"
@@ -110,7 +110,7 @@ new #[Title('Teams')] class extends Component {
                                         data-test="team-leave-button"
                                     />
                                 </flux:tooltip>
-                            </flux:modal.trigger>
+                            </x-modal.trigger>
                         @endif
 
                         <flux:tooltip :content="$team->role === 'member' ? __('View team') : __('Edit team')">
@@ -127,16 +127,15 @@ new #[Title('Teams')] class extends Component {
                 </div>
 
                 @if (! $team->isPersonal && $team->role !== 'owner')
-                    <flux:modal :name="'leave-team-'.$team->id" focusable class="max-w-lg">
+                    <x-modal
+                        :name="'leave-team-'.$team->id"
+                        :title="__('Leave team')"
+                        :description="__('Are you sure you want to leave :name?', ['name' => $team->name])"
+                        icon="arrow-right-start-on-rectangle"
+                        tone="danger"
+                    >
                         <form wire:submit="leaveTeam({{ $team->id }})" class="space-y-6">
-                            <div>
-                                <flux:heading size="lg">{{ __('Leave team') }}</flux:heading>
-                                <flux:subheading>
-                                    {{ __('Are you sure you want to leave :name?', ['name' => $team->name]) }}
-                                </flux:subheading>
-                            </div>
-
-                            <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+                            <x-modal.actions>
                                 <flux:modal.close>
                                     <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
                                 </flux:modal.close>
@@ -144,9 +143,9 @@ new #[Title('Teams')] class extends Component {
                                 <flux:button variant="danger" type="submit" data-test="leave-team-confirm">
                                     {{ __('Leave team') }}
                                 </flux:button>
-                            </div>
+                            </x-modal.actions>
                         </form>
-                    </flux:modal>
+                    </x-modal>
                 @endif
             @empty
                 <flux:text class="py-8 text-center text-zinc-500 dark:text-zinc-400">
@@ -156,16 +155,16 @@ new #[Title('Teams')] class extends Component {
         </div>
     </x-pages::settings.layout>
 
-    <flux:modal name="create-team" :show="$errors->isNotEmpty()" focusable class="max-w-lg">
+    <x-modal
+        name="create-team"
+        :title="__('Create a new team')"
+        :description="__('Give your team a name to get started.')"
+        icon="user-group"
+    >
         <form wire:submit="createTeam" class="space-y-6">
-            <div>
-                <flux:heading size="lg">{{ __('Create a new team') }}</flux:heading>
-                <flux:subheading>{{ __('Give your team a name to get started.') }}</flux:subheading>
-            </div>
-
             <flux:input wire:model="name" :label="__('Team name')" type="text" required autofocus data-test="create-team-name" />
 
-            <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+            <x-modal.actions>
                 <flux:modal.close>
                     <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
@@ -173,7 +172,7 @@ new #[Title('Teams')] class extends Component {
                 <flux:button variant="primary" type="submit" data-test="create-team-submit">
                     {{ __('Create team') }}
                 </flux:button>
-            </div>
+            </x-modal.actions>
         </form>
-    </flux:modal>
+    </x-modal>
 </section>

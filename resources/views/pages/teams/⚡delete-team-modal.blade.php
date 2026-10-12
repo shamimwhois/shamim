@@ -76,26 +76,34 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="delete-team" :show="$errors->isNotEmpty()" focusable class="max-w-lg">
+<x-modal
+    name="delete-team"
+    title="{{ __('Delete this team?') }}"
+    :description="__('This action cannot be undone. This will permanently delete the team \':name\'.', ['name' => $team->name])"
+    icon="exclamation-triangle"
+    tone="danger"
+>
     <form wire:submit="deleteTeam" class="space-y-6">
-        <div>
-            <flux:heading size="lg">{{ __('Are you sure?') }}</flux:heading>
-            <flux:subheading>
-                {{ __('This action cannot be undone. This will permanently delete the team ":name".', ['name' => $team->name]) }}
-            </flux:subheading>
-        </div>
+        <flux:input
+            wire:model="deleteName"
+            :label="$this->deleteConfirmLabel"
+            required
+            data-test="delete-team-name"
+        />
 
-        <div class="space-y-4">
-            <flux:input wire:model="deleteName" :label="$this->deleteConfirmLabel" required data-test="delete-team-name" />
-        </div>
-
-        <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+        <x-modal.actions :submit="__('Delete team')">
             <flux:modal.close>
-                <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
+                <flux:button variant="filled" class="w-full sm:w-auto">{{ __('Cancel') }}</flux:button>
             </flux:modal.close>
-            <flux:button variant="danger" type="submit" data-test="delete-team-confirm">
+
+            <flux:button
+                variant="danger"
+                type="submit"
+                class="w-full sm:w-auto"
+                data-test="delete-team-confirm"
+            >
                 {{ __('Delete team') }}
             </flux:button>
-        </div>
+        </x-modal.actions>
     </form>
-</flux:modal>
+</x-modal>
