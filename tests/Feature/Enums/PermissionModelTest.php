@@ -4,8 +4,6 @@ use App\Enums\AccountPermission;
 use App\Enums\AccountRole;
 use App\Enums\PermissionGroup;
 use App\Enums\RolePlan;
-use App\Enums\TeamPermission;
-use App\Enums\TeamRole;
 
 /**
  * The permission model contract.
@@ -14,7 +12,7 @@ use App\Enums\TeamRole;
  * size. A count assertion catches a permission being added or removed; it does
  * not catch a permission being silently swapped for another one of the same
  * group — which is exactly the change that would quietly grant a plain user the
- * ability to publish, or hand a team admin the member list.
+ * ability to publish, or hand a seller the user-management surface.
  */
 test('each account role exposes exactly the permissions it should', function () {
     expect(array_map(fn (AccountPermission $p) => $p->value, AccountRole::User->permissions()))
@@ -22,6 +20,9 @@ test('each account role exposes exactly the permissions it should', function () 
             'post:create',
             'post:update-own',
             'post:delete-own',
+            'dev-lab:use',
+            'ai-hub:use',
+            'ideas:use',
         ]);
 
     expect(array_map(fn (AccountPermission $p) => $p->value, AccountRole::Seller->permissions()))
@@ -30,9 +31,13 @@ test('each account role exposes exactly the permissions it should', function () 
             'post:create',
             'post:update-own',
             'post:delete-own',
+            'dev-lab:use',
+            'ai-hub:use',
+            'ideas:use',
             // Seller-specific.
             'post:publish',
             'taxonomy:manage',
+            'marketplace:use',
             'product:create',
             'product:update-own',
             'product:delete-own',
@@ -80,13 +85,51 @@ test('the selling group is seller-scoped and admin-inclusive', function () {
         fn (AccountPermission $p) => $p->group() === PermissionGroup::Selling,
     );
 
-    expect($selling)->toHaveCount(6);
+    // Six product/sales permissions plus `marketplace:use`.
+    expect($selling)->toHaveCount(7);
 
     foreach ($selling as $permission) {
         expect(AccountRole::User->hasPermission($permission))->toBeFalse()
             ->and(AccountRole::Seller->hasPermission($permission))->toBeTrue()
             ->and(AccountRole::Admin->hasPermission($permission))->toBeTrue();
     }
+});
+
+test('every role can reach the shared modules', function () {
+    // The three shared modules are open to all roles by design; the Marketplace
+    // is the one module gated to sellers and above.
+    $shared = [
+        AccountPermission::UseDeveloperLab,
+        AccountPermission::UseAiHub,
+        AccountPermission::UseIdeas,
+    ];
+
+    foreach (AccountRole::cases() as $role) {
+        foreach ($shared as $permission) {
+            expect($role->hasPermission($permission))
+                ->toBeTrue("{$role->value} should hold {$permission->value}");
+        }
+    }
+
+    expect(AccountRole::User->hasPermission(AccountPermission::UseMarketplace))->toBeFalse()
+        ->and(AccountRole::Seller->hasPermission(AccountPermission::UseMarketplace))->toBeTrue()
+        ->and(AccountRole::Admin->hasPermission(AccountPermission::UseMarketplace))->toBeTrue();
+});
+
+test('the platform group holds exactly the shared module permissions', function () {
+    $platform = array_values(array_map(
+        fn (AccountPermission $p) => $p->value,
+        array_filter(
+            AccountPermission::cases(),
+            fn (AccountPermission $p) => $p->group() === PermissionGroup::Platform,
+        ),
+    ));
+
+    expect($platform)->toBe([
+        'dev-lab:use',
+        'ai-hub:use',
+        'ideas:use',
+    ]);
 });
 
 test('role levels order correctly and do not grant on their own', function () {
@@ -145,33 +188,10 @@ test('each account role maps to a plan', function () {
         ->and(AccountRole::Admin->plan())->toBe(RolePlan::Platform);
 });
 
-test('team roles hold exactly the team permissions they should', function () {
-    $values = fn (TeamRole $role) => array_map(fn (TeamPermission $p) => $p->value, $role->permissions());
-
-    expect($values(TeamRole::Owner))->toBe([
-        'team:update',
-        'team:delete',
-        'member:add',
-        'member:update',
-        'member:remove',
-        'invitation:create',
-        'invitation:cancel',
-    ]);
-
-    // A team admin may change settings and manage invitations, but the member
-    // list belongs to the owner.
-    expect($values(TeamRole::Admin))->toBe([
-        'team:update',
-        'invitation:create',
-        'invitation:cancel',
-    ]);
-
-    // Membership is the grant; there is no team permission a plain member holds.
-    expect($values(TeamRole::Member))->toBe([]);
-});
-
-test('only a team owner may delete the team', function () {
-    expect(TeamRole::Owner->hasPermission(TeamPermission::DeleteTeam))->toBeTrue()
-        ->and(TeamRole::Admin->hasPermission(TeamPermission::DeleteTeam))->toBeFalse()
-        ->and(TeamRole::Member->hasPermission(TeamPermission::DeleteTeam))->toBeFalse();
+test('each account role owns a distinct top-level dashboard route', function () {
+    // The three homes are separate URL spaces, not nested under one another.
+    // This asserts the route names; ROUTES.md records the paths they resolve to.
+    expect(AccountRole::User->dashboardRoute())->toBe('dashboard.index')
+        ->and(AccountRole::Seller->dashboardRoute())->toBe('seller.dashboard')
+        ->and(AccountRole::Admin->dashboardRoute())->toBe('admin.dashboard');
 });

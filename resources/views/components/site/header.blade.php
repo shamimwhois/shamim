@@ -66,7 +66,8 @@
             />
 
             @auth
-                <flux:button variant="filled" size="sm" :href="route('dashboard.index')" icon="squares-2x2">
+                {{-- Points at the dashboard the account's role owns, not a fixed path. --}}
+                <flux:button variant="filled" size="sm" :href="route(auth()->user()->dashboardRoute())" icon="squares-2x2">
                     Dashboard
                 </flux:button>
             @else
@@ -127,7 +128,7 @@
             <div class="hairline my-3"></div>
 
             @auth
-                <a href="{{ route('dashboard.index') }}" wire:navigate class="rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900">
+                <a href="{{ route(auth()->user()->dashboardRoute()) }}" wire:navigate class="rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900">
                     Dashboard
                 </a>
             @else

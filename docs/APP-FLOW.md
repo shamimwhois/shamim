@@ -22,8 +22,8 @@ from the role, never stored — see [`PERMISSIONS.md`](PERMISSIONS.md).
 | --- | --- | --- | --- |
 | **Guest** | — | Home, blog index, blog detail, about, auth pages | — |
 | **Reader** | `user` | All guest surfaces + comment submission + authoring workspace | `/dashboard` |
-| **Seller** | `seller` | Everything a reader has, plus taxonomy and publishing rights | `/dashboard/seller` |
-| **Admin** | `admin` | Everything, plus comment moderation and account administration | `/dashboard/admin` |
+| **Seller** | `seller` | Everything a reader has, plus taxonomy and publishing rights | `/seller/dashboard` |
+| **Admin** | `admin` | Everything, plus comment moderation and account administration | `/admin/dashboard` |
 
 ### Role capabilities
 
@@ -63,24 +63,44 @@ these journeys.
 | Auth routes | `login`, `register`, `logout`, `password.*`, `verification.*`, `two-factor.*` | — | Fortify + `pages::auth.*` |
 | `GET /settings/profile` | `profile.edit` | `auth` | `pages::settings.profile` |
 | `GET /settings/security` | `security.edit` | `auth`, `verified`, `password.confirm` | `pages::settings.security` |
-| `GET /settings/teams` | `teams.index` | `auth`, `verified` | `pages::teams.index` |
+| `GET /settings/teams` | `teams.index.redirect` | `auth`, `verified` | *301 → `/settings/security`* |
 | `GET /dashboard` | `dashboard.index` | `auth`, `verified` | `pages::dashboard.index` |
 | `GET /dashboard/posts` | `dashboard.posts.index` | `auth`, `verified` | `pages::dashboard.posts.index` |
 | `GET /dashboard/posts/create` | `dashboard.posts.create` | `auth`, `verified` | `pages::dashboard.posts.edit` |
 | `GET /dashboard/posts/{post:id}/edit` | `dashboard.posts.edit` | `auth`, `verified` | `pages::dashboard.posts.edit` |
 | `GET /dashboard/comments` | `dashboard.comments` | `auth`, `verified` | `pages::dashboard.comments` |
 | `GET /dashboard/taxonomy` | `dashboard.taxonomy` | `auth`, `verified` | `pages::dashboard.taxonomy` |
-| `GET /dashboard/seller` | `dashboard.seller.index` | `permission:product:create` | `pages::dashboard.seller.index` |
-| `GET /dashboard/admin` | `dashboard.admin.index` | `permission:admin:access` | `pages::dashboard.admin.index` |
-| `GET /dashboard/admin/users` | `dashboard.admin.users` | `permission:admin:access` | `pages::dashboard.admin.users` |
+| `GET /seller/dashboard` | `seller.dashboard` | `auth`, `verified`, `permission:product:create` | `pages::seller.dashboard` |
+| `GET /admin/dashboard` | `admin.dashboard` | `auth`, `verified`, `permission:admin:access` | `pages::admin.dashboard` |
+| `GET /admin/users` | `admin.users` | `auth`, `verified`, `permission:admin:access` | `pages::admin.users` |
+| `GET /ideas` | `ideas.index` | `auth`, `verified`, `permission:ideas:use` | `pages::ideas.index` |
+| `GET /dev-lab` | `dev-lab.index` | `auth`, `verified`, `permission:dev-lab:use` | `pages::dev-lab.index` |
+| `GET /ai-hub` | `ai-hub.index` | `auth`, `verified`, `permission:ai-hub:use` | `pages::ai-hub.index` |
+| `GET /marketplace` | `marketplace.index` | `auth`, `verified`, `permission:marketplace:use` | `pages::marketplace.index` |
+| `GET /dashboard/seller` | `dashboard.seller.redirect` | — | *301 → `/seller/dashboard`* |
+| `GET /dashboard/admin` | `dashboard.admin.redirect` | — | *301 → `/admin/dashboard`* |
+| `GET /teams/dashboard` | `team.dashboard` | `auth`, `verified` | *301 → `/dashboard`* |
 
-> **On the `{current_team}` prefix.** The starter kit scopes `dashboard` under a
-> team slug at `/{current_team}/dashboard` (route name `team.dashboard`). It is
-> still registered, so the team flows continue to work, but it renders
-> starter-kit scaffolding rather than the application. **Login, registration and
-> e-mail verification no longer send anyone there** — each resolves the role's
-> own dashboard through `AccountRole::dashboardRoute()`. See
-> [`ROUTES.md`](ROUTES.md) §9 for why the route remains.
+> **On the new route shape.** Role dashboards are **role-owned top-level
+> spaces**: the role is the first path segment, so `/dashboard` is the reader
+> and author workspace, `/seller/dashboard` is the selling workspace, and
+> `/admin/dashboard` is platform administration. No role's home is nested
+> inside another's. The shared authoring workspace stays on `/dashboard` for
+> every authenticated account — a seller and an admin still write posts there —
+> and only the *homes* are distinct.
+>
+> Four product modules are additionally exposed as permission-guarded top-level
+> routes: `/ideas`, `/dev-lab`, `/ai-hub` and `/marketplace`. The modules are
+> not built yet, so each renders a placeholder page, but the URL space and the
+> permission guard are real and the sidebar points at them.
+>
+> The team feature — `teams`, `team_memberships`, `team_invitations`,
+> `users.current_team_id` and the `{current_team}` route prefix — has been
+> removed entirely. The former `team.dashboard` name survives only as a **301
+> redirect to `/dashboard`**, so an old bookmark resolves rather than 404s;
+> likewise `/settings/teams` redirects to `/settings/security`, and the old
+> nested `dashboard/seller` and `dashboard/admin` paths redirect to the new
+> role-owned URLs. See [`ROUTES.md`](ROUTES.md) for the full map.
 
 ---
 
@@ -324,8 +344,8 @@ Entry: /login (layouts/auth/split.blade.php)
         ├─ session intended URL present → redirect there
         └─ otherwise                    → $user->dashboardRoute()
                                             user   → dashboard.index
-                                            seller → dashboard.seller.index
-                                            admin  → dashboard.admin.index
+                                            seller → seller.dashboard
+                                            admin  → admin.dashboard
 ```
 
 **Two notes that matter here.** The layout is a split shell driven by the application's theme tokens — it does **not** force dark mode, and a test asserts that no `class="dark"` appears in the rendered auth pages. The redirect is resolved from the account's **role**, not from a fixed path: `config/fortify.php` has no `redirects` map, only `home`, and nothing in the codebase hardcodes `/dashboard` as a post-login destination.
@@ -337,10 +357,10 @@ Entry: /login (layouts/auth/split.blade.php)
 Identical to Journey G through authentication. The divergence is entirely in step 5 and in what the shell renders afterwards:
 
 ```
-dashboard.seller.index  → Selling section visible in the sidebar
-                          (requires product:create)
-dashboard.admin.index   → Selling AND Administration sections visible
-                          (requires admin:access)
+seller.dashboard  → Selling section visible in the sidebar
+                    (requires product:create)
+admin.dashboard   → Selling AND Administration sections visible
+                    (requires admin:access)
 ```
 
 A `user` account sees neither section, and the navigation drops the heading along with its items — so a plain user never meets an "Administration" heading with nothing under it. This is why the sidebar is generated from `DashboardNavigation` rather than written into the Blade template: the menu and the route guards read from the same source and cannot disagree.
@@ -518,8 +538,8 @@ Added with the role model. These are the cases where the answer is not obvious a
 | Scenario | Expected behaviour | Rationale |
 | --- | --- | --- |
 | Guest requests a dashboard route | Redirect to `/login`, **not** `403` | They may hold the permission once authenticated. A `403` is a dead end with no way forward. |
-| Authenticated `user` requests `dashboard.admin.index` | `403` before the component boots | The route middleware (`permission:admin:access`) refuses it. A rendered admin shell with hidden buttons would still leak the layout and any data the component loads. |
-| `seller` requests a route needing `product:configure` | `403` | `seller` holds seven selling permissions, none of which configure payments. Enumerated in [PERMISSIONS.md](./PERMISSIONS.md). |
+| Authenticated `user` requests `admin.dashboard` | `403` before the component boots | The route middleware (`permission:admin:access`) refuses it. A rendered admin shell with hidden buttons would still leak the layout and any data the component loads. |
+| `seller` requests a route needing `payment:configure` | `403` | `seller` holds nine permissions beyond the user baseline, none of which configure payments. Enumerated in [PERMISSIONS.md](./PERMISSIONS.md). |
 | Admin attempts to delete another admin | Refused (`UserPolicy@delete`) | `$account->accountRole()->isAtLeast($user->accountRole())` refuses any target at or above the actor's level. Without it, two admins could delete each other. |
 | Admin attempts to delete their own account | Refused through the admin path | Self-deletion is a separate, confirmed flow. Allowing it through the user-management table would make it a one-click irreversible act. |
 | An account whose role was just downgraded has an open dashboard tab | The next Livewire request re-checks permission and fails | Livewire re-authorises on every round-trip rather than trusting the snapshot. A demoted admin does not keep admin rights for the session. |

@@ -25,7 +25,6 @@ Companion documents: [PRD](./PRD.md) · [TRD](./TRD.md) · [Application Flow](./
 | Table | Purpose | Rows expected | Soft delete |
 | --- | --- | --- | --- |
 | `users`   | *(existing)* Authentication identity, **extended with `role`** | 1–100 | No |
-| `teams`, `team_members`, `team_invitations` | *(existing)* Team workspace; **`memberships` carries team roles** | small | Yes (teams) |
 | `cache`, `jobs`, `sessions`, `password_reset_tokens`, `passkeys` | *(existing)* Framework tables | — | No |
 | **`categories`** | ★ One-to-many grouping for posts | 5–20 | No |
 | **`tags`** | ★ Many-to-many labelling for posts | 20–200 | No |
@@ -60,9 +59,10 @@ choice, and the cast is what keeps it type-safe.
 config to invalidate, so changing what a role may do is a one-method edit. See
 [`PERMISSIONS.md`](PERMISSIONS.md).
 
-`User` also carries `current_team_id` (existing starter-kit column) — a
-denormalised pointer to the active team, so a team-scoped URL can be generated
-without a session lookup.
+`role` is the **only** authorisation axis on `users`. The starter-kit's
+`current_team_id` column and the team tables (`teams`, `memberships`,
+`team_invitations`) were removed along with the team feature, so there is no
+second, narrower scope to reconcile against.
 
 ---
 
@@ -225,17 +225,16 @@ returns `AccountPermission::cases()`. Both make inheritance structural — see
 
 ### 3.4 `App\Enums\AccountPermission`
 
-24 cases in 4 groups (`PermissionGroup`): Content 6, Moderation 2, Selling 6,
-Administration 10.
+26 cases in 5 groups (`PermissionGroup`): Content 6, Moderation 2, Selling 7,
+Platform 3, Administration 10.
 
 | Group | Count | Example |
 | --- | ---: | --- |
 | `content` | 6 | `post:create`, `post:publish` |
 | `moderation` | 2 | `comment:moderate`, `taxonomy:manage` |
-| `selling` | 6 | `product:create`, `sale:view-own` |
-| `administration` | 10 | `admin:access`, `role:manage` |
-
-Exposes `group(): PermissionGroup`, `groupLabel()`, and the static
+| `selling` | 7 | `product:create`, `sale:view-own`, `marketplace:use` |
+| `platform` | 3 | `dev-lab:use`, `ai-hub:use`, `ideas:use` |
+| `administration` | 10 | `admin:access`, `role:manage` |Exposes `group(): PermissionGroup`, `groupLabel()`, and the static
 `grouped()` / `options()`.
 
 **No storage.** This enum is the entire permission model — no table, no pivot,
@@ -254,21 +253,6 @@ Commercial entitlements, deliberately separate from authorization.
 
 `productListingLimit()` distinguishes `null` (unlimited) from `0` (not
 permitted); the two are not collapsed.
-
-### 3.6 `App\Enums\TeamRole` and `TeamPermission`
-
-Backs the `memberships.role` column — the **second, independent** authorization
-axis.
-
-| Team role | Level | Team permissions |
-| --- | ---: | ---: |
-| `Owner` | 3 | 7 |
-| `Admin` | 2 | 3 |
-| `Member` | 1 | 0 |
-
-A team admin may update team settings and manage invitations; the member list
-belongs to the owner. A plain member holds no team permission — membership
-itself is the view grant.
 
 ### 3.2 `App\Enums\CommentStatus`
 
@@ -338,18 +322,20 @@ Cast: `status` → `CommentStatus`. `#[Fillable(['post_id', 'user_id', 'parent_i
 `User` is the starter-kit model extended with the platform role. It declares the role through the `#[Fillable]` / `#[Hidden]` attributes, casts `role` to `AccountRole`, and defaults it in `$attributes` — so a model instantiated in memory and never saved already reports `user`, matching the migration default (§1.3).
 
 ```php
-#[Fillable(['name', 'email', 'password', 'role', 'current_team_id'])]
+#[Fillable(['name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
-    use HasAccountRole, HasFactory, HasTeams, Notifiable,
+    use HasAccountRole, HasFactory, Notifiable,
         PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $attributes = ['role' => AccountRole::User->value];
 }
 ```
 
-The model body itself holds only the properties and `initials()`. Role behaviour lives in `App\Concerns\HasAccountRole` (§4.6) and team behaviour in the starter kit's `HasTeams`, so `User` stays close to the skeleton shape while both axes remain independently testable.
+The model body itself holds only the properties and `initials()`. Role behaviour
+lives in `App\Concerns\HasAccountRole` (§4.6), so `User` stays close to the
+skeleton shape while that behaviour remains independently testable.
 
 **Role API provided by `HasAccountRole`.** Reach for these; do not compare `$user->role` to a string, and do not branch on role in a view when a permission check expresses the same intent.
 
@@ -373,9 +359,7 @@ The model body itself holds only the properties and `initials()`. Role behaviour
 | --- | --- | --- |
 | `App\Concerns\HasSlug` | Derives a unique slug from a source field; applies an incrementing suffix on collision; respects a manual override | Posts, categories, and tags all need identical collision behaviour. A per-model copy would drift. |
 | `App\Concerns\HasReadingTime` | Computes word count and reading minutes from plain text (200 wpm) | Used by the post pipeline and by tests that need the same algorithm. |
-| `App\Concerns\GeneratesUniqueTeamSlugs` | Team-name → collision-free slug | Team creation and rename share one rule; a per-call copy would drift. |
 | `App\Concerns\HasAccountRole` | `role` cast, the three role predicates, and the account permission check | Keeps platform-role behaviour out of the model body and testable on its own (§3.3). |
-| `App\Concerns\HasTeams` | Membership, current-team switching, invitations | Starter-kit capability, retained verbatim. |
 | `App\Concerns\PasswordValidationRules` | The single password rule set used by registration, reset, and profile updates | Three entry points must not enforce three different policies. |
 | `App\Concerns\ProfileValidationRules` | Name/email rules shared by registration and profile update | Same reason. |
 
@@ -497,13 +481,13 @@ Six cheap aggregates. If this ever became hot it would move behind a cached `Pos
 
 Each role's dashboard reads a different slice, and the queries reflect that.
 
-**Seller dashboard** (`pages::dashboard.seller.index`) reads the account's plan
+**Seller dashboard** (`pages::seller.dashboard`) reads the account's plan
 rather than the database: `RolePlan::productListingLimit()` and
 `commissionPercent()`. No query — there is no `Product` model to count. The
 screen states entitlements against a feature that does not yet exist, which is
 why it is honest about being empty rather than showing a zero.
 
-**Admin dashboard** (`pages::dashboard.admin.index`) adds platform-wide counts
+**Admin dashboard** (`pages::admin.dashboard`) adds platform-wide counts
 that the author dashboard deliberately does not scope:
 
 | Metric | Query shape |
@@ -556,16 +540,14 @@ These ship with Laravel and the starter kit and are unmodified.
 | `0001_01_01_000002_create_jobs_table` | `jobs`, `job_batches`, `failed_jobs` |
 | `2024_01_01_000000_create_passkeys_table` | `passkeys` |
 | `2025_08_14_170933_add_two_factor_columns_to_users_table` | 2FA columns on `users` |
-| `2026_01_27_000001_create_teams_table` | `teams`, `memberships`, `team_invitations` |
-| `2026_01_27_000002_add_current_team_id_to_users_table` | `users.current_team_id` |
 
 **Ordering note.** The `2026_10_12_*` content migrations run after the
-starter-kit's `2026_01_27_*` team tables, so `users` and `teams` both exist
-before anything references them. On a fresh `php artisan migrate`: framework
-tables → passkeys and 2FA → teams → content → `users.role`.
+framework tables, so `users` exists before `posts` references it. On a fresh
+`php artisan migrate`: framework tables → passkeys and 2FA → content →
+`users.role`.
 
 **Rollback.** Each `down()` drops exactly what its `up()` created. Rolling back
-the content batch leaves the framework and starter-kit tables intact, and
+the content batch leaves the framework tables intact, and
 `add_role_to_users_table::down()` drops the index before the column — dropping
 the column first would fail on SQLite.
 

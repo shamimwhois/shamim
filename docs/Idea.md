@@ -20,8 +20,12 @@
 > **Already built and reusable by this module:** three account roles and their
 > permission matrix ([PERMISSIONS.md](./PERMISSIONS.md)), the modal system
 > ([COMPONENTS.md](./COMPONENTS.md)), the dashboard shell with permission-driven
-> navigation, and teams/memberships. The module's deferred status and its
-> relationship to the rest of the roadmap are recorded in
+> navigation, and the `/ideas` route with its `ideas:use` guard — currently
+> rendering a placeholder page, which is the seam this module plugs into. There
+> is **no** team or membership layer to reuse: the starter kit's team feature was
+> removed, so collaboration primitives ("Team members", below) would be new
+> work. The module's deferred status and its relationship to the rest of the
+> roadmap are recorded in
 > [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission).
 >
 > **Naming note.** This spec addresses `https://shamim.it`. In-repository

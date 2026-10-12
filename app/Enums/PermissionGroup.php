@@ -15,6 +15,7 @@ enum PermissionGroup: string
     case Content = 'content';
     case Moderation = 'moderation';
     case Selling = 'selling';
+    case Platform = 'platform';
     case Administration = 'administration';
 
     /**
@@ -26,6 +27,7 @@ enum PermissionGroup: string
             self::Content => __('Content'),
             self::Moderation => __('Moderation'),
             self::Selling => __('Selling'),
+            self::Platform => __('Platform'),
             self::Administration => __('Administration'),
         };
     }

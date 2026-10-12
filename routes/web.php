@@ -4,7 +4,6 @@ use App\Enums\AccountPermission;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
-use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -34,74 +33,122 @@ Route::get('robots.txt', RobotsController::class);
 
 /*
 |--------------------------------------------------------------------------
-| Dashboard
+| Role dashboards
 |--------------------------------------------------------------------------
 |
-| One URL space, three role-scoped homes. Every account reaches `/dashboard`,
-| but which page that renders — and which navigation it sees — depends on the
-| account's role:
+| Three separate, role-owned URL spaces. The role is the first path segment,
+| so the URL states which surface it belongs to and no role's home is nested
+| inside another's:
 |
-|   user   → /dashboard          (author workspace)
-|   seller → /dashboard/seller   (products, sales, reviews)
-|   admin  → /dashboard/admin    (platform administration)
+|   /dashboard          user    — author workspace (posts, comments, taxonomy)
+|   /seller/dashboard   seller  — selling workspace
+|   /admin/dashboard    admin   — platform administration
 |
-| Deliberately NOT nested under the `{current_team}` prefix used by the
-| starter kit's team routes. This is a single-author portfolio: posts belong to
-| a user, not a team, and forcing a team slug into every URL would add a
-| segment that carries no meaning. The starter kit's team routes are left
-| untouched below.
+| The shared author workspace stays on `/dashboard` because a seller and an
+| admin both write posts; only their *homes* are distinct.
 |
-| `permission:` is the account-level guard from `AccountPermission`. It is
+| `permission:` is the account-level guard from {@see AccountPermission}. It is
 | enforced on the route as well as in the component, so an unauthorised account
-| never reaches the page at all.
+| never reaches the page at all — a 403 before the component boots, rather than
+| a rendered shell with a hidden button.
 |
 */
 
 Route::middleware(['auth', 'verified'])->prefix('dashboard')->name('dashboard.')->group(function () {
-    /* Every role lands here; the component forwards to the role's own home. */
+    /*
+     * The user role's home, and the shared author workspace. Available to every
+     * authenticated account: a seller and an admin still write posts here.
+     */
     Route::livewire('/', 'pages::dashboard.index')->name('index');
 
-    /* Author workspace — available to every authenticated account. */
     Route::livewire('posts', 'pages::dashboard.posts.index')->name('posts.index');
     Route::livewire('posts/create', 'pages::dashboard.posts.edit')->name('posts.create');
     Route::livewire('posts/{post:id}/edit', 'pages::dashboard.posts.edit')->name('posts.edit');
     Route::livewire('comments', 'pages::dashboard.comments')->name('comments');
     Route::livewire('taxonomy', 'pages::dashboard.taxonomy')->name('taxonomy');
-
-    /* Seller workspace. */
-    Route::middleware('permission:'.AccountPermission::CreateProduct->value)
-        ->prefix('seller')
-        ->name('seller.')
-        ->group(function () {
-            Route::livewire('/', 'pages::dashboard.seller.index')->name('index');
-        });
-
-    /* Admin workspace. */
-    Route::middleware('permission:'.AccountPermission::AccessAdminPanel->value)
-        ->prefix('admin')
-        ->name('admin.')
-        ->group(function () {
-            Route::livewire('/', 'pages::dashboard.admin.index')->name('index');
-            Route::livewire('users', 'pages::dashboard.admin.users')->name('users');
-        });
 });
 
 /*
+| Seller workspace. Guarded by the selling permission, not by the role name —
+| a role check would drift from the permission matrix, a permission check cannot.
+*/
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::CreateProduct->value])
+    ->prefix('seller')
+    ->name('seller.')
+    ->group(function () {
+        Route::livewire('dashboard', 'pages::seller.dashboard')->name('dashboard');
+    });
+
+/*
+| Admin workspace.
+*/
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::AccessAdminPanel->value])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::livewire('dashboard', 'pages::admin.dashboard')->name('dashboard');
+        Route::livewire('users', 'pages::admin.users')->name('users');
+    });
+
+/*
 |--------------------------------------------------------------------------
-| Starter kit routes
+| Platform modules
 |--------------------------------------------------------------------------
 |
-| Preserved as shipped. The team-scoped dashboard remains reachable at
-| /{current_team}/dashboard so the invitation and team-management flows
-| continue to work unchanged.
+| One route per product module, each with its own top-level URL space and its
+| own permission. The modules are not built yet, so each route renders a
+| placeholder page that states what is planned and what already exists. The
+| routes are real and the navigation points at them, so each module has a
+| landing spot to be built into rather than needing a routing change later.
+|
+| The URL space is claimed now on purpose: `/ideas`, `/dev-lab`, `/ai-hub` and
+| `/marketplace` are top-level names that must not be taken by anything else.
 |
 */
 
-Route::prefix('{current_team}')
-    ->middleware(['auth', 'verified', EnsureTeamMembership::class])
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseDeveloperLab->value])
     ->group(function () {
-        Route::view('dashboard', 'dashboard')->name('team.dashboard');
+        Route::livewire('dev-lab', 'pages::dev-lab.index')->name('dev-lab.index');
     });
+
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseAiHub->value])
+    ->group(function () {
+        Route::livewire('ai-hub', 'pages::ai-hub.index')->name('ai-hub.index');
+    });
+
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseMarketplace->value])
+    ->group(function () {
+        Route::livewire('marketplace', 'pages::marketplace.index')->name('marketplace.index');
+    });
+
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseIdeas->value])
+    ->group(function () {
+        Route::livewire('ideas', 'pages::ideas.index')->name('ideas.index');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Backward-compatible redirects
+|--------------------------------------------------------------------------
+|
+| The role dashboards moved from nested paths to role-owned top-level spaces.
+| These redirects keep existing bookmarks, external links, and any in-flight
+| email working. 301 rather than 302 because the move is permanent — a search
+| engine or browser is correct to cache it.
+|
+| The `team.dashboard` name is preserved as a redirect to `/dashboard`. It was
+| the starter kit's team-scoped dashboard; with the team feature removed there
+| is no team to scope by, but the name is still referenced in documentation and
+| may be bookmarked, so it resolves rather than 404s.
+|
+*/
+
+Route::redirect('dashboard/seller', '/seller/dashboard', 301)->name('dashboard.seller.redirect');
+Route::redirect('dashboard/admin', '/admin/dashboard', 301)->name('dashboard.admin.redirect');
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::redirect('teams/dashboard', '/dashboard', 301)->name('team.dashboard');
+});
 
 /*
 | Authentication routes (login, register, password reset, two-factor, passkeys)

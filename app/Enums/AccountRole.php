@@ -9,9 +9,9 @@ namespace App\Enums;
  * coarse, application-wide identity that decides which dashboard an account
  * lands on and which navigation it sees.
  *
- * It is deliberately separate from {@see TeamRole}, which is fine-grained and
- * scoped to a single team. A user can be a `member` of one team and the `owner`
- * of another; they still have only one AccountRole.
+ * It is the only role axis in the application. The fine-grained, team-scoped
+ * role that once coexisted with it was removed along with the team feature, so
+ * there is no longer a second, narrower role to keep in sync.
  *
  * Hierarchy (ascending privilege): User → Seller → Admin.
  */
@@ -39,7 +39,7 @@ enum AccountRole: string
     public function description(): string
     {
         return match ($this) {
-            self::User => __('Reads content, manages their own account and team membership.'),
+            self::User => __('Reads content, writes posts and manages their own account.'),
             self::Seller => __('Everything a user can do, plus publishing and selling products.'),
             self::Admin => __('Full access, including moderation, user management and platform settings.'),
         };
@@ -85,6 +85,10 @@ enum AccountRole: string
                 AccountPermission::CreatePost,
                 AccountPermission::UpdateOwnPost,
                 AccountPermission::DeleteOwnPost,
+
+                AccountPermission::UseDeveloperLab,
+                AccountPermission::UseAiHub,
+                AccountPermission::UseIdeas,
             ],
 
             self::Seller => [
@@ -92,6 +96,8 @@ enum AccountRole: string
 
                 AccountPermission::PublishPost,
                 AccountPermission::ManageTaxonomy,
+
+                AccountPermission::UseMarketplace,
 
                 AccountPermission::CreateProduct,
                 AccountPermission::UpdateOwnProduct,
@@ -174,13 +180,20 @@ enum AccountRole: string
 
     /**
      * Get the route name of this role's dashboard home.
+     *
+     * These are the canonical, role-owned dashboard routes. They are
+     * deliberately **not** nested under one another: `/dashboard` is the reader
+     * and author workspace, `/seller/dashboard` is the selling workspace, and
+     * `/admin/dashboard` is platform administration. A role's home is the first
+     * segment of its URL, so the address bar alone tells you which surface you
+     * are on.
      */
     public function dashboardRoute(): string
     {
         return match ($this) {
             self::User => 'dashboard.index',
-            self::Seller => 'dashboard.seller.index',
-            self::Admin => 'dashboard.admin.index',
+            self::Seller => 'seller.dashboard',
+            self::Admin => 'admin.dashboard',
         };
     }
 

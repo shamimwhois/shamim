@@ -32,6 +32,7 @@ yarn-error.log
 /.kiro
 /.pi
 /.mcp.json
+/.workbuddy-ai
 /AGENTS.md
 /CLAUDE.md
 /boost.json

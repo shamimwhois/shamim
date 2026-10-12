@@ -116,7 +116,7 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
         description="Platform health, accounts, and the moderation queue."
     >
         <x-slot:actions>
-            <flux:button :href="route('dashboard.admin.users')" icon="users" wire:navigate>
+            <flux:button :href="route('admin.users')" icon="users" wire:navigate>
                 Manage users
             </flux:button>
         </x-slot:actions>
@@ -135,7 +135,7 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
                     :value="$this->totalAccounts"
                     icon="users"
                     hint="All roles"
-                    :href="route('dashboard.admin.users')"
+                    :href="route('admin.users')"
                 />
 
                 <x-dashboard.stat
@@ -204,7 +204,7 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
                     </h2>
 
                     <a
-                        href="{{ route('dashboard.admin.users') }}"
+                        href="{{ route('admin.users') }}"
                         wire:navigate
                         class="font-mono text-2xs font-medium text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
                     >

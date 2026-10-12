@@ -17,7 +17,7 @@
              --}}
             <aside class="hidden w-64 shrink-0 border-r border-ink-200 bg-white lg:flex lg:flex-col dark:border-ink-800 dark:bg-ink-900">
                 <div class="flex h-16 items-center border-b border-ink-200 px-5 dark:border-ink-800">
-                    <a href="{{ route('dashboard.index') }}" wire:navigate class="group flex items-center gap-2.5 font-mono text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+                    <a href="{{ route(auth()->user()->dashboardRoute()) }}" wire:navigate class="group flex items-center gap-2.5 font-mono text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
                         <span aria-hidden="true" class="grid size-7 place-items-center rounded-xs border border-ink-900/15 bg-ink-900 font-mono text-xs font-bold text-signal-400 dark:border-ink-50/15 dark:bg-ink-50 dark:text-ink-950">
                             &gt;_
                         </span>
@@ -104,7 +104,7 @@
                     class="sticky top-0 z-30 border-b border-ink-200 bg-white/90 backdrop-blur-md lg:hidden dark:border-ink-800 dark:bg-ink-900/90"
                 >
                     <div class="flex h-14 items-center justify-between px-4">
-                        <a href="{{ route('dashboard.index') }}" wire:navigate class="flex items-center gap-2 font-mono text-sm font-semibold text-ink-900 dark:text-ink-50">
+                        <a href="{{ route(auth()->user()->dashboardRoute()) }}" wire:navigate class="flex items-center gap-2 font-mono text-sm font-semibold text-ink-900 dark:text-ink-50">
                             <span aria-hidden="true" class="grid size-6 place-items-center rounded-xs bg-ink-900 text-2xs font-bold text-signal-400 dark:bg-ink-50 dark:text-ink-950">&gt;_</span>
                             Dashboard
                         </a>

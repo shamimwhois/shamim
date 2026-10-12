@@ -55,44 +55,44 @@ test('a plain user sees the author workspace at /dashboard', function () {
 test('a seller is forwarded from /dashboard to the seller home', function () {
     $this->actingAs(User::factory()->seller()->create())
         ->get(route('dashboard.index'))
-        ->assertRedirect(route('dashboard.seller.index'));
+        ->assertRedirect(route('seller.dashboard'));
 });
 
 test('an admin is forwarded from /dashboard to the admin home', function () {
     $this->actingAs(User::factory()->admin()->create())
         ->get(route('dashboard.index'))
-        ->assertRedirect(route('dashboard.admin.index'));
+        ->assertRedirect(route('admin.dashboard'));
 });
 
 test('a seller can reach the seller home', function () {
     $this->actingAs(User::factory()->seller()->create())
-        ->get(route('dashboard.seller.index'))
+        ->get(route('seller.dashboard'))
         ->assertOk()
         ->assertSee('id="dashboard-main"', escape: false);
 });
 
 test('a plain user is forbidden from the seller home', function () {
     $this->actingAs(User::factory()->create())
-        ->get(route('dashboard.seller.index'))
+        ->get(route('seller.dashboard'))
         ->assertForbidden();
 });
 
 test('an admin can reach the admin home', function () {
     $this->actingAs(User::factory()->admin()->create())
-        ->get(route('dashboard.admin.index'))
+        ->get(route('admin.dashboard'))
         ->assertOk()
         ->assertSee('id="dashboard-main"', escape: false);
 });
 
 test('a seller is forbidden from the admin home', function () {
     $this->actingAs(User::factory()->seller()->create())
-        ->get(route('dashboard.admin.index'))
+        ->get(route('admin.dashboard'))
         ->assertForbidden();
 });
 
 test('a plain user is forbidden from the admin home', function () {
     $this->actingAs(User::factory()->create())
-        ->get(route('dashboard.admin.index'))
+        ->get(route('admin.dashboard'))
         ->assertForbidden();
 });
 
@@ -106,24 +106,24 @@ test('the sidebar shows the administration section only to admins', function () 
     $this->actingAs(User::factory()->create())
         ->get(route('dashboard.index'))
         ->assertOk()
-        ->assertDontSee('Admin home');
+        ->assertDontSee('Admin dashboard');
 
     $this->actingAs(User::factory()->admin()->create())
-        ->get(route('dashboard.admin.index'))
+        ->get(route('admin.dashboard'))
         ->assertOk()
-        ->assertSee('Admin home');
+        ->assertSee('Admin dashboard');
 });
 
 test('the sidebar shows the selling section only to sellers and admins', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('dashboard.index'))
         ->assertOk()
-        ->assertDontSee('Seller home');
+        ->assertDontSee('Seller dashboard');
 
     $this->actingAs(User::factory()->seller()->create())
-        ->get(route('dashboard.seller.index'))
+        ->get(route('seller.dashboard'))
         ->assertOk()
-        ->assertSee('Seller home');
+        ->assertSee('Seller dashboard');
 });
 
 test('a plain user never sees the taxonomy link in the sidebar', function () {
@@ -141,15 +141,15 @@ test('a plain user never sees the taxonomy link in the sidebar', function () {
 
 test('the sidebar shows the account role and plan', function () {
     $this->actingAs(User::factory()->seller()->create())
-        ->get(route('dashboard.seller.index'))
+        ->get(route('seller.dashboard'))
         ->assertOk()
         ->assertSee('Seller');
 });
 
 test('each role resolves its own dashboard route', function () {
     expect(User::factory()->create()->dashboardRoute())->toBe('dashboard.index')
-        ->and(User::factory()->seller()->create()->dashboardRoute())->toBe('dashboard.seller.index')
-        ->and(User::factory()->admin()->create()->dashboardRoute())->toBe('dashboard.admin.index');
+        ->and(User::factory()->seller()->create()->dashboardRoute())->toBe('seller.dashboard')
+        ->and(User::factory()->admin()->create()->dashboardRoute())->toBe('admin.dashboard');
 });
 
 test('the account role casts to the enum', function () {

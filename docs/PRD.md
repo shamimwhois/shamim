@@ -51,7 +51,7 @@ DevFolio therefore optimizes for **one author writing well**, not for thousands 
 
 - **Multi-author publishing.** One primary author. The schema keeps a `user_id` foreign key on posts so multi-author is a future extension, and no co-authoring UI ships in v1.
 
-  > **Revised.** This exclusion originally read "no roles, permissions, or co-authoring UI ships in v1". The **roles and permissions model has since shipped** and is now a core part of the product: three account roles (`user`, `seller`, `admin`) with 24 derived permissions and role-scoped dashboards. Co-authoring remains out of scope. See [`PERMISSIONS.md`](PERMISSIONS.md).
+  > **Revised.** This exclusion originally read "no roles, permissions, or co-authoring UI ships in v1". The **roles and permissions model has since shipped** and is now a core part of the product: three account roles (`user`, `seller`, `admin`) with 28 derived permissions and role-scoped dashboards. Co-authoring remains out of scope. See [`PERMISSIONS.md`](PERMISSIONS.md).
   >
   > The distinction that matters: the role model governs *what an account may do on the platform*, not *who may collaborate on a given post*. A post still has one author.
 - **Newsletter delivery.** Email capture is limited to the contact form; no campaign tooling, no double opt-in list management.
@@ -86,6 +86,8 @@ DevFolio therefore optimizes for **one author writing well**, not for thousands 
 - A meaningful share of readers arrive on a **mobile device from a social or search referrer**, so mobile-first layout is the design baseline, not an adaptation.
 - Readers may have `prefers-reduced-motion` enabled; animation must never be load-bearing for comprehension.
 - The site owner is the only privileged user; there is no privilege-escalation surface to defend beyond "is this the owner".
+
+  > **Revised.** The authorisation model has since grown three account roles (`user`, `seller`, `admin`). The site owner remains the platform administrator, but escalation is now defended explicitly: `AccountRole::assignableBy()` never grants `admin`, and `UserPolicy@delete` refuses any target at or above the actor's own level. See §5.3 and [PERMISSIONS.md](PERMISSIONS.md).
 
 ---
 
@@ -181,6 +183,19 @@ Requirements use MoSCoW priority. Each carries an ID for traceability into the [
 | FR-6.5 | Must | SEO fundamentals: canonical URLs, sitemap, semantic HTML, meaningful titles and descriptions. |
 | FR-6.6 | Should | Open Graph images per post. |
 
+### 4.7 Platform modules (routes and navigation shipped; modules not yet built)
+
+Four product modules beyond the blog are specified in their own documents and are reachable today, but **not yet built**: each path resolves to a permission-guarded placeholder page that states the module is not yet available and describes what is planned. The routes, permissions, and navigation entries ship now so the module has a landing spot to be built into.
+
+| ID | Module | Path | Route name | Permission | Status |
+| --- | --- | --- | --- | --- | --- |
+| FR-7.1 | Ideas, Plans, Tasks, Projects & Collaboration | `/ideas` | `ideas.index` | `ideas:use` | Placeholder — not yet available. Reachable by every role. |
+| FR-7.2 | Developer Lab | `/dev-lab` | `dev-lab.index` | `dev-lab:use` | Placeholder — not yet available. Reachable by every role. |
+| FR-7.3 | AI Knowledge Hub | `/ai-hub` | `ai-hub.index` | `ai-hub:use` | Placeholder — not yet available. Reachable by every role. |
+| FR-7.4 | Developer Marketplace & Digital Product Ecosystem | `/marketplace` | `marketplace.index` | `marketplace:use` | Placeholder — not yet available. Requires a `seller` account or above. |
+
+All four appear in the dashboard sidebar's **Modules** section, between Content and Selling, and each entry is shown only to accounts holding the module's permission. The Marketplace is the only one of the four a plain `user` cannot reach.
+
 ---
 
 ## 5. User Stories
@@ -243,7 +258,7 @@ Stories are written in the standard form and carry acceptance criteria that map 
 > As an **account holder of any role**, I want to authenticate with email and password (plus two-factor where enabled), so that only I can reach my own data.
 
 - Unauthenticated access to any `/dashboard` route redirects to login with a return URL. The redirect is a **redirect, not a 403** — the account may hold the permission once authenticated.
-- Successful authentication redirects to the intended destination, or to the dashboard **owned by the account's role**: `dashboard.index` (user), `dashboard.seller.index` (seller), `dashboard.admin.index` (admin).
+- Successful authentication redirects to the intended destination, or to the dashboard **owned by the account's role**: `dashboard.index` (`/dashboard`, user), `seller.dashboard` (`/seller/dashboard`, seller), `admin.dashboard` (`/admin/dashboard`, admin).
 - Two-factor challenge and passkey flows continue to work unmodified.
 - Five failed attempts within a minute trigger rate limiting.
 - The sign-in screen renders in the application's active theme. It must not force dark mode.
@@ -293,7 +308,7 @@ Added with M5. These did not previously have a requirement, which is how the sys
 > As a **registered reader**, I want a dashboard I am allowed to be on, so that signing in does not drop me on a page that refuses me.
 
 - A `user`-role account lands on `dashboard.index`, which is reachable with `post:create`.
-- The sidebar shows Content (posts, comments) and hides Selling and Administration entirely, **including their headings**.
+- The sidebar shows Content (posts, comments) and Modules (Ideas, Developer Lab, AI Hub), and hides Selling and Administration entirely, **including their headings**.
 - No navigation entry is visible unless the account holds the permission its route requires.
 
 **US-14 — Own my writing without owning the platform** *(Must)*
@@ -368,6 +383,7 @@ Added with M5. These did not previously have a requirement, which is how the sys
 | **Product listings** | The `seller` role, its six selling permissions and its plan limits (25 listings, 15 % commission) all ship and are enforced. There is **no `Product` model**, so the seller dashboard states entitlements against an empty feature. |
 | **Public API** | Specified in [`API.md`](API.md) and **deliberately unimplemented**. No `routes/api.php`, no Sanctum. |
 | **Admin bootstrap** | `AccountRole::assignableBy()` refuses to grant `admin` to anyone, so the role is reachable only via seeder or direct database write. Needs a deliberate answer before operation by anyone but the author. |
+| **Platform modules** | The four module routes (`/ideas`, `/dev-lab`, `/ai-hub`, `/marketplace`), their permissions, and their sidebar entries **ship and resolve**, but each renders a placeholder page. The modules themselves are unbuilt. See §4.7 and [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission). |
 
 ---
 

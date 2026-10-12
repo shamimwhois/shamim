@@ -215,18 +215,6 @@ No props. Registration counterpart, used in the security settings page.
 
 ---
 
-### `<x-team-invitation-alert>`
-
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `invitation` | `array` | Needs `teamName` and `code` keys |
-| `action` | `string` | Verb for the sentence — `'Log in'` or `'Register'` |
-
-Renders an informational callout when a visitor arrives via an invitation link.
-Carries `data-test="team-invitation-alert"`.
-
----
-
 ## 3. Dashboard components
 
 ### `<x-dashboard.header>`
@@ -285,34 +273,36 @@ A single metric tile.
 
 ---
 
-### `⚡team-switcher` — `<livewire:team-switcher />`
+### `<x-module-placeholder>`
 
-A Livewire SFC (note the `⚡`) rather than a plain component, because it holds
-state and dispatches events.
+The shared shell for a product module that has a route, a permission and a
+sidebar entry but no feature yet. Every unbuilt module renders through this
+component, so the four placeholder pages cannot drift into four different
+designs. It wraps `<x-dashboard.header>` with `eyebrow="Module"` and states
+three things honestly: what the module is, what is already built underneath it,
+and that the module itself is not available yet.
 
-No props. Renders a dropdown of the account's teams plus a "New team" action
-that opens the `create-team-switcher` modal.
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `title` | `string` | — | Also rendered as the card heading |
+| `description` | `string` | — | One-line summary of the module |
+| `icon` | `string` | `'sparkles'` | Must be a real Flux icon |
+| `status` | `string` | `'planned'` | Declared for future use; the badge is currently a fixed "Not yet available" |
+| `features` | `array` | `[]` | Planned features, each rendered as a checked list item |
+| `spec` | `?string` | `null` | Path to the module's specification document |
 
-**Lives in `components/`, not `pages/`**, and is invoked **without a namespace
-prefix**. Both are intentional:
+```blade
+<x-module-placeholder
+    :title="__('Developer Lab')"
+    :description="__('A browser-based environment to write, run, inspect and debug code.')"
+    icon="beaker"
+    :spec="'docs/lab.md'"
+    :features="[__('Write and run code in the browser'), __('Work through guided challenges')]"
+/>
+```
 
-- It renders inside a sidebar, not at a route, so it does not belong under
-  `pages/`.
-- `config/livewire.php` lists `resource_path('views/components')` in
-  `component_locations`, so a bare `<livewire:team-switcher />` resolves there.
-  Only `component_namespaces` (`pages::`, `layouts::`) need a prefix.
-
-Note that **the current dashboard layout does not use this component at all** —
-the only `livewire:team-switcher` references are in the legacy
-`layouts/app/*` files (see [§6](#6-layouts)).
-
----
-
-### `⚡create-team-modal`
-
-Livewire SFC. The modal body for creating a team. Closes by dispatching
-`close-modal` with the name `create-team-switcher`; paired with the
-`create-team` and `create-team-switcher` triggers elsewhere.
+Used by `pages::dev-lab.index`, `pages::ai-hub.index`,
+`pages::marketplace.index` and `pages::ideas.index`.
 
 ---
 
@@ -403,10 +393,11 @@ No props. Used by `layouts/public.blade.php` only. Dashboard screens use
 
 | Prop | Type | Default |
 | --- | --- | --- |
-| `showTeam` | `bool` | `true` |
+| `showRole` | `bool` | `true` |
 
 The dropdown in the dashboard sidebar footer. Carries
-`data-test="sidebar-menu-button"`.
+`data-test="sidebar-menu-button"`. `showRole` controls whether the account's
+role label renders beneath its name in the collapsed-header area.
 
 > **Legacy.** This component still uses `zinc-*` classes where the project token
 > is `ink-*`. It predates the design token migration and is a candidate for
@@ -420,17 +411,15 @@ The dropdown in the dashboard sidebar footer. Carries
 | Layout | Tag | Used by |
 | --- | --- | --- |
 | `layouts/public.blade.php` | `<x-layouts::public>` | Home, blog, about |
-| `layouts/dashboard.blade.php` | `<x-layouts::dashboard>` | All dashboard pages |
+| `layouts/dashboard.blade.php` | `<x-layouts::dashboard>` | All dashboard and settings pages |
 | `layouts/auth.blade.php` | `<x-layouts::auth>` | All seven Fortify screens |
 | `layouts/auth/split.blade.php` | `<x-layouts::auth.split>` | The implementation behind the above |
-| `layouts/app.blade.php` | `<x-layouts::app>` | Legacy alias → `app.sidebar` |
-| `layouts/app/sidebar.blade.php` | `<x-layouts::app.sidebar>` | Starter-kit, unreferenced by app pages |
 
-`layouts/app/*` are **starter-kit leftovers**. Only
-`resources/views/dashboard.blade.php` (also legacy) references them; no
-application page does. They are retained rather than deleted because their tests
-still exercise them, and they are marked here so nobody mistakes them for the
-real dashboard layout.
+The starter-kit `layouts/app*` layouts and `views/dashboard.blade.php` were
+deleted along with the team feature. The public site (landing page, blog index,
+post detail, about) renders inside `layouts::public`, which is the default;
+dashboard and settings screens opt into `layouts::dashboard` explicitly — see
+[How a page gets its layout](#how-a-page-gets-its-layout).
 
 ---
 
@@ -450,34 +439,36 @@ anonymous classes addressed by **name string**, never `::class`.
 | `pages::dashboard.taxonomy` | `pages/dashboard/⚡taxonomy.blade.php` | `/dashboard/taxonomy` |
 | `pages::dashboard.posts.index` | `pages/dashboard/posts/⚡index.blade.php` | `/dashboard/posts` |
 | `pages::dashboard.posts.edit` | `pages/dashboard/posts/⚡edit.blade.php` | `/dashboard/posts/{post:id}/edit` |
-| `pages::dashboard.seller.index` | `pages/dashboard/seller/⚡index.blade.php` | `/dashboard/seller` |
-| `pages::dashboard.admin.index` | `pages/dashboard/admin/⚡index.blade.php` | `/dashboard/admin` |
-| `pages::dashboard.admin.users` | `pages/dashboard/admin/⚡users.blade.php` | `/dashboard/admin/users` |
+| `pages::seller.dashboard` | `pages/seller/⚡dashboard.blade.php` | `/seller/dashboard` |
+| `pages::admin.dashboard` | `pages/admin/⚡dashboard.blade.php` | `/admin/dashboard` |
+| `pages::admin.users` | `pages/admin/⚡users.blade.php` | `/admin/users` |
+| `pages::dev-lab.index` | `pages/dev-lab/⚡index.blade.php` | `/dev-lab` |
+| `pages::ai-hub.index` | `pages/ai-hub/⚡index.blade.php` | `/ai-hub` |
+| `pages::marketplace.index` | `pages/marketplace/⚡index.blade.php` | `/marketplace` |
+| `pages::ideas.index` | `pages/ideas/⚡index.blade.php` | `/ideas` |
 | `pages::settings.profile` | `pages/settings/⚡profile.blade.php` | `/settings/profile` |
 | `pages::settings.security` | `pages/settings/⚡security.blade.php` | `/settings/security` |
 | `pages::settings.appearance` | `pages/settings/⚡appearance.blade.php` | `/settings/appearance` |
 | `pages::settings.delete-user-modal` | `pages/settings/⚡delete-user-modal.blade.php` | (component) |
 | `pages::settings.two-factor-setup-modal` | `pages/settings/⚡two-factor-setup-modal.blade.php` | (component) |
 | `pages::settings.two-factor.recovery-codes` | `pages/settings/two-factor/⚡recovery-codes.blade.php` | (component) |
-| `pages::teams.index` | `pages/teams/⚡index.blade.php` | `/settings/teams` |
-| `pages::teams.edit` | `pages/teams/⚡edit.blade.php` | `/settings/teams/{team:slug}/edit` |
 
 `pages/settings/layout.blade.php` is a **plain Blade component**, not an SFC —
 the settings shell, invoked as `<x-pages::settings.layout>`.
 
 Modal SFCs receive their target through props rather than reading the route,
-which is what allows one `remove-member-modal` to serve every member in a list:
+which is what allows one modal component to serve every row in a list:
 
 ```blade
-<livewire:pages::teams.remove-member-modal
-    :member-id="$member['id']"
-    :modal-name="'remove-member-'.$member['id']"
-    :key="'remove-member-modal-'.$member['id']"
+<livewire:pages::settings.delete-user-modal
+    :user-id="$user->id"
+    :modal-name="'delete-user-'.$user->id"
+    :key="'delete-user-modal-'.$user->id"
 />
 ```
 
 The `:key` is required. Without it Livewire reuses one component instance across
-the loop and every row's modal operates on the same member.
+the loop and every row's modal operates on the same record.
 
 ---
 
@@ -495,9 +486,14 @@ new #[Layout('layouts::dashboard')] class extends Component { … }
 ```
 
 `component_namespaces` (which gives `pages::` and `layouts::`) and
-`component_locations` (which lets `<livewire:team-switcher />` resolve without a
-prefix) are both declared there too, so `config/livewire.php` is the file to
-read first when a component cannot be found.
+`component_locations` (which lists `resources/views/components` and
+`resource_path('views/livewire')`) are both declared there too.
+`component_locations` is what lets a plain component resolve by short name —
+`components/module-placeholder.blade.php` is `<x-module-placeholder />`, and an
+SFC placed under `views/livewire` is `<livewire:name />`, neither needing a
+namespace prefix. Only the `pages::` and `layouts::` namespaces need one. So
+`config/livewire.php` is the file to read first when a component cannot be
+found.
 
 ---
 
@@ -510,7 +506,7 @@ are tracked rather than rediscovered.
 | --- | --- | --- |
 | 1 | `<x-placeholder-pattern>` defaults `id` to `uniqid()` | Two instances on a page collide; the second renders blank. Pass an explicit `id`. |
 | 2 | `<x-desktop-user-menu>` uses `zinc-*` tokens | Off-palette against the `ink-*` system. Predates the token migration. |
-| 3 | `layouts/app/*` and `views/dashboard.blade.php` are starter-kit leftovers | Unreferenced by app pages but still tested. Confusing to newcomers. |
+| 3 | `<x-desktop-user-menu>` and other pre-migration components use `zinc-*` tokens | Off-palette against the `ink-*` system, but they still render. |
 | 4 | Invalid Flux icon names recurred four times | `storefront`, `book-open-text`, `folder-git-2`, `layout-grid` all threw. All fixed; a repo-wide audit is now part of the verification gate. |
 
 On issue 4: the audit that found them is

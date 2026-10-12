@@ -1,8 +1,8 @@
 # DevFolio
 
 A portfolio and technical-writing platform for a senior developer — long-form
-blog, role-scoped dashboard, team workspaces, and the documentation that
-describes all of it.
+blog, role-scoped dashboards, and the platform modules those dashboards
+front — plus the documentation that describes all of it.
 
 Built with Laravel 13, Livewire 4 single-file components and Flux UI. No build
 step beyond Vite; no JavaScript framework. Every interaction is either a
@@ -22,15 +22,21 @@ and "platform" oversells it.
 - An **authenticated authoring tool** — draft, edit, publish, archive, with
   taxonomy management and comment moderation.
 - A **role-scoped application** — three account roles (`user`, `seller`,
-  `admin`) with an additive permission hierarchy, each with its own dashboard
-  and sidebar.
+  `admin`) with an additive permission hierarchy, each on its own top-level
+  dashboard path and sidebar.
+- **Module scaffolding** — Developer Lab, AI Knowledge Hub, Marketplace and
+  Ideas each have a real permission-guarded route and a placeholder page; the
+  URL space is claimed ahead of the modules themselves.
 - **Documented** — PRD, TRD, UI/UX brief, application flow, schema, ERD,
   architecture, components, routes, permissions and an API design.
 
 **It is not (yet):**
 
-- A multi-tenant SaaS. Teams exist and work; there is no billing, no
-  organisation hierarchy, no per-team theming.
+- A multi-tenant SaaS. There is no organisation hierarchy, no tenancy and no
+  per-tenant theming — accounts are flat and platform-wide. (The starter kit's
+  team feature was removed outright; see [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) §1.)
+- A finished module suite. All four modules above are placeholders: the routes,
+  guards and navigation are real, the module bodies are not.
 - A storefront. The `seller` role, its plan limits and its permissions are
   **fully defined and enforced**, but no `Product` model exists, so there is
   nothing to sell. This is a deliberate half-built layer — see
@@ -97,8 +103,8 @@ Visit `http://localhost:8000`.
 
 | Email | Role | Lands on |
 | --- | --- | --- |
-| `test@example.com` | `admin` | `/dashboard/admin` |
-| `seller@example.com` | `seller` | `/dashboard/seller` |
+| `test@example.com` | `admin` | `/admin/dashboard` |
+| `seller@example.com` | `seller` | `/seller/dashboard` |
 | `user@example.com` | `user` | `/dashboard` |
 
 Sign in as each in turn — the sidebar, the dashboard and the visible
@@ -127,8 +133,7 @@ working.
 | Fresh database + data | `php artisan migrate:fresh --seed` |
 
 `composer test` is the composed gate: it clears config, runs Pint in check mode,
-runs PHPStan, then runs the suite. It is what CI should call — and it will fail
-on the known failing test described below.
+runs PHPStan, then runs the suite. It is what CI should call.
 
 **On this machine specifically**, `php` and `composer` are not on `PATH`
 inside the sandboxed shell. Use the wrapper:
@@ -149,18 +154,14 @@ All four must be green before a change is considered finished.
 
 | Gate | Command | Current state |
 | --- | --- | --- |
-| Tests | `php artisan test` | **169 passing**, 403 assertions |
+| Tests | `php artisan test` | **165 passing**, 490 assertions |
 | Types | `vendor/bin/phpstan analyse` | **No errors** (level 7) |
 | Style | `vendor/bin/pint --dirty` | **Clean** |
 | Build | `npm run build` | **Green** |
 
-There is **one known failing test**:
-`Tests\Feature\Teams\TeamInvitationTest > accepted team invitations cannot be
-accepted again`. It is a defect in the inherited starter-kit test, not in the
-application — Livewire swallows the `ModelNotFoundException` before Pest's
-`expectException` can observe it. It is left in place rather than deleted,
-because `AGENTS.md` forbids removing tests without approval. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §9.
+There are **no known failures**. The suite previously carried one inherited
+starter-kit defect (`TeamInvitationTest`); that test was removed along with the
+team feature it covered, so the gate is now clean end to end.
 
 ---
 
@@ -171,17 +172,16 @@ app/
 ├── Actions/          Single-purpose write operations, grouped by domain
 │   ├── Comments/     ApproveComment, RejectComment
 │   ├── Fortify/      CreateNewUser, ResetUserPassword
-│   ├── Posts/        Create, Update, Publish, Archive, Delete, Sync…
-│   └── Teams/        CreateTeam
-├── Concerns/         Reusable model traits (roles, teams, slugs, reading time)
-├── Data/             Read-only DTOs: AuthorProfile, PostMetrics, TeamPermissions
+│   └── Posts/        Create, Update, Publish, Archive, Delete, Sync…
+├── Concerns/         Reusable model traits (roles, slugs, reading time)
+├── Data/             Read-only DTOs: AuthorProfile, PostMetrics
 ├── Enums/            AccountRole, AccountPermission, RolePlan, PostStatus…
 ├── Http/
 │   ├── Controllers/  Feed, Sitemap, Robots — the three non-Livewire responses
-│   ├── Middleware/   EnsureAccountPermission, EnsureTeamMembership
-│   └── Responses/    Per-flow Fortify redirect responses
-├── Models/           User, Post, Category, Tag, Comment, Team, Membership…
-├── Policies/         PostPolicy, TeamPolicy, UserPolicy
+│   ├── Middleware/   EnsureAccountPermission
+│   └── Responses/    Per-flow Fortify redirect responses (role-aware)
+├── Models/           User, Post, Category, Tag, Comment
+├── Policies/         PostPolicy, UserPolicy
 ├── Support/          DashboardNavigation, MarkdownRenderer, Seo
 └── Views/pages/      Livewire single-file components (⚡ prefix)
 ```

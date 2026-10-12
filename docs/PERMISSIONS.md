@@ -15,34 +15,32 @@ disagree, the code wins.
 | Model integration | `app/Concerns/HasAccountRole.php` |
 | Route guard | `app/Http/Middleware/EnsureAccountPermission.php` |
 | Resource authorization | `app/Policies/*.php` |
-| Team roles | `app/Enums/TeamRole.php` |
-| Team permissions | `app/Enums/TeamPermission.php` |
 
 ---
 
-## 1. Two independent axes
+## 1. One axis
 
-The application has **two** authorization systems that never overlap.
+The application has **one** authorization system. An account's authority
+everywhere in the product is described by a single pair of enums:
 
 ```
-Axis 1 — Account          Axis 2 — Team membership
-─────────────────         ─────────────────────────
-user / seller / admin     owner / admin / member
-platform-wide             scoped to one team
-stored on users.role      stored on memberships.role
+Account
+───────────────────────────
+user / seller / admin
+platform-wide
+stored on users.role
 ```
 
-They answer different questions and must not be conflated.
+It answers one question: *what may this account do on this platform?* May it
+publish posts? May it create product listings? May it open the admin panel?
 
-**Axis 1** answers: *what may this account do on this platform?* May it publish
-posts? May it create product listings? May it open the admin panel?
-
-**Axis 2** answers: *what may this account do in this particular team?* May it
-invite members to *this* team? May it delete *this* team?
-
-Conflating them produces the classic bug: an admin of team A becoming an admin
-of team B because "admin" was treated as a single concept. This model makes that
-unrepresentable — a team role lives on a `Membership` row, not on the account.
+> **Historical note.** The starter kit this project began from carried a second,
+> narrower axis — team roles (`owner`/`admin`/`member`) on `TeamRole`, resolved
+> against a `Membership` row. That whole feature was **removed**: there is no
+> team, no membership, and no second role to reconcile against. Any earlier
+> revision of this document that described a two-axis model is obsolete. Removing
+> the second axis also removed the class of bug it was there to prevent, because
+> a team-scoped role is no longer expressible at all.
 
 ---
 
@@ -50,9 +48,9 @@ unrepresentable — a team role lives on a `Membership` row, not on the account.
 
 | Role | Level | Permissions | Plan |
 | --- | --- | --- | --- |
-| `user` | 1 | 3 | `free` |
-| `seller` | 2 | 11 | `seller` |
-| `admin` | 3 | 24 | `platform` |
+| `user` | 1 | 6 | `free` |
+| `seller` | 2 | 15 | `seller` |
+| `admin` | 3 | 28 | `platform` |
 
 Roles are **additive by construction**:
 
@@ -61,7 +59,7 @@ Roles are **additive by construction**:
 public function permissions(): array
 {
     return [
-        ...self::User->permissions(),   // inherits all three
+        ...self::User->permissions(),   // inherits all six
         AccountPermission::PublishPost,
         // … eight more
     ];
@@ -98,7 +96,7 @@ this actor act on this target" (a 3 may act on a 1 or a 2) and inappropriate for
 
 ## 3. The permission matrix
 
-24 permissions in 4 groups. The right-hand column lists the roles that hold
+28 permissions in 5 groups. The right-hand column lists the roles that hold
 each.
 
 ### Content — 6
@@ -131,10 +129,30 @@ also be trusted to publish.
 Comment moderation — approving and rejecting — is **admin-only**. Sellers may
 manage taxonomy (categories and tags) because product listings need them.
 
-### Selling — 6
+### Platform — 3
 
 | Permission | `user` | `seller` | `admin` |
 | --- | :---: | :---: | :---: |
+| `dev-lab:use` | ✓ | ✓ | ✓ |
+| `ai-hub:use` | ✓ | ✓ | ✓ |
+| `ideas:use` | ✓ | ✓ | ✓ |
+
+The three modules every account may reach. Each guards one top-level route —
+`/dev-lab`, `/ai-hub`, `/ideas` — which currently renders a placeholder page
+stating the module is not yet available. The route and the permission are real
+now so the URL space is claimed and the navigation works; only the module bodies
+are outstanding.
+
+These are **baseline** permissions: they sit in `AccountRole::User` and are
+inherited upward by spread, so every role holds them. That is intentional — a
+developer tool and an ideas backlog are not privileges, and gating them would
+mean a seller loses a capability the moment they are promoted past `user`.
+
+### Selling — 7
+
+| Permission | `user` | `seller` | `admin` |
+| --- | :---: | :---: | :---: |
+| `marketplace:use` | | ✓ | ✓ |
 | `product:create` | | ✓ | ✓ |
 | `product:update-own` | | ✓ | ✓ |
 | `product:delete-own` | | ✓ | ✓ |
@@ -142,14 +160,19 @@ manage taxonomy (categories and tags) because product listings need them.
 | `sale:view-own` | | ✓ | ✓ |
 | `support:manage-own` | | ✓ | ✓ |
 
-This entire group is **the seller role's reason to exist**. Every permission is
+This group is **the seller role's reason to exist**. Every permission is
 `-own` or `:create` — a seller operates on their own inventory and nobody
 else's. The `-any` counterparts live in the Administration group.
 
-> **Not implemented.** These six permissions are fully defined and enforced by
-> the middleware, but there is **no `Product` model** to authorize against. The
-> seller dashboard is reachable and its sidebar entries filter correctly; the
-> listings page does not exist. See
+`marketplace:use` guards `/marketplace`, the Developer Marketplace &
+Digital Product Ecosystem module. It is the one module gated **above** the
+baseline: browsing and selling in a marketplace is the seller's function, so a
+plain `user` does not reach it. The page is a placeholder for now.
+
+> **Not implemented.** The six `product:*` / `sale:*` / `support:*` permissions
+> are fully defined and enforced by the middleware, but there is **no `Product`
+> model** to authorize against. The seller dashboard is reachable and its sidebar
+> entries filter correctly; the listings page does not exist. See
 > [`audit/PHASE-0-AUDIT.md`](audit/PHASE-0-AUDIT.md) §10.
 
 ### Administration — 10
@@ -167,8 +190,8 @@ else's. The `-any` counterparts live in the Administration group.
 | `payment:configure` | | | ✓ |
 | `audit:view` | | | ✓ |
 
-Note that `admin:access` — the permission guarding the whole `/dashboard/admin`
-sub-tree — is itself a permission rather than a role check. A route declares
+Note that `admin:access` — the permission guarding the whole `/admin` sub-tree —
+is itself a permission rather than a role check. A route declares
 `permission:admin:access`; nothing anywhere declares `role:admin`.
 
 **Why no `role:admin` check exists.** A route guarded by role name must be
@@ -214,10 +237,12 @@ Authorization is checked at **three** levels. All three matter.
 ### Level 1 — Route middleware
 
 ```php
-Route::middleware('permission:'.AccountPermission::AccessAdminPanel->value)
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::AccessAdminPanel->value])
     ->prefix('admin')
+    ->name('admin.')
     ->group(function () {
-        Route::livewire('/', 'pages::dashboard.admin.index')->name('index');
+        Route::livewire('dashboard', 'pages::admin.dashboard')->name('dashboard');
+        Route::livewire('users', 'pages::admin.users')->name('users');
     });
 ```
 
@@ -248,7 +273,6 @@ is not bound until the component runs. Policies do.
 | Policy | Methods |
 | --- | --- |
 | `PostPolicy` | `viewAny`, `viewPublic`, `view`, `create`, `update`, `delete`, `restore`, `forceDelete`, `publish` |
-| `TeamPolicy` | `viewAny`, `view`, `create`, `update`, `leave`, `addMember`, `updateMember`, `removeMember`, `inviteMember`, `cancelInvitation`, `delete` |
 | `UserPolicy` | `viewAny`, `view`, `updateRole`, `update`, `delete` |
 
 Two methods deserve comment:
@@ -257,8 +281,9 @@ Two methods deserve comment:
   different: `view` answers "may the dashboard show this post", `viewPublic`
   answers "may the public route serve it". A draft is `view`-able by its author
   and never `viewPublic`-able by anyone.
-- `TeamPolicy::leave` is not a permission check at all — it refuses personal
-  teams and ownership, which are structural facts rather than grants.
+- `UserPolicy::updateRole` is the escalation guard (see §6), and it is the
+  policy that replaced the removed `TeamPolicy` as the place where "who may
+  administer whom" is decided.
 
 `UserPolicy::updateRole` is the escalation guard, and it is checked twice:
 
@@ -329,50 +354,7 @@ would permit granting `seller`.
 
 ---
 
-## 7. Team roles and permissions
-
-Axis 2. Stored on `Membership`, not on the account.
-
-| Team role | Level |
-| --- | --- |
-| `owner` | 3 |
-| `admin` | 2 |
-| `member` | 1 |
-
-| Team permission | owner | admin | member |
-| --- | :---: | :---: | :---: |
-| `team:update` | ✓ | ✓ | |
-| `team:delete` | ✓ | | |
-| `member:add` | ✓ | | |
-| `member:update` | ✓ | | |
-| `member:remove` | ✓ | | |
-| `invitation:create` | ✓ | ✓ | |
-| `invitation:cancel` | ✓ | ✓ | |
-
-Totals: **owner 7, admin 3, member 0.**
-
-Three things stand out, and all three are deliberate:
-
-**A plain member holds no team permission at all.** Membership grants access to
-the team and nothing more. There is no `team:view` — being a member *is* the
-view grant. A permission for "can see the thing you are already a member of"
-would be redundant.
-
-**A team admin cannot add, update or remove members.** Those three are
-owner-only. A team admin may change team settings and manage outstanding
-invitations, but the membership list itself belongs to the owner. This is a
-tighter split than the account-level model, where an admin is broadly powerful.
-
-**Deleting a team is owner-only**, and personal teams cannot be deleted at all
-regardless of role — `TeamPolicy` refuses `isPersonal` teams before consulting
-permissions.
-
-Team permissions are namespaced `entity:action` the same way account
-permissions are, so the same ability string never means two things.
-
----
-
-## 8. Navigation
+## 7. Navigation
 
 `app/Support/DashboardNavigation.php` is the single definition of the dashboard
 sidebar. Each entry declares the permission its route requires:
@@ -407,7 +389,7 @@ and an admin sees all of them.
 
 ---
 
-## 9. Testing authorization
+## 8. Testing authorization
 
 **Test the denial path for every grant.** The interesting failures are all
 negative.
@@ -417,7 +399,7 @@ test('a plain user cannot reach the admin dashboard', function () {
     $user = User::factory()->create();          // defaults to `user`
 
     $this->actingAs($user)
-        ->get(route('dashboard.admin.index'))
+        ->get(route('admin.dashboard'))
         ->assertForbidden();
 });
 ```
@@ -446,41 +428,56 @@ individually:
 - no role may grant a role at or above its own level, and `admin` is not
   assignable by anyone
 - `RolePlan::Platform->productListingLimit()` is `null` (unlimited), not `0`
-- owner / admin / member hold 7 / 3 / 0 team permissions respectively
+- every role reaches the three baseline modules; the marketplace is seller-and-above
+- each role owns a distinct top-level dashboard route
 
 `DashboardTest` asserts role-scoped dashboards, sidebar filtering, role badges
-and `dashboardRoute()` per role. `Dashboard/ModerationTest` asserts that comments
-on another author's posts are never listed — a negative assertion, which is the
-only kind that would catch a missing scope.
+and `dashboardRoute()` per role. `RoutingStructureTest` asserts the route shape
+directly: the three role paths are distinct and unnested, each role reaches only
+its own dashboard, guests are redirected to login rather than refused, the four
+module routes exist and are permission-gated, the old nested paths return `301`,
+and **no registered route carries a `team` or `current_team` parameter** — the
+regression test for the removed feature. `Dashboard/ModerationTest` asserts that
+comments on another author's posts are never listed — a negative assertion, which
+is the only kind that would catch a missing scope.
 
 These tests were written against a first draft of this document and **caught two
-errors in it** (team admins do not hold member-management permissions, and
-comment moderation is admin-only rather than seller-accessible). That is the
-argument for pinning composition: prose drifts silently, tests do not.
+errors in it** (comment moderation is admin-only rather than seller-accessible,
+and a permission-group total did not match the enum). That is the argument for
+pinning composition: prose drifts silently, tests do not.
 
 ---
 
-## 10. Extending the model
+## 9. Extending the model
 
 ### Adding a permission
 
 1. Add the case to `AccountPermission`.
 2. Implement `group()` for it — an unhandled case is a PHPStan error, which is
    deliberate: a permission with no group cannot be rendered in grouped UI.
-3. Add it to `AccountRole::Seller` **only** if sellers should hold it.
+3. Add it to `AccountRole::User` if **every** role should hold it (a baseline
+   module like `dev-lab:use`), or to `AccountRole::Seller` if sellers and above
+   should hold it.
 4. **Nothing else.** Admins receive it automatically from `cases()`.
+
+If the permission guards a route, add the route beside its siblings in
+`routes/web.php` and an entry in `DashboardNavigation` — the nav and the guard
+must read from the same permission, or a link can 403.
 
 ### Adding a role
 
 1. Add the case to `AccountRole` and implement `label()`, `description()`,
    `badgeColor()`, `plan()`, `permissions()`, `level()`, `dashboardRoute()`.
 2. Add a `RolePlan` case, or return an existing plan.
-3. Create `pages/dashboard/<role>/⚡index.blade.php`.
-4. Add a middleware-guarded group in `routes/web.php`.
+3. Create `resources/views/pages/<role>/⚡dashboard.blade.php`, with
+   `#[Layout('layouts::dashboard')]` on the component — the Livewire default
+   layout is the public shell.
+4. Add a middleware-guarded group in `routes/web.php`, using a **permission**
+   guard rather than a role check.
 5. Add `DashboardNavigation` entries.
 6. Add a `UserFactory` state and a `UserSeeder` account.
 
-Step 2 is the minimum for the role to *work*: `RedirectsToCurrentTeam` uses
+Step 3 is the minimum for the role to *work*: `RedirectsToRoleDashboard` uses
 `router->has()` so a role can be declared before its dashboard exists, and login
 falls back to `/dashboard` rather than producing a 500.
 

@@ -17,6 +17,23 @@ Every specification document in `docs/` mandates this step:
 
 **Audited revision.** `main` @ `c239af8` (working tree carries 120 staged changes, listed in §7).
 
+> **⚠️ Point-in-time snapshot — do not read as current state.** This document
+> records the repository exactly as it was *before* the redesign it motivated.
+> Several findings below **no longer describe the codebase**:
+>
+> - **The team feature has since been removed entirely** — models, tables,
+>   middleware, components and tests (§7 and §10 below describe it as live).
+> - **Account roles and permissions now exist** (§10 states they do not);
+>   the role model is account-scoped and **single-axis**, not team-scoped.
+> - **The test failure noted below is gone** — the test was deleted with the
+>   feature it covered. `composer test` is green.
+> - Role dashboards now live at `/dashboard`, `/seller/dashboard` and
+>   `/admin/dashboard`.
+>
+> For the current state see [PERMISSIONS.md](../PERMISSIONS.md),
+> [ROUTES.md](../ROUTES.md) and [ARCHITECTURE.md](../ARCHITECTURE.md). This file
+> is retained as the historical record of *why* those changes were made.
+
 ---
 
 ## 1. Verified stack

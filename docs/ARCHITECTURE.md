@@ -48,15 +48,15 @@ HTTP request
   │
   ├─ middleware
   │    ├─ auth ................. Fortify session guard
-  │    ├─ permission:xxx ....... EnsureAccountPermission
-  │    └─ team ................. EnsureTeamMembership
+  │    ├─ verified ............. email verification
+  │    └─ permission:xxx ....... EnsureAccountPermission
   │
   ├─ Livewire mounts the SFC ... resources/views/pages/**/⚡*.blade.php
   │    ├─ mount() .............. authorization, initial state, SEO
   │    ├─ render() ............. implicit, returns the same file
   │    └─ actions .............. methods invoked via wire:click / wire:submit
   │
-  └─ layouts/dashboard.blade.php ... or layouts/public.blade.php
+  └─ layouts::public ....... the single application shell
        └─ components/dashboard/nav.blade.php
             └─ Support/DashboardNavigation::for($user)
 ```
@@ -99,18 +99,22 @@ syncing, and fires no events. A caller cannot half-create a post.
 
 ### `app/Enums/`
 
-Eight enums carry the application's closed sets.
+`app/Enums/`
+
+Six enums carry the application's closed sets.
 
 | Enum | Cases | Purpose |
 | --- | --- | --- |
 | `AccountRole` | 3 | `user`, `seller`, `admin` — the account's role |
-| `AccountPermission` | 24 | Every grantable ability, in 4 groups |
-| `PermissionGroup` | 4 | `content`, `moderation`, `selling`, `administration` |
+| `AccountPermission` | 26 | Every grantable ability, in 5 groups |
+| `PermissionGroup` | 5 | `content`, `moderation`, `selling`, `platform`, `administration` |
 | `RolePlan` | 3 | `free`, `seller`, `platform` — commercial entitlements |
 | `PostStatus` | 3 | `draft`, `published`, `archived` |
 | `CommentStatus` | 3 | `pending`, `approved`, `rejected` |
-| `TeamRole` | 3 | `owner`, `admin`, `member` |
-| `TeamPermission` | 7 | What a team role may do within a team |
+
+There is a single role axis. The team-scoped `TeamRole` and `TeamPermission`
+enums were removed along with the team feature, so `AccountRole` +
+`AccountPermission` are the entire authorisation vocabulary.
 
 Enums over lookup tables because these sets are **closed and behavioural**. A
 `post_statuses` table would let a deployment add a fourth status the code
@@ -127,12 +131,10 @@ Model traits, one responsibility each.
 | Trait | Adds |
 | --- | --- |
 | `HasAccountRole` | Role, plan, permission checks, `dashboardRoute()` |
-| `HasTeams` | Team relationships, membership, personal team |
 | `HasSlug` | Slug generation with uniqueness |
 | `HasReadingTime` | Word-count → reading minutes |
 | `PasswordValidationRules` | Shared password rules |
 | `ProfileValidationRules` | Shared profile rules |
-| `GeneratesUniqueTeamSlugs` | Team-specific slug uniqueness |
 
 `HasAccountRole` is the most load-bearing. It is what makes
 `$user->can('/^post:/')`-style checks unnecessary: the model answers its own
@@ -140,11 +142,10 @@ authorization questions, and every other layer delegates to it.
 
 ### `app/Data/`
 
-Immutable read-only DTOs — `AuthorProfile`, `PostMetrics`, `TeamPermissions`,
-`UserTeam`. They exist to stop **arrays with implicit shapes** crossing layer
-boundaries. When a Blade template does `$post->metrics->wordCount` instead of
-`$metrics['word_count']`, a typo is a static-analysis error rather than a blank
-space on a page.
+Immutable read-only DTOs — `AuthorProfile`, `PostMetrics`. They exist to stop
+**arrays with implicit shapes** crossing layer boundaries. When a Blade template
+does `$post->metrics->wordCount` instead of `$metrics['word_count']`, a typo is a
+static-analysis error rather than a blank space on a page.
 
 ### `app/Http/Responses/`
 
@@ -159,15 +160,17 @@ TwoFactorLoginResponse   → dashboard after challenge
 PasskeyLoginResponse     → dashboard after passkey
 ```
 
-All five share `Responses/Concerns/RedirectsToCurrentTeam`, which resolves the
-destination from `AccountRole::dashboardRoute()`.
+All five share `Responses/Concerns/RedirectsToRoleDashboard`, which resolves the
+destination from `AccountRole::dashboardRoute()`. It touches no team URL
+defaults — there is no team to seed a prefix from.
 
 **This was the most consequential bug in the inherited codebase.** Every
 successful login, registration and verification landed on the starter kit's
 placeholder `/{team:slug}/dashboard` — a page that shows framework scaffolding,
-not the application. The fix routes each role to its own dashboard and guards
-with `app('router')->has($routeName)` so a role can be declared before its
-dashboard exists.
+not the application. The fix routes each role to its own dashboard —
+`/dashboard`, `/seller/dashboard`, `/admin/dashboard` — and guards with
+`app('router')->has($routeName)` so a role can be declared before its dashboard
+exists.
 
 ### `app/Support/`
 
@@ -176,7 +179,10 @@ The three cross-cutting services.
 **`DashboardNavigation`** — the single source of truth for the dashboard
 sidebar. Entries declare `label`, `route`, `pattern`, `icon`, `permissions` and
 an optional `badge`. `for(User $user)` filters by permission and resolves
-badges.
+badges. Sections render in a fixed order — Overview, Content, Moderation,
+**Modules** (Ideas / Developer Lab / AI Hub / Marketplace), Selling,
+Administration — and a section whose every item is filtered out is dropped
+entirely, heading included.
 
 Its importance is structural: the sidebar and the route guards read from the
 same definitions, so a navigation item cannot be visible to an account whose
@@ -223,6 +229,50 @@ pointing at `pages::dashboard.⚡index` means
 Because a missing view is a runtime error rather than a build error, route
 names and file paths are asserted in tests — see `docs/ROUTES.md`.
 
+### Role-owned URL spaces
+
+Each role owns a **top-level** path; the role is the first segment of the URL,
+so the address bar alone states which surface is loaded. No role's home is
+nested inside another's.
+
+| Role | Path | Route name | Guard |
+| --- | --- | --- | --- |
+| user | `/dashboard` | `dashboard.index` | `auth, verified` |
+| seller | `/seller/dashboard` | `seller.dashboard` | `auth, verified, permission:product:create` |
+| admin | `/admin/dashboard` | `admin.dashboard` | `auth, verified, permission:admin:access` |
+
+The seller and admin guards name a **permission**, not a role. A role check
+would drift from the permission matrix; a permission check cannot.
+
+The shared author workspace stays on `/dashboard` for *every* authenticated
+account, because a seller and an admin both still write posts:
+`dashboard.posts.index`, `dashboard.posts.create`, `dashboard.posts.edit`,
+`dashboard.comments`, `dashboard.taxonomy`. Admin-only `/admin/users` →
+`admin.users` sits alongside the admin dashboard.
+
+### Platform module routes
+
+Four modules each claim a top-level URL space, guarded by their own permission.
+They are not built yet, so each renders a placeholder page via the shared
+`resources/views/components/module-placeholder.blade.php` — the routes are real
+and the navigation points at them, so each has a landing spot to be built into
+rather than needing a routing change later.
+
+| Module | Path | Route name | Permission |
+| --- | --- | --- | --- |
+| Developer Lab | `/dev-lab` | `dev-lab.index` | `dev-lab:use` |
+| AI Knowledge Hub | `/ai-hub` | `ai-hub.index` | `ai-hub:use` |
+| Marketplace | `/marketplace` | `marketplace.index` | `marketplace:use` |
+| Ideas | `/ideas` | `ideas.index` | `ideas:use` |
+
+The URL spaces are claimed now on purpose: these are top-level names that must
+not be taken by anything else.
+
+A small set of **301 redirects** keeps old bookmarks working after the move from
+nested paths: `dashboard/seller` → `/seller/dashboard`,
+`dashboard/admin` → `/admin/dashboard`, the preserved name `team.dashboard`
+→ `/dashboard`, and `settings/teams` → `/settings/security`.
+
 ### The modal system
 
 Eight modals were independent copies of the same pattern. They now share one
@@ -248,9 +298,12 @@ not introduced by the duplication, it was *hidden* by it.
 
 ## 5. Authorization
 
-Two independent axes. Conflating them is the mistake this design avoids.
+**One axis.** A single, platform-wide permission set, derived from the account's
+role. An earlier design had a second, team-scoped axis; the team feature was
+removed in its entirety, so that axis no longer exists and nothing here should
+be read as though it does.
 
-### Axis 1 — account permissions (platform-wide)
+### Account permissions (platform-wide)
 
 ```
 User → role (enum) → permissions (derived)
@@ -260,9 +313,9 @@ User → role (enum) → permissions (derived)
 
 | Role | Level | Permissions |
 | --- | --- | --- |
-| `user` | 1 | 3 |
-| `seller` | 2 | 11 (includes all of `user`) |
-| `admin` | 3 | 24 (all cases) |
+| `user` | 1 | 6 |
+| `seller` | 2 | 15 (includes all of `user`) |
+| `admin` | 3 | 26 (all cases) |
 
 Seller inherits by **spread** — `...self::User->permissions()` — so adding a
 user permission automatically reaches sellers. Admin returns
@@ -297,19 +350,10 @@ Two failure modes are handled loudly rather than silently:
   permission once authenticated; a 403 would be a dead end. `auth` normally
   runs first, so this branch is defensive.
 
-### Axis 2 — team roles (per team)
-
-`TeamRole` / `TeamPermission` answer "what may this person do *in this team*".
-A team `admin` on one team is a `member` on another. This is why team
-authorization cannot be expressed as a token ability or an account permission —
-it depends on which team is being addressed.
-
-Enforced by `EnsureTeamMembership` plus `Membership` model checks.
-
 ### Policies
 
-`PostPolicy`, `TeamPolicy`, `UserPolicy` handle resource-scoped questions the
-middleware cannot answer — "may this account edit **this** post".
+`PostPolicy` and `UserPolicy` handle resource-scoped questions the middleware
+cannot answer — "may this account edit **this** post".
 
 `UserPolicy` contains the escalation guard. Role assignment is checked twice:
 the policy authorizes the action, and `AccountRole::assignableBy()` filters
@@ -322,18 +366,16 @@ Full matrix: [`PERMISSIONS.md`](PERMISSIONS.md).
 
 ## 6. Data layer
 
-Eleven application migrations plus the framework defaults.
+Six application migrations plus the framework defaults.
 
 ```
-users ──────────┐
-  │             │
-  ├─ posts ─────┼── post_tag ──── tags
-  │   │         │
+users
+  │
+  ├─ posts ───── post_tag ──── tags
+  │   │
   │   └─ comments
-  │             │
-  └─ memberships ┴── teams ──── team_invitations
-        │
-        └─ current_team_id (users)
+  │
+  └─ role (AccountRole)
 ```
 
 Conventions, applied without exception:
@@ -343,10 +385,6 @@ Conventions, applied without exception:
 - **Full PHPDoc property blocks** on every model, so PHPStan level 7 can
   resolve attribute types.
 - **Enums are cast** — `'role' => AccountRole::class`, not `'role' => 'string'`.
-
-`current_team_id` on `users` is a denormalised pointer to the active team. It
-is what lets a team-scoped URL be generated without a session lookup on every
-request.
 
 `PostObserver` keeps the denormalised `posts_count` columns on `categories` and
 `tags` in step. Denormalisation is deliberate: a category listing shows counts,
@@ -408,7 +446,6 @@ Pest 5, 169 passing tests, 403 assertions.
 | `Feature/Blog/*` | Index, show, sharing, drafts, previews |
 | `Feature/Dashboard/*` | Post management, moderation, taxonomy |
 | `Feature/DashboardTest` | Role-scoped dashboards, nav filtering, role badges |
-| `Feature/Teams/*` | Membership, invitations, ownership |
 | `Feature/Settings/*` | Profile, security, 2FA lifecycle |
 
 Two conventions worth stating:
@@ -419,23 +456,6 @@ there is a "stranger cannot". Authorization bugs live on the negative path.
 **Test the contract, not the markup.** `AuthLayoutTest` asserts that the layout
 does *not* hardcode a theme, not that a particular `div` has a particular class.
 Class-level assertions break on every redesign and catch nothing.
-
-### The one known failure
-
-```
-Tests\Feature\Teams\TeamInvitationTest > accepted team invitations cannot be accepted again
-```
-
-Pest's `expectException(ModelNotFoundException::class)` never fires, because
-Livewire catches the exception inside its own request handling before it can
-propagate. The application behaviour is correct — an already-accepted invitation
-cannot be re-accepted — but the assertion cannot observe it through a Livewire
-test.
-
-It is left failing rather than deleted: `AGENTS.md` forbids removing tests
-without approval, and a suppressed failure is worse than a visible one. The
-correct fix is to assert on the Livewire component's error state instead of
-expecting a thrown exception.
 
 ---
 
@@ -483,6 +503,6 @@ Where a new feature plugs in, in the order you would touch them.
 6. `DashboardNavigation` — section entries
 7. `UserSeeder`, `UserFactory` — a state and a demo account
 
-Step 2 is enough for the role to *work*: `RedirectsToCurrentTeam` uses
+Step 2 is enough for the role to *work*: `RedirectsToRoleDashboard` uses
 `router->has()` so a role can be declared before its dashboard exists, and the
 login redirect will fall back rather than 500.

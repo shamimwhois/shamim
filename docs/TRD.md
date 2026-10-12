@@ -53,7 +53,7 @@ Versions below are the versions actually installed in this repository, verified 
 
 | Package | Considered for | Why rejected |
 | --- | --- | --- |
-| `spatie/laravel-permission` | Author roles | **Revised.** Three account roles and 24 permissions now exist, but they are enum-backed behaviour, not rows. There is no `roles` table, no `permissions` table, and no pivot, because the mapping is code that deploys with the release rather than data an operator can edit at runtime. See §2.5 and [ERD §5.9](./ERD.md). Adding this package now would mean maintaining a second, competing source of truth for the same question. |
+| `spatie/laravel-permission` | Author roles | **Revised.** Three account roles and 28 permissions now exist, but they are enum-backed behaviour, not rows. There is no `roles` table, no `permissions` table, and no pivot, because the mapping is code that deploys with the release rather than data an operator can edit at runtime. See §2.5 and [ERD §5.9](./ERD.md). Adding this package now would mean maintaining a second, competing source of truth for the same question. |
 | `spatie/laravel-medialibrary` | Post cover images | No image uploads in v1 (non-goal). Adding it introduces storage config, conversions, and queue surface for zero requirement. |
 | Meilisearch / Algolia | Search | Operationally heavy for a few hundred posts. Revisit at >5 000 posts. |
 | `spatie/laravel-sluggable` | Slugs | Slug generation is ~20 lines in a model mutator and needs custom collision handling anyway. |
@@ -111,13 +111,13 @@ The application follows the layering already present in this codebase. New code 
 
 **Existing conventions this project already established and that new code must follow:**
 
-1. **Livewire component format is single-file (SFC)** in `resources/views/pages/` (full-page, registered with `Route::livewire()`) and `resources/views/components/` (reusable), with the ⚡ filename prefix. Class-based components are **not** used. An SFC opens with `<?php ... new class extends Component { ... }; ?>` followed by the Blade template. `config/livewire.php` declares the `pages::` and `layouts::` namespaces and adds `views/components` to `component_locations`, so a component in that directory is referenced as `<livewire:team-switcher />` with **no** namespace prefix.
-2. **Multi-step domain operations live in Action classes** under `app/Actions/**`, invoked through a public `handle()` method, with dependencies constructor-injected and resolved by the container. See `app/Actions/Teams/CreateTeam.php`.
-3. **Authorization uses Gates/Policies**, checked with `Gate::authorize()` at the top of the action that mutates state. See `app/Actions/Teams/...` usages of `Gate::authorize('leave', $team)`. Three policies exist: `PostPolicy`, `TeamPolicy`, `UserPolicy`.
+1. **Livewire component format is single-file (SFC)** in `resources/views/pages/` (full-page, registered with `Route::livewire()`) and `resources/views/components/` (reusable), with the ⚡ filename prefix. Class-based components are **not** used. An SFC opens with `<?php ... new class extends Component { ... }; ?>` followed by the Blade template. `config/livewire.php` declares the `pages::` and `layouts::` namespaces and adds `views/components` to `component_locations`, so a component in that directory is referenced as `<livewire:module-placeholder />` with **no** namespace prefix.
+2. **Multi-step domain operations live in Action classes** under `app/Actions/**`, invoked through a public `handle()` method, with dependencies constructor-injected and resolved by the container. See `app/Actions/Posts/UpdatePost.php`.
+3. **Authorization uses Gates/Policies**, checked with `Gate::authorize()` at the top of the action that mutates state. Two policies exist: `PostPolicy` and `UserPolicy`.
 4. **Models declare configuration with PHP attributes**: `#[Fillable([...])]` and `#[Hidden([...])]`, with casts in a `casts()` method. Do not add `protected $fillable` properties.
 5. **Shared behaviour is extracted into concerns** under `app/Concerns/**` (traits). Validation rule sets live there too.
 6. **Enums live in `app/Enums/`** with TitleCase keys, and are cast on the model. Enums may carry behaviour (`label()`, `permissions()`, `dashboardRoute()`); they are not bare value lists.
-7. **Value objects / DTOs live in `app/Data/`** as readonly classes: `AuthorProfile`, `PostMetrics`, `TeamPermissions`, `UserTeam`.
+7. **Value objects / DTOs live in `app/Data/`** as readonly classes: `AuthorProfile`, `PostMetrics`.
 8. **Fortify response contracts are bound to app classes** in `app/Http/Responses/`, registered in `FortifyServiceProvider`. There is one response per flow: `LoginResponse`, `RegisterResponse`, `TwoFactorLoginResponse`, `PasskeyLoginResponse`, `VerifyEmailResponse`.
 9. **Dashboard navigation is declared, not written into the view.** Every sidebar item names the permission it requires, and `DashboardNavigation::for($user)` drops any item the account cannot reach — so the visible menu and the route guards cannot disagree.
 
@@ -126,7 +126,7 @@ The application follows the layering already present in this codebase. New code 
 **Public page (full document):**
 
 1. Route matched in `routes/web.php`.
-2. Route middleware runs (`auth`, `verified`, `EnsureTeamMembership` where applicable).
+2. Route middleware runs (`auth`, `verified`, and `EnsureAccountPermission` on the permission-guarded routes).
 3. Controller or page component resolves data through a scoped query.
 4. Blade renders the document, including `@vite`, `@fluxAppearance`, SEO partials.
 5. Browser hydrates Livewire islands.
@@ -151,35 +151,43 @@ Fortify provides the headless flows; this application owns the views and the pos
 - **Two-factor** and **passkey** support already exist on the `User` model via `TwoFactorAuthenticatable` and `PasskeyAuthenticatable`.
 - **Login layout** is a single split shell, `layouts/auth/split.blade.php`, delegating through `layouts/auth.blade.php`. It follows the application's theme tokens rather than forcing dark mode, and carries a skip link to the form.
 
-**Post-login destination respects `intended`.** A reader prompted to log in before commenting returns to the post: the `auth` middleware stores the intended URL in the session and `LoginResponse` honours it before falling back to the role's dashboard. The three role dashboards are `dashboard.index`, `dashboard.seller.index`, and `dashboard.admin.index`.
+**Post-login destination respects `intended`.** A reader prompted to log in before commenting returns to the post: the `auth` middleware stores the intended URL in the session and `LoginResponse` honours it before falling back to the role's dashboard. The three role dashboards are `dashboard.index` (`/dashboard`), `seller.dashboard` (`/seller/dashboard`), and `admin.dashboard` (`/admin/dashboard`).
 
 ### 2.5 Authorisation model
 
-> **Revised.** An earlier draft of this section read: *"There is exactly one privileged role: the post author. Authorisation is expressed as a Policy, not scattered `if` statements."* The policy half is still true. The role half is not: the application now has three account roles, and the model has two independent authorisation axes.
+> **Revised.** An earlier draft of this section read: *"There is exactly one privileged role: the post author. Authorisation is expressed as a Policy, not scattered `if` statements."* The policy half is still true. The role half is not: the application now has three account roles.
 
-**Two axes, never conflated.** Authorisation is the intersection of:
+**One axis, not two.** Authorisation is expressed through a single vocabulary:
 
 | Axis | Question it answers | Backed by | Enforced at |
 | --- | --- | --- | --- |
 | **Account role** | What may this account do *anywhere* on the platform? | `users.role` → `AccountRole` + `AccountPermission` | Policies, gates, `DashboardNavigation`, route middleware |
-| **Team role** | What may this account do *inside this team*? | `memberships.role` → `TeamRole` + `TeamPermission` | `TeamPolicy`, membership checks |
 
-An account holds exactly one account role and one team role *per team*. Owning a team does not make anyone a platform administrator, which is why the two live in different enums and cannot be substituted for one another.
+An account holds exactly one account role. It is the only role axis in the application, and `AccountRole` + `AccountPermission` are the only authorisation vocabulary: there is no second, narrower scope to reconcile against.
 
 **Account roles, ascending.**
 
 | Role | Level | Plan | Reach |
 | --- | --- | --- | --- |
-| `user` | 1 | Free | Author and edit **own** posts; moderate comments on own posts; join teams |
+| `user` | 1 | Free | Author and edit **own** posts; moderate comments on own posts |
 | `seller` | 2 | Seller | Everything a user can do, plus publish without review, manage taxonomy, create and sell product listings, view own sales |
 | `admin` | 3 | Platform | Every permission, including `admin:access`, `user:manage`, `role:manage`, `product:review`, `sale:view-any`, `refund:process`, `payment:configure`, `audit:view` |
 
 `Seller` **inherits** the user permission set by spreading it, rather than restating it; `Admin` is `AccountPermission::cases()` outright. Inheritance is a deliberate choice — adding a baseline permission automatically reaches both higher roles, so the matrix cannot drift out of sync. [PERMISSIONS.md](./PERMISSIONS.md) publishes the full matrix, generated by executing the enums rather than transcribing them.
 
-**Policies remain the enforcement point.** Three exist:
+**The permission set, exactly.** `AccountPermission` carries **28** cases in five groups.
+
+- **Content** — `post:create`, `post:update-own`, `post:update-any`, `post:delete-own`, `post:delete-any`, `post:publish`.
+- **Moderation** — `comment:moderate`, `taxonomy:manage`.
+- **Platform** — `dev-lab:use`, `ai-hub:use`, `ideas:use`.
+- **Selling** — `marketplace:use`, `product:create`, `product:update-own`, `product:delete-own`, `product:submit`, `sale:view-own`, `support:manage-own`.
+- **Administration** — `admin:access`, `user:manage`, `role:manage`, `product:review`, `product:manage-any`, `seller:manage`, `sale:view-any`, `refund:process`, `payment:configure`, `audit:view`.
+
+`AccountRole::User` holds **6** of them (`post:create`, `post:update-own`, `post:delete-own`, `dev-lab:use`, `ai-hub:use`, `ideas:use`); `AccountRole::Seller` holds **15** (the user set plus `post:publish`, `taxonomy:manage`, `marketplace:use`, `product:create`, `product:update-own`, `product:delete-own`, `product:submit`, `sale:view-own`, `support:manage-own`); `AccountRole::Admin` holds all **28**.
+
+**Policies remain the enforcement point.** Two exist:
 
 - `PostPolicy` — `view` (published or owner), `create`, `update`, `delete`, `publish`, `unpublish`. Ownership checks route through `User::canActOn($owner)`, the single rule expressing "the owner, or any admin". Stating it once is what stops the "admins can do anything" clause from being remembered in one policy and forgotten in another.
-- `TeamPolicy` — the team axis; drives `Gate::authorize('leave', $team)` and friends.
 - `UserPolicy` — account management: `viewAny`, `view`, `update`, `updateRole`, `delete`. Contains **no role names at all**; every ability reduces to an account-level permission, so adding a fourth role later is a change to `AccountRole` and nothing in the policy. `delete` carries the escalation guard — an account may never delete itself through this path (self-deletion is a separate, confirmed flow), and `$account->accountRole()->isAtLeast($user->accountRole())` refuses any target at or above the actor's own level. That single line is why an admin cannot remove another admin.
 
 Per-target role rules are split for a reason worth naming: `updateRole` answers the blanket "may this account edit roles at all", while "may **this** account edit **that** account" depends on the target and lives in the component. Both checks run. Collapsing them into one ability would make the policy answer a question it cannot see the inputs for.
@@ -206,19 +214,19 @@ The rendered HTML is produced from a sanitised pipeline and treated as trusted *
 
 ### 2.7 Dashboard shell and role-based navigation
 
-> **Revised.** The original draft had a single dashboard reached at `⚡dashboard.blade.php`. There are now three dashboards, one shell, and one navigation map.
+> **Revised.** The original draft had a single dashboard reached at `⚡dashboard.blade.php`. There are now three dashboards, one shell, and one navigation map, each role owning a top-level URL space.
 
 **One shell, three homes.** `layouts/dashboard.blade.php` renders the chrome — sidebar, top bar, user menu, flash region — and each dashboard page opts in with `#[Layout('layouts::dashboard')]`. That attribute is not optional: `config/livewire.php` sets `component_layout => 'layouts::public'`, so **every SFC defaults to the public shell** and a dashboard page that forgets the attribute renders inside the blog chrome, with a public header and footer around it. This is the single most common mistake in this area of the codebase.
 
-**Roles decide the home, permissions decide the menu.**
+**Roles decide the home, permissions decide the menu.** Each role home is a top-level path whose first segment names the surface — no role dashboard is nested inside another's:
 
-| Role | Route | Component |
-| --- | --- | --- |
-| `user` | `dashboard.index` | `pages/dashboard/⚡index` |
-| `seller` | `dashboard.seller.index` | `pages/dashboard/seller/⚡index` |
-| `admin` | `dashboard.admin.index` | `pages/dashboard/admin/⚡index` |
+| Role | Path | Route name | Guard | Component |
+| --- | --- | --- | --- | --- |
+| `user` | `/dashboard` | `dashboard.index` | `auth`, `verified` | `pages/dashboard/⚡index` |
+| `seller` | `/seller/dashboard` | `seller.dashboard` | `auth`, `verified`, `permission:product:create` | `pages/seller/⚡dashboard` |
+| `admin` | `/admin/dashboard` | `admin.dashboard` | `auth`, `verified`, `permission:admin:access` | `pages/admin/⚡dashboard` |
 
-`AccountRole::dashboardRoute()` returns the route name, and every Fortify response calls it. Nothing hardcodes `/dashboard`.
+The shared author workspace stays on `/dashboard` for every authenticated account — a seller and an admin both write posts — through `dashboard.posts.index`, `dashboard.posts.create`, `dashboard.posts.edit`, `dashboard.comments`, and `dashboard.taxonomy`. Admin has one further surface, `/admin/users` (`admin.users`). `AccountRole::dashboardRoute()` returns the route name for a role's home, and every Fortify response calls it; nothing hardcodes `/dashboard`.
 
 **The sidebar is data.** `App\Support\DashboardNavigation::for($user)` returns sections of items, each already filtered to what the account may reach and carrying a resolved badge count. Four properties matter:
 
@@ -226,6 +234,8 @@ The rendered HTML is produced from a sanitised pipeline and treated as trusted *
 2. **An empty section is dropped with its heading.** A plain user never sees an "Administration" heading with nothing beneath it.
 3. **Badges are resolved in the support class, not the view.** The definition declares *which* badge it wants (`pending-comments`); `for()` fills in the number. The definition therefore carries no live data and can be reasoned about statically.
 4. **The pending-comment badge is scoped to the viewer.** It counts comments on the account's own posts unless the account holds `comment:moderate`, so the badge means "work waiting for *you*", not "work waiting for somebody".
+
+**Sections, in order.** `Overview`, `Content`, `Moderation`, `Modules`, `Selling`, `Administration`. The **Modules** section sits between Content and Selling and holds **Ideas**, **Developer Lab**, **AI Hub**, and **Marketplace** — each a separate top-level URL space gated by its own permission. A plain user sees Ideas, Developer Lab, and AI Hub (they hold `dev-lab:use`, `ai-hub:use`, and `ideas:use`) and never Marketplace, which requires `marketplace:use`; the section heading is dropped for anyone who would see none of its items. The role homes appear as "Seller dashboard" in Selling and "Admin dashboard" in Administration.
 
 **Plans are derived from roles, not stored alongside them.** `AccountRole::plan()` maps `user → Free`, `seller → Seller`, `admin → Platform`. `RolePlan` carries the commercial shape — tagline, feature bullets, `productListingLimit()`, `commissionPercent()`, `canSell()` — separately from the authority that `AccountRole` carries. Today the plan is a pure function of the role; when entitlements become per-account data they move onto the `users` table and the enum becomes the fallback default. The reason the split exists now rather than later is that plan limits should be read *through* the account (`$user->plan()->productListingLimit()`), never inlined as a conditional at a call site.
 
@@ -266,7 +276,7 @@ Each decision is recorded as context → decision → consequence, so a future m
 
 **Context.** Creating a post, publishing a post, and approving a comment each involve multiple steps and need to be callable from Livewire and from tests.
 
-**Decision.** Put each in a dedicated class under `app/Actions/**` exposing `handle()`, with dependencies injected through the constructor. This matches the existing `App\Actions\Teams\CreateTeam`.
+**Decision.** Put each in a dedicated class under `app/Actions/**` exposing `handle()`, with dependencies injected through the constructor. This matches the existing `App\Actions\Posts\UpdatePost`.
 
 **Consequences.**
 
@@ -396,28 +406,25 @@ app/
 ├── Actions/
 │   ├── Comments/                      ApproveComment, RejectComment
 │   ├── Fortify/                       (existing) CreateNewUser, ResetUserPassword, …
-│   ├── Posts/                         CreatePost, UpdatePost, PublishPost,
-│   │                                  UnpublishPost, DeletePost, SyncPostTags
-│   └── Teams/                         (existing)
-├── Concerns/                          GeneratesUniqueTeamSlugs, HasAccountRole,
-│                                      HasReadingTime, HasSlug, HasTeams,
+│   └── Posts/                         CreatePost, UpdatePost, PublishPost,
+│                                      UnpublishPost, DeletePost, SyncPostTags
+├── Concerns/                          HasAccountRole, HasReadingTime, HasSlug,
 │                                      PasswordValidationRules, ProfileValidationRules
 ├── Console/                           (existing)
-├── Data/                              AuthorProfile, PostMetrics, TeamPermissions, UserTeam
+├── Data/                              AuthorProfile, PostMetrics
 ├── Enums/                             AccountPermission, AccountRole, CommentStatus,
-│                                      PermissionGroup, PostStatus, RolePlan,
-│                                      TeamPermission, TeamRole
+│                                      PermissionGroup, PostStatus, RolePlan
 ├── Http/
 │   ├── Controllers/                   (existing) Controller
 │   │                                  FeedController, RobotsController, SitemapController
-│   ├── Middleware/                    (existing) EnsureAccountPermission, EnsureTeamMembership
+│   ├── Middleware/                    (existing) EnsureAccountPermission
 │   ├── Requests/
 │   └── Responses/                     (existing) LoginResponse, RegisterResponse,
 │                                      TwoFactorLoginResponse, PasskeyLoginResponse,
 │                                      VerifyEmailResponse
-├── Models/                            (existing) User, Team, TeamInvitation, Membership
+├── Models/                            (existing) User
 │                                      Category, Comment, Post, PostTag, Tag
-├── Policies/                          PostPolicy, TeamPolicy, UserPolicy
+├── Policies/                          PostPolicy, UserPolicy
 ├── Providers/                         (existing)
 ├── Rules/                             (existing)
 └── Support/                           DashboardNavigation, MarkdownRenderer, Seo
@@ -425,7 +432,7 @@ app/
 database/
 ├── factories/                         (existing) UserFactory
 │                                      ★ CategoryFactory, CommentFactory, PostFactory, TagFactory
-├── migrations/                        (existing) 3 baseline + passkeys + 2FA + 2 team
+├── migrations/                        (existing) 3 baseline + passkeys + 2FA
 │                                      ★ categories, tags, posts, post_tag, comments,
 │                                        add_role_to_users_table
 └── seeders/                           ★ UserSeeder first, then CategorySeeder,
@@ -439,37 +446,37 @@ resources/
 └── views/
     ├── components/                    modal shell + modal/{actions,trigger},
     │                                  auth-header, auth-session-status, comment,
-    │                                  empty-state, pagination, placeholder-pattern,
-    │                                  post-card, section-marker, share-icon, tag-pill,
-    │                                  app-logo, dashboard/*, post/*, site/*,
-    │                                  ⚡team-switcher, ⚡create-team-modal, …
-    ├── layouts/                       Three top-level shells — app.blade.php,
-    │                                  public.blade.php, dashboard.blade.php —
-    │                                  plus auth.blade.php delegating to
-    │                                  auth/split.blade.php, and the starter kit's
-    │                                  app/ subdirectory
+    │                                  empty-state, module-placeholder, pagination,
+    │                                  placeholder-pattern, post-card, section-marker,
+    │                                  share-icon, tag-pill, app-logo,
+    │                                  dashboard/*, post/*, site/*, …
+    ├── layouts/                       Three top-level shells — public.blade.php,
+    │                                  dashboard.blade.php, and auth.blade.php
+    │                                  delegating to auth/split.blade.php
     ├── pages/
     │   ├── auth/                      login, register, forgot-password,
     │   │                              reset-password, confirm-password,
     │   │                              two-factor-challenge, verify-email
     │   ├── blog/                      ⚡index, ⚡show
-    │   ├── dashboard/                 ⚡index, ⚡comments, ⚡taxonomy
-    │   │   ├── admin/                 ⚡index, ⚡users
-    │   │   ├── posts/                 ⚡index, ⚡edit
-    │   │   └── seller/                ⚡index
+    │   ├── dashboard/                 ⚡index, ⚡comments, ⚡taxonomy, posts/(⚡index, ⚡edit)
+    │   ├── admin/                     ⚡dashboard, ⚡users
+    │   ├── seller/                    ⚡dashboard
+    │   ├── dev-lab/                   ⚡index (placeholder)
+    │   ├── ai-hub/                    ⚡index (placeholder)
+    │   ├── marketplace/               ⚡index (placeholder)
+    │   ├── ideas/                     ⚡index (placeholder)
     │   ├── settings/                  (existing) layout.blade.php, two-factor/,
     │   │                              ⚡profile, ⚡security, ⚡appearance,
     │   │                              ⚡delete-user-form, ⚡delete-user-modal,
     │   │                              ⚡two-factor-setup-modal
-    │   ├── teams/                     (existing) ⚡index, ⚡edit
     │   ├── ⚡about.blade.php
     │   └── ⚡home.blade.php
     └── partials/                      head, settings-heading
 
 routes/
 ├── console.php                        (existing)
-├── settings.php                       (existing)
-└── web.php                            public + auth + dashboard + teams
+├── settings.php                       account settings + passkey endpoints
+└── web.php                            public + role dashboards + modules + redirects
 
 tests/
 ├── Feature/
@@ -477,24 +484,24 @@ tests/
 │   ├── Blog/                          index, detail, filter, comment, sharing
 │   ├── Dashboard/                     post management, moderation, taxonomy
 │   ├── Enums/                         PermissionModelTest
-│   └── Teams/                         (existing)
+│   └── Routing/                       RoutingStructureTest
 └── Unit/                              Support/*
 ```
 
-**Two notes a reader will otherwise trip over.** First, there is no `app/Livewire/` directory — Livewire components are SFCs under `resources/views`, and the framework locates them through `config/livewire.php`, not by convention. Second, `resources/views/pages/dashboard/` mixes three roles in one directory tree: `admin/` and `seller/` are role-scoped subdirectories, while `⚡index`, `⚡comments`, and `⚡taxonomy` are shared across roles and filter their own content by permission.
+**Two notes a reader will otherwise trip over.** First, there is no `app/Livewire/` directory — Livewire components are SFCs under `resources/views`, and the framework locates them through `config/livewire.php`, not by convention. Second, `resources/views/pages/dashboard/` holds the shared author workspace (`⚡index`, `⚡comments`, `⚡taxonomy`, `posts/`) filtered by permission, while the seller and admin homes live in their own top-level directories (`pages/seller/`, `pages/admin/`) matching their URL spaces.
 
 ### 4.2 Naming conventions
 
 | Artifact | Convention | Example |
 | --- | --- | --- |
 | Livewire page component | `resources/views/pages/<area>/⚡<name>.blade.php`, registered via `Route::livewire('uri', 'pages::<area>.<name>')` | `pages/blog/⚡index.blade.php` → `'pages::blog.index'` |
-| Livewire UI component | `resources/views/components/⚡<name>.blade.php`, referenced **without** a namespace prefix | `components/⚡team-switcher.blade.php` → `<livewire:team-switcher />` |
+| Livewire UI component | `resources/views/components/⚡<name>.blade.php`, referenced **without** a namespace prefix | `components/module-placeholder.blade.php` → `<x-module-placeholder />` |
 | Blade partial / component | kebab-case, referenced with `<x-...>` | `<x-post-card :post="$post" />` |
 | Layout | `layouts/<name>.blade.php`, or `layouts/<family>/<variant>.blade.php` | `layouts/dashboard.blade.php`, `layouts/auth/split.blade.php` |
 | Action | verb + noun, `handle()` entry point | `App\Actions\Posts\PublishPost` |
 | Enum | singular noun, TitleCase cases, behaviour on the enum | `App\Enums\PostStatus::Published` |
 | Support class | noun describing the computation | `App\Support\MarkdownRenderer` |
-| Route name | dot-namespaced | `blog.index`, `dashboard.posts.edit`, `dashboard.admin.users` |
+| Route name | dot-namespaced | `blog.index`, `dashboard.posts.edit`, `admin.users` |
 | Migration | anonymous class, snake_case filename | `2026_10_12_080204_create_posts_table.php` |
 | Test | mirrors the namespace it covers | `tests/Feature/Enums/PermissionModelTest.php` |
 
@@ -710,13 +717,13 @@ A traceability matrix that only lists successes is a marketing document. These a
 
 ### 7.2 Deferred by decision, not by omission
 
-The following four product modules are specified in their own documents and are **not** part of the delivered system. Their permissions exist in `AccountPermission` and their navigation sections exist in `DashboardNavigation`, because both were designed as complete matrices rather than incrementally extended ones.
+The following four product modules are specified in their own documents and are **not** part of the delivered system. Each has a real route rendering a permission-guarded placeholder page (via `resources/views/components/module-placeholder.blade.php`, which states the module is not yet available and lists what is planned), its own `AccountPermission`, and its own `DashboardNavigation` entry. They are deferred rather than omitted because their routes, permissions, and navigation were designed once, coherently, instead of being grown one feature at a time.
 
-| Module | Spec | Deferred because |
-| --- | --- | --- |
-| Developer Lab | [lab.md](./lab.md) | Needs the substrate this pass built |
-| Idea Bank | [Idea.md](./Idea.md) | Same |
-| AI Knowledge Hub & Package | [AI Knowledge Hub & Package.md](./AI%20Knowledge%20Hub%20%26%20Package.md) | Same |
-| Developer Marketplace & Dig | [Developer Marketplace & Dig.md](./Developer%20Marketplace%20%26%20Dig.md) | Needs payments, which needs the plan entitlements in `RolePlan` |
+| Module | Path | Route name | Permission | Spec | Deferred because |
+| --- | --- | --- | --- | --- | --- |
+| Developer Lab | `/dev-lab` | `dev-lab.index` | `dev-lab:use` | [lab.md](./lab.md) | Needs the substrate this pass built |
+| Ideas, Plans, Tasks, Projects & Collaboration | `/ideas` | `ideas.index` | `ideas:use` | [Idea.md](./Idea.md) | Same |
+| AI Knowledge Hub & Package | `/ai-hub` | `ai-hub.index` | `ai-hub:use` | [AI Knowledge Hub & Package.md](./AI%20Knowledge%20Hub%20%26%20Package.md) | Same |
+| Developer Marketplace & Digital Product Ecosystem | `/marketplace` | `marketplace.index` | `marketplace:use` | [Developer Marketplace & Dig.md](./Developer%20Marketplace%20%26%20Dig.md) | Needs payments, which needs the plan entitlements in `RolePlan` |
 
-Declaring a permission before its module exists is a deliberate choice: it means the permission matrix, the navigation map, and the plan definitions were each designed once, coherently, instead of being grown one feature at a time into an inconsistent shape.
+Declaring a route and permission before its module exists is a deliberate choice — it claims the top-level URL space now and gives each module a landing spot to be built into rather than requiring a routing change later. `UseDeveloperLab`, `UseAiHub`, and `UseIdeas` group under `PermissionGroup::Platform`; `UseMarketplace` groups under `PermissionGroup::Selling`.

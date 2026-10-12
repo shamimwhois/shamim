@@ -29,9 +29,7 @@ A note on what this ERD deliberately does **not** draw: there is no `roles` tabl
 erDiagram
     USERS ||--o{ POSTS : "authors"
     USERS ||--o{ COMMENTS : "writes"
-    USERS ||--o{ TEAM_MEMBERS : "belongs to"
     USERS ||--o{ PASSKEYS : "registers"
-    USERS }o--o| TEAMS : "current team"
 
     CATEGORIES ||--o{ POSTS : "groups"
 
@@ -39,9 +37,6 @@ erDiagram
     POSTS }o--o{ TAGS : "labelled by"
 
     COMMENTS }o--o| COMMENTS : "replies to"
-
-    TEAMS ||--|{ TEAM_MEMBERS : "has"
-    TEAMS ||--o{ TEAM_INVITATIONS : "issues"
 
     USERS {
         bigint      id                  PK
@@ -53,7 +48,6 @@ erDiagram
         string      two_factor_secret
         string      two_factor_recovery_codes
         timestamp   two_factor_confirmed_at
-        bigint      current_team_id     FK
         string      remember_token
         timestamp   created_at
         timestamp   updated_at
@@ -112,38 +106,6 @@ erDiagram
         bigint      parent_id           FK
         text        body
         string      status
-        timestamp   created_at
-        timestamp   updated_at
-    }
-
-    TEAMS {
-        bigint      id                  PK
-        string      name
-        string      slug                U
-        boolean     is_personal
-        timestamp   created_at
-        timestamp   updated_at
-        timestamp   deleted_at          S
-    }
-
-    TEAM_MEMBERS {
-        bigint      id                  PK
-        bigint      team_id             FK
-        bigint      user_id             FK
-        string      role
-        timestamp   created_at
-        timestamp   updated_at
-    }
-
-    TEAM_INVITATIONS {
-        bigint      id                  PK
-        string      code                  U
-        bigint      team_id             FK
-        string      email
-        string      role
-        bigint      invited_by          FK
-        timestamp   expires_at
-        timestamp   accepted_at
         timestamp   created_at
         timestamp   updated_at
     }
@@ -243,9 +205,7 @@ erDiagram
 | R4 | `Post` → `Comment` | 1 : N | `cascadeOnDelete` | Comments belong to exactly one post and never outlive it. |
 | R5 | `User` → `Comment` | 1 : N | `cascadeOnDelete` | Every comment has a named, authenticated author. No anonymous comments exist. |
 | R6 | `Comment` → `Comment` | 1 : N (self, nullable) | `cascadeOnDelete` | Reserved for threading. v1 renders flat; the column ships now so threading is not a migration later. |
-| R7 | `User` → `Team` | 1 : N via `team_members` | `cascadeOnDelete` | Starter-kit capability, retained. Not used for content scoping. |
-| R8 | `Team` → `TeamInvitation` | 1 : N | `cascadeOnDelete` | Starter-kit capability, retained. |
-| R9 | `User` → `Passkey` | 1 : N | `cascadeOnDelete` | WebAuthn credentials. |
+| R7 | `User` → `Passkey` | 1 : N | `cascadeOnDelete` | WebAuthn credentials. |
 
 ---
 
@@ -295,9 +255,9 @@ erDiagram
 
 ### 5.7 Soft delete on posts only
 
-**Decision.** `deleted_at` on `posts` and on the starter kit's `teams`. Nothing else.
+**Decision.** `deleted_at` on `posts`. Nothing else.
 
-**Why.** A post's URL may be linked from anywhere on the internet; deletion must be recoverable, and a soft-deleted post correctly 404s while remaining restorable. Comments, tags, categories, and pivots have no such external contract, so soft-deleting them would add a `deleted_at` predicate to every query for zero benefit.
+**Why.** A post's URL may be linked from anywhere on the internet; deletion must be recoverable, and a soft-deleted post correctly 404s while remaining restorable. Comments, tags, categories, and pivots have no such external contract, so soft-deleting them would add a `deleted_at` predicate to every query for zero benefit. (The starter-kit `teams` table, the only other table that carried `deleted_at`, was removed with the team feature.)
 
 ### 5.8 Status as a string column with a PHP enum cast
 
@@ -331,25 +291,30 @@ not authorization, and they live in code for the same reason.
 
 ---
 
-### 5.10 Two role columns that are not the same thing
+### 5.10 Exactly one role enum
 
-`users.role` and `memberships.role` are both called "role" and hold entirely
-different values.
+There is a single role column and a single role enum.
 
 | Column | Values | Scope |
 | --- | --- | --- |
 | `users.role` | `user` \| `seller` \| `admin` | Platform-wide |
-| `memberships.role` | `owner` \| `admin` \| `member` | One team |
 
-**Why the name is reused.** Both answer "what is this account's role", just
-against different nouns — the platform, and a team. Two independent axes is the
-correct model; an `admin` of team A must not become an `admin` of team B, and a
-single shared column could not express that.
+`AccountRole` is the **only** role axis in the application. An earlier
+starter-kit design carried a second, team-scoped role on a `memberships` table
+(`owner` \| `admin` \| `member`), resolved from a separate `TeamRole` enum. Both
+the `memberships` table and the `TeamRole` enum were removed along with the team
+feature: the persistence that remains is `users.role`, and the authorisation
+that remains is `AccountRole` + `AccountPermission`.
 
-The cost is ambiguity in prose, which is why every document that mentions a role
-states *which* axis it means. In code the two are never confused: they are
-different enums (`AccountRole` and `TeamRole`) and PHPStan would reject a
-substitution.
+**Why one axis is enough.** The two-axis model existed to answer "what may this
+person do in *this* team" separately from "what may this person do on the
+platform". With teams gone there is no narrower scope to express, so the
+distinction has no referent — and a single axis cannot fall out of sync with
+itself. An `admin` is an admin everywhere; there is no per-team privilege to
+leak across a boundary, because there is no boundary.
+
+In code the consequence is that a role is never ambiguous: `users.role` is
+always an `AccountRole`, and no other enum competes for the name.
 
 ---
 
@@ -452,7 +417,7 @@ Which entity relationships each surface touches, and therefore which needs eager
 
 ## 9. Migration Dependency Order
 
-Fourteen migrations, in five waves. Arrows are hard dependencies: a table cannot be created before everything pointing at it exists. The filenames sort in exactly this order — that is not cosmetic, it is the execution order.
+Eleven migrations, in four waves. Arrows are hard dependencies: a table cannot be created before everything pointing at it exists. The filenames sort in exactly this order — that is not cosmetic, it is the execution order.
 
 ```mermaid
 flowchart LR
@@ -469,14 +434,7 @@ flowchart LR
         TFA["users: +two-factor columns"] --> U
     end
 
-    subgraph W3["Wave 3 — teams"]
-        direction TB
-        TE[teams]
-        CT["users: +current_team_id"] --> U
-        CT --> TE
-    end
-
-    subgraph W4["Wave 4 — content"]
+    subgraph W3["Wave 3 — content"]
         direction TB
         C1[categories]
         T[tags]
@@ -488,12 +446,12 @@ flowchart LR
         C --> U
     end
 
-    subgraph W5["Wave 5 — account role"]
+    subgraph W4["Wave 4 — account role"]
         direction TB
         R["users: +role"] --> U
     end
 
-    W1 --> W2 --> W3 --> W4 --> W5
+    W1 --> W2 --> W3 --> W4
 ```
 
 | Wave | Migration | Creates / alters | Depends on |
@@ -503,14 +461,12 @@ flowchart LR
 | 1 | `0001_01_01_000002_create_jobs_table` | `jobs`, `job_batches`, `failed_jobs` | — |
 | 2 | `2024_01_01_000000_create_passkeys_table` | `passkeys` | `users` |
 | 2 | `2025_08_14_170933_add_two_factor_columns_to_users_table` | `users.two_factor_secret`, `two_factor_recovery_codes`, `two_factor_confirmed_at` | `users` |
-| 3 | `2026_01_27_000001_create_teams_table` | `teams`, `team_memberships`, `team_invitations` | `users` (all three carry a `user_id` foreign key) |
-| 3 | `2026_01_27_000002_add_current_team_id_to_users_table` | `users.current_team_id` | `users`, `teams` |
-| 4 | `2026_10_12_080202_create_categories_table` | `categories` | — |
-| 4 | `2026_10_12_080203_create_tags_table` | `tags` | — |
-| 4 | `2026_10_12_080204_create_posts_table` | `posts` (+ index `status, published_at`) | `users`, `categories` |
-| 4 | `2026_10_12_080205_create_post_tag_table` | `post_tag` | `posts`, `tags` |
-| 4 | `2026_10_12_080207_create_comments_table` | `comments` (+ index `post_id, status`) | `posts`, `users` |
-| 5 | `2026_10_12_094528_add_role_to_users_table` | `users.role` (+ index `role`) | `users` |
+| 3 | `2026_10_12_080202_create_categories_table` | `categories` | — |
+| 3 | `2026_10_12_080203_create_tags_table` | `tags` | — |
+| 3 | `2026_10_12_080204_create_posts_table` | `posts` (+ index `status, published_at`) | `users`, `categories` |
+| 3 | `2026_10_12_080205_create_post_tag_table` | `post_tag` | `posts`, `tags` |
+| 3 | `2026_10_12_080207_create_comments_table` | `comments` (+ index `post_id, status`) | `posts`, `users` |
+| 4 | `2026_10_12_094528_add_role_to_users_table` | `users.role` (+ index `role`) | `users` |
 
 ### Why `role` is last and not first
 
@@ -524,8 +480,7 @@ Adding `role` inside `0001_01_01_000000_create_users_table` would have been tidi
 
 - `post_tag` must come after both `posts` and `tags`; it is a pure pivot and has no other columns beyond the two timestamps.
 - `comments` must come after `posts` — and after `users`, because the `user_id` foreign key is `cascadeOnDelete`, so deleting an account removes their comments even on other people's posts (§10).
-- `add_current_team_id_to_users_table` must come after `create_teams_table`, or the foreign key has nothing to point at.
-- Wave 4 timestamps are milliseconds apart (`080202` … `080207`): the gap at `080206` is a migration that was authored and dropped during development. Left as-is rather than renumbered, because renaming an applied migration breaks `migrations` table bookkeeping on any database that has already run it.
+- Wave 3 timestamps are milliseconds apart (`080202` … `080207`): the gap at `080206` is a migration that was authored and dropped during development. Left as-is rather than renumbered, because renaming an applied migration breaks `migrations` table bookkeeping on any database that has already run it.
 
 ---
 

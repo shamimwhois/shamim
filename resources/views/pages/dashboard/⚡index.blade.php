@@ -14,15 +14,15 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 /**
- * Dashboard overview.
+ * Dashboard overview — the author workspace.
  *
- * `/dashboard` is the single entry point every authenticated account reaches,
- * but it is not the destination. Which dashboard an account actually needs
- * depends on its role:
+ * `/dashboard` is the user role's home and the shared author workspace. It is
+ * also the safe landing spot for every authenticated account, so it forwards a
+ * seller or an admin to the dashboard their role owns:
  *
- *   seller → redirects to the seller home
- *   admin  → redirects to the admin home
  *   user   → renders the author workspace below
+ *   seller → redirects to `/seller/dashboard`
+ *   admin  → redirects to `/admin/dashboard`
  *
  * The redirect is a real HTTP redirect rather than a conditional render so the
  * URL always names what is on screen, and so the sidebar's active state and

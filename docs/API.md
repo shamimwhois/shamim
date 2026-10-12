@@ -133,9 +133,9 @@ hierarchy (`app/Enums/AccountRole.php`):
 
 | Role | Level | Permissions | Inherits |
 | --- | --- | --- | --- |
-| `user` | 1 | 3 | — |
-| `seller` | 2 | 11 | everything `user` has |
-| `admin` | 3 | 24 | everything, plus administration |
+| `user` | 1 | 6 | — |
+| `seller` | 2 | 15 | everything `user` has |
+| `admin` | 3 | 28 | everything, plus administration |
 
 **Token abilities must never exceed the account's role.** A token is a
 *restriction* on top of a role, never a grant. A `user`-role account that
@@ -232,7 +232,7 @@ because a slug is what a client can hold across a re-import.
 | `POST` | `/posts` | `post:create` | Creates a draft. |
 | `PATCH` | `/posts/{id}` | `post:update-own` | Author only. `post:update-any` extends to others. |
 | `DELETE` | `/posts/{id}` | `post:delete-own` | Soft delete. |
-| `POST` | `/posts/{id}/publish` | `post:publish-own` | Transitions `draft` → `published`. |
+| `POST` | `/posts/{id}/publish` | `post:publish` | Transitions `draft` → `published`. |
 
 Collection filters:
 
@@ -334,37 +334,40 @@ stronger mechanism than an authenticated API call, because otherwise a single
 compromised admin token becomes a way to mint more admins. Attempting to assign
 a disallowed role is a `403`, not a silently ignored no-op.
 
-### 6.5 Teams
+### 6.5 Role dashboards and platform modules
 
-Teams are governed by a **separate** permission system — `TeamRole` /
-`TeamPermission` — not by `AccountPermission`. Membership in a team carries a
-role (`owner`, `admin`, `member`) and that role determines what the member may
-do *within that team*.
+Authorisation is **single-axis**. There is exactly one role enum
+(`AccountRole`) and one permission enum (`AccountPermission`); the team-scoped
+role and permission axes were removed along with the team feature, and no
+`TeamRole` / `TeamPermission` exists. Every ability an account holds is an
+`AccountPermission`, resolved from its single account role.
 
-This is a deliberate two-axis model: account-level permissions answer "what may
-this person do on the platform", team-level permissions answer "what may this
-person do in this team". Conflating them would make a team admin on one team an
-admin on every team.
+The role-owned surfaces — the route-permission equivalent of the web
+dashboards — map onto the same abilities:
 
-| Method | Path | Team role required |
+| Surface | Path | Ability | Notes |
+| --- | --- | --- | --- |
+| Reader / author workspace | `/dashboard` | `post:create` | The user role's home; sellers and admins also author here. |
+| Seller workspace | `/seller/dashboard` | `product:create` | The selling home. |
+| Admin dashboard | `/admin/dashboard` | `admin:access` | Platform administration. |
+| Admin user list | `/admin/users` | `user:manage` | Paginated; mirrors `GET /users`. |
+
+The four product modules are each a permission-guarded top-level space. All are
+declared ahead of the modules they front (see §12), so the permission is the
+contract and the page renders a placeholder until the module is built:
+
+| Module | Path | Ability |
 | --- | --- | --- |
-| `GET` | `/teams` | *(membership)* — teams the account belongs to |
-| `GET` | `/teams/{slug}` | `member` |
-| `POST` | `/teams` | *(any token)* — creator becomes `owner` |
-| `GET` | `/teams/{slug}/members` | `member` |
-| `POST` | `/teams/{slug}/invitations` | `invitation:create` |
-| `DELETE` | `/teams/{slug}/invitations/{code}` | `invitation:cancel` |
+| Ideas, Plans, Tasks, Projects & Collaboration | `/ideas` | `ideas:use` |
+| Developer Lab | `/dev-lab` | `dev-lab:use` |
+| AI Knowledge Hub | `/ai-hub` | `ai-hub:use` |
+| Developer Marketplace & Digital Product Ecosystem | `/marketplace` | `marketplace:use` |
 
-Those two ability names are `TeamPermission` values, resolved **against the
-target team's membership role** — not against the account. The full set is
-`team:update`, `team:delete`, `member:add`, `member:update`, `member:remove`,
-`invitation:create`, `invitation:cancel`.
-
-Token abilities therefore cannot express team authorization on their own. An
-account-level ability string like `team:invite` would be dangerous: it would
-read as a platform-wide grant when it must be a per-team one. The correct shape
-is a token bound to an account, with team authorization resolved per request
-from the membership row.
+Ability strings are exactly the `AccountPermission` enum values. Because there
+is only one axis, a token ability can always be expressed as a plain
+account-level string — there is no per-resource scope that would need to be
+resolved from a membership row, and consequently no ability name that reads as
+a narrower grant than it is.
 
 ### 6.6 Seller resources
 
@@ -488,7 +491,7 @@ Recorded so the design is falsifiable rather than aspirational.
 | 2 | Read-only public resources: posts, categories, tags | Phase 1 |
 | 3 | Write resources: post create/update, comment create | Phase 2 |
 | 4 | Administrative resources: users, role changes | Phase 3 |
-| 5 | Teams | Phase 4 |
+| 5 | Platform modules: `ideas:use`, `dev-lab:use`, `ai-hub:use`, `marketplace:use` | Phase 4 |
 | 6 | Seller products | **Blocked — no `Product` model** |
 
 Each phase ships with Laravel Resource classes, Form Requests, a policy per

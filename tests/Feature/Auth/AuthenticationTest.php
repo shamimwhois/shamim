@@ -20,8 +20,8 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     // Login lands on the dashboard the account's role owns. A plain user gets
-    // the author workspace at /dashboard; the redirect is resolved from
-    // AccountRole, not from the starter kit's team prefix.
+    // the author workspace at /dashboard; the destination is resolved from
+    // AccountRole::dashboardRoute(), never from a fixed path.
     $response
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('dashboard.index'));
@@ -37,7 +37,7 @@ test('a seller lands on the seller dashboard after logging in', function () {
         'password' => 'password',
     ])
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard.seller.index'));
+        ->assertRedirect(route('seller.dashboard'));
 
     $this->assertAuthenticated();
 });
@@ -50,7 +50,7 @@ test('an admin lands on the admin dashboard after logging in', function () {
         'password' => 'password',
     ])
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard.admin.index'));
+        ->assertRedirect(route('admin.dashboard'));
 
     $this->assertAuthenticated();
 });

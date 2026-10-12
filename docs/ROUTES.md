@@ -13,8 +13,8 @@ the intent. Where the two differ, the difference is called out.
 
 | File | Contains |
 | --- | --- |
-| `routes/web.php` | Public pages, dashboard, team-scoped starter routes |
-| `routes/settings.php` | Account settings, teams, passkey endpoints |
+| `routes/web.php` | Public pages, the three role dashboards, the four platform modules, backward-compatible redirects |
+| `routes/settings.php` | Account settings, passkey endpoints |
 | Framework / Fortify / Livewire | Auth, 2FA, passkeys, Livewire transport, Flux assets |
 
 `routes/console.php` registers no routes. There is **no `routes/api.php`** — see
@@ -83,18 +83,20 @@ per-route `redirects` map, so Fortify delegates to the response classes in
 | Role | Route | URI |
 | --- | --- | --- |
 | `user` | `dashboard.index` | `/dashboard` |
-| `seller` | `dashboard.seller.index` | `/dashboard/seller` |
-| `admin` | `dashboard.admin.index` | `/dashboard/admin` |
+| `seller` | `seller.dashboard` | `/seller/dashboard` |
+| `admin` | `admin.dashboard` | `/admin/dashboard` |
 
-Previously all four flows landed on `team.dashboard` —
-`/{current_team}/dashboard` — which renders the starter kit's placeholder page,
-not the application. `RedirectsToCurrentTeam::dashboardPathFor()` now guards
-with `app('router')->has($routeName)` and falls back to `/dashboard`, so a role
-can be declared in the enum before its dashboard route exists without producing
-a 500.
+Each role owns a **top-level** URL space: the role is the first path segment, so
+the address bar names the surface. No role dashboard is nested inside another —
+the previous `/{current_team}/dashboard` scoping is gone along with the team
+feature, and no registered route carries a `current_team` or `team` parameter.
 
-The fallback is why `'home' => '/dashboard'` still matters: it is what a role
-with no registered dashboard route receives.
+The response classes resolve the destination through
+`AccountRole::dashboardRoute()` and guard with `app('router')->has($routeName)`,
+falling back to `/dashboard`, so a role can be declared in the enum before its
+dashboard route exists without producing a 500. That fallback is why
+`'home' => '/dashboard'` still matters: it is what a role with no registered
+dashboard route receives.
 
 ### Email verification
 
@@ -119,36 +121,44 @@ step but not the second factor. A guest requesting either is redirected.
 
 ---
 
-## 4. Dashboard routes
+## 4. Role dashboards
 
-```
-middleware: ['auth', 'verified']
-prefix:     dashboard
-name:       dashboard.
-```
+Three separate, **role-owned** URL spaces. The role is the first path segment,
+so no role's home is nested inside another's. Each is stated with its exact
+enforced middleware.
 
-Every authenticated, verified account can reach the base group. The seller and
-admin sub-groups are additionally guarded by a **permission**, not by a role.
-
-| Method | URI | Name | Guard |
+| Method | URI | Name | Middleware |
 | --- | --- | --- | --- |
-| `GET` | `/dashboard` | `dashboard.index` | any authenticated account |
-| `GET` | `/dashboard/posts` | `dashboard.posts.index` | authenticated |
-| `GET` | `/dashboard/posts/create` | `dashboard.posts.create` | authenticated |
-| `GET` | `/dashboard/posts/{post:id}/edit` | `dashboard.posts.edit` | authenticated + policy |
-| `GET` | `/dashboard/comments` | `dashboard.comments` | authenticated |
-| `GET` | `/dashboard/taxonomy` | `dashboard.taxonomy` | authenticated |
-| `GET` | `/dashboard/seller` | `dashboard.seller.index` | `permission:product:create` |
-| `GET` | `/dashboard/admin` | `dashboard.admin.index` | `permission:admin:access` |
-| `GET` | `/dashboard/admin/users` | `dashboard.admin.users` | `permission:admin:access` |
+| `GET` | `/dashboard` | `dashboard.index` | `auth`, `verified` |
+| `GET` | `/dashboard/posts` | `dashboard.posts.index` | `auth`, `verified` |
+| `GET` | `/dashboard/posts/create` | `dashboard.posts.create` | `auth`, `verified` |
+| `GET` | `/dashboard/posts/{post:id}/edit` | `dashboard.posts.edit` | `auth`, `verified` + policy |
+| `GET` | `/dashboard/comments` | `dashboard.comments` | `auth`, `verified` |
+| `GET` | `/dashboard/taxonomy` | `dashboard.taxonomy` | `auth`, `verified` |
+| `GET` | `/seller/dashboard` | `seller.dashboard` | `auth`, `verified`, `permission:product:create` |
+| `GET` | `/admin/dashboard` | `admin.dashboard` | `auth`, `verified`, `permission:admin:access` |
+| `GET` | `/admin/users` | `admin.users` | `auth`, `verified`, `permission:admin:access` |
+
+`dashboard.*` is the **user** role's home and the shared author workspace: a
+seller and an admin still write posts here. Only their *homes* are distinct, so
+`/dashboard` stays reachable by every authenticated, verified account even
+though it is the user role's landing page. The seller and admin homes are
+guarded by a **permission**, not by a role name — a role check would drift from
+the permission matrix, a permission check cannot.
+
+The whole `dashboard.*` group is declared under `middleware(['auth',
+'verified'])`, `prefix('dashboard')`, `name('dashboard.')`. The seller group
+uses `prefix('seller')`, `name('seller.')`; the admin group uses
+`prefix('admin')`, `name('admin.')`.
 
 ### Two design decisions worth stating
 
-**`/dashboard` is deliberately unguarded.** It is the landing page for *every*
-role, and `pages::dashboard.⚡index`'s `mount()` forwards a seller or admin to
-their own dashboard via `redirectRoute($routeName, navigate: true)`. Guarding it
-with a permission would make it unreachable for the roles that must land there
-first in order to be forwarded.
+**`/dashboard` is deliberately unguarded by permission.** It is the landing page
+for *every* role, and `pages::dashboard.index`'s `mount()` forwards a seller or
+admin to the dashboard their role owns via `redirectRoute($routeName, navigate:
+true)`. Guarding it with a permission would make it unreachable for the roles
+that must land there first in order to be forwarded — the redirect is a real
+HTTP redirect so the URL always names what is on screen.
 
 **`posts/{post:id}` binds by id, not slug.** The dashboard edits the post you
 own; a slug is a publication concern, not an authoring one. The *public* route
@@ -164,9 +174,56 @@ answered by `PostPolicy` inside the component.
 
 ---
 
-## 5. Settings routes
+## 5. Platform module routes
 
-Two groups with **different** guards. The split is deliberate.
+Four product modules, each with its own top-level URL space and its own
+permission. The modules are **not built yet** — each route renders a placeholder
+page (via `resources/views/components/module-placeholder.blade.php`) stating
+what is planned. The routes and guards resolve today, and the sidebar points at
+them, so each module has a landing spot to be built into rather than needing a
+routing change later.
+
+| Method | URI | Name | Middleware |
+| --- | --- | --- | --- |
+| `GET` | `/dev-lab` | `dev-lab.index` | `auth`, `verified`, `permission:dev-lab:use` |
+| `GET` | `/ai-hub` | `ai-hub.index` | `auth`, `verified`, `permission:ai-hub:use` |
+| `GET` | `/marketplace` | `marketplace.index` | `auth`, `verified`, `permission:marketplace:use` |
+| `GET` | `/ideas` | `ideas.index` | `auth`, `verified`, `permission:ideas:use` |
+
+The URL space is claimed now on purpose: `/ideas`, `/dev-lab`, `/ai-hub` and
+`/marketplace` are top-level names that must not be taken by anything else. A
+guest is redirected to login rather than refused, because they may hold the
+permission after authenticating.
+
+---
+
+## 6. Backward-compatible redirects
+
+The role dashboards moved from nested paths to role-owned top-level spaces.
+These redirects keep existing bookmarks, external links and in-flight email
+working. They are **301**, not 302: the move is permanent, so a browser or
+search engine is correct to cache it.
+
+| Method | URI | Name | Target | Middleware |
+| --- | --- | --- | --- | --- |
+| `GET` | `/dashboard/seller` | `dashboard.seller.redirect` | `/seller/dashboard` (301) | — |
+| `GET` | `/dashboard/admin` | `dashboard.admin.redirect` | `/admin/dashboard` (301) | — |
+| `GET` | `/teams/dashboard` | `team.dashboard` | `/dashboard` (301) | `auth`, `verified` |
+| `GET` | `/settings/teams` | `teams.index.redirect` | `/settings/security` (301) | `auth`, `verified` |
+
+The `team.dashboard` name is preserved as a redirect to `/dashboard`. It was the
+starter kit's team-scoped dashboard; with the team feature removed there is no
+team to scope by, but the name is still referenced in documentation and may be
+bookmarked, so it resolves rather than 404s. `settings/teams` lands on the
+security screen — the closest surviving screen, since no team surface remains.
+
+---
+
+## 7. Settings routes
+
+Two groups with **different** guards. The split is deliberate. Account settings
+are shared by every role — there is no team-scoped settings surface; the team
+feature and its `/settings/teams` routes were removed.
 
 | Method | URI | Name | Guard |
 | --- | --- | --- | --- |
@@ -174,8 +231,7 @@ Two groups with **different** guards. The split is deliberate.
 | `GET` | `/settings/profile` | `profile.edit` | `auth` **only** |
 | `GET` | `/settings/appearance` | `appearance.edit` | `auth`, `verified` |
 | `GET` | `/settings/security` | `security.edit` | `auth`, `verified`, `password.confirm`\* |
-| `GET` | `/settings/teams` | `teams.index` | `auth`, `verified` |
-| `GET` | `/settings/teams/{team}` | `teams.edit` | `auth`, `verified`, `EnsureTeamMembership` |
+| `GET` | `/settings/teams` | `teams.index.redirect` | `auth`, `verified` → 301 to `/settings/security` |
 
 \* `password.confirm` is applied **conditionally**:
 
@@ -200,17 +256,13 @@ address is how you recover from being unable to receive the verification mail**.
 Requiring `verified` here would make an unverifiable account permanently stuck —
 unable to verify, and unable to change the address that verification is sent to.
 
-`/settings/teams/{team}` binds `{team}`, not `{team:slug}` — the model's
-`getRouteKeyName()` supplies the slug, and `EnsureTeamMembership` on the route
-refuses a non-member before the component boots.
-
 `/.well-known/passkey-endpoints` is a JSON discovery document, returns
 `security.edit` for both `enroll` and `manage`, and is intentionally
 unauthenticated.
 
 ---
 
-## 6. Passkey routes
+## 8. Passkey routes
 
 Provided by `laravel/passkeys`. Two groups: unauthenticated (login) and
 authenticated (registration and management).
@@ -232,7 +284,7 @@ not by application code.
 
 ---
 
-## 7. Two-factor management routes
+## 9. Two-factor management routes
 
 Fortify's management endpoints. All require `auth`; those that change state are
 additionally behind password confirmation.
@@ -255,7 +307,7 @@ where that state persists between requests.
 
 ---
 
-## 8. Password confirmation routes
+## 10. Password confirmation routes
 
 | Method | URI | Name |
 | --- | --- | --- |
@@ -270,30 +322,36 @@ confirmed — the screen exists to *establish* the state, not to re-assert it.
 
 ---
 
-## 9. Starter-kit route — retained
+## 11. The removed team routes
 
-| Method | URI | Name | Middleware |
-| --- | --- | --- | --- |
-| `GET` | `/{current_team}/dashboard` | `team.dashboard` | `auth`, `verified`, `EnsureTeamMembership` |
+The team feature was deleted **entirely**, and with it every team-scoped route.
+Nothing in the current route table carries a `current_team` or `team`
+parameter, and no URL can reintroduce team scoping by accident.
 
-This is the only starter-kit route left registered.
+Removed: the `Team`, `Membership` and `TeamInvitation` models; the `HasTeams`
+and `GeneratesUniqueTeamSlugs` traits; `TeamPolicy`; the
+`EnsureTeamMembership` and `SetTeamUrlDefaults` middleware; the
+`TeamPermissions` and `UserTeam` DTOs; the `TeamName` and
+`UniqueTeamInvitation` rules; `Actions/Teams/*` and `Notifications/Teams/*`;
+the `RedirectsToCurrentTeam` response concern; the `TeamRole` and
+`TeamPermission` enums; the whole `resources/views/pages/teams/` tree; the
+`⚡team-switcher`, `⚡create-team-modal` and `team-invitation-alert` components;
+the `layouts/app*` layouts; `views/dashboard.blade.php`; the `create_teams_table`
+and `add_current_team_id_to_users_table` migrations; the `TeamFactory` and
+`TeamInvitationFactory`; and the whole `tests/Feature/Teams/` directory.
 
-**Why it still exists.** `routes/web.php` documents the reason: the team
-invitation and team-management flows link to it, and removing it would break
-them until they are repointed at `/dashboard`. It renders
-`resources/views/dashboard.blade.php`, which is also starter-kit scaffolding.
+The `teams`, `team_memberships` and `team_invitations` tables are gone, as is
+`users.current_team_id`. The authorisation model is now **single-axis**:
+`AccountRole` + `AccountPermission` are the only vocabulary. Any description of
+a two-axis (account + team) model is stale.
 
-**It is not the application's dashboard.** Nothing a user is directed to by
-login, registration or verification reaches it — all of those now resolve
-through the role-aware redirect. It is reachable only by typing the URL or
-following a team flow, and it is the last piece of the starter kit with a live
-route. Removing it is a contained follow-up: repoint the team links at
-`/dashboard`, delete the route, delete `views/dashboard.blade.php`, delete
-`layouts/app/*`.
+Two routes survive as redirects so old links resolve — `/teams/dashboard` →
+`/dashboard` (`team.dashboard`) and `/settings/teams` → `/settings/security`
+(`teams.index.redirect`); see §6.
 
 ---
 
-## 10. Package routes (not listed individually)
+## 12. Package routes (not listed individually)
 
 | Prefix | Source | Count |
 | --- | --- | --- |
@@ -307,19 +365,22 @@ that changes between releases.
 
 ---
 
-## 11. Conventions
+## 13. Conventions
 
 **Route names mirror URIs, with dots for nesting.**
 
 ```
 /dashboard          → dashboard.index
 /dashboard/posts    → dashboard.posts.index
-/settings/teams     → teams.index        ← deliberate exception
+/seller/dashboard   → seller.dashboard
+/admin/users        → admin.users
 ```
 
-`teams.*` rather than `settings.teams.*` because the team routes were named
-before they moved under `/settings`, and the name is referenced by redirects and
-tests. Renaming would be tidier and is not worth the churn.
+Role homes are named `<role>.dashboard`, not `dashboard.<role>.*`, because the
+role is the first path segment and the name follows the path. The two redirects
+are the exceptions that prove the rule: `team.dashboard` and `teams.index.redirect`
+keep names that no longer match their target, on purpose, so old references
+still resolve.
 
 **View routes use `Route::livewire`.** The second argument is always a
 `pages::` or `layouts::` name. A typo is a runtime 500, not a build failure —
@@ -327,9 +388,9 @@ which is why route names and their components are exercised by tests rather
 than trusted.
 
 **Model binding keys are explicit.** `{post:slug}` on public routes,
-`{post:id}` on dashboard routes, `{team:slug}` on team routes. Never a bare
-`{post}`, because the default key silently changes if the model's
-`getRouteKeyName()` changes.
+`{post:id}` on dashboard routes. Never a bare `{post}`, because the default key
+silently changes if the model's `getRouteKeyName()` changes. No route binds a
+team, because no route is team-scoped.
 
 **Guards are permission-based, not role-based.** Every role check is expressed
 as `permission:<ability>` or a policy. There is no `->middleware('role:admin')`
@@ -338,16 +399,16 @@ must be edited every time a role's permissions change.
 
 ---
 
-## 12. Known issues
+## 14. Known issues
 
 | # | Issue | Impact |
 | --- | --- | --- |
-| 1 | `team.dashboard` and `views/dashboard.blade.php` are live starter-kit scaffolding | Confusing: two things called "dashboard". §9. |
-| 2 | `settings/teams` is named `teams.*`, not `settings.teams.*` | Inconsistent with its URI. §11. |
-| 3 | `dashboard.posts.create` and `.edit` differ only by a bound model | Intentional, but means the "create" guard cannot be expressed in middleware. §4. |
-| 4 | `dashboard.index` is unguarded by permission | Intentional — it is the forwarding entry point for every role. §4. |
-| 5 | `settings/teams/{team}` binds `{team}`, not `{team:slug}` | Relies on `Team::getRouteKeyName()`. Changing that method would silently change the URI shape. |
+| 1 | `dashboard.posts.create` and `.edit` differ only by a bound model | Intentional, but means the "create" guard cannot be expressed in middleware. §4. |
+| 2 | `dashboard.index` is unguarded by permission | Intentional — it is the forwarding entry point for every role. §4. |
+| 3 | Modules render placeholders, not features | Intentional. The routes and guards are real; the modules are unbuilt. §5. |
+| 4 | `team.dashboard` and `teams.index.redirect` name routes that no longer match their behaviour | Historic names kept so old links and docs resolve. §6, §13. |
 
-On issue 5: the binding key is implicit where the dashboard's post routes are
-explicit (`{post:id}`). Making the team route explicit too would remove the
-dependency on a model method for a URL's shape.
+On issue 3: because the routes exist and the navigation points at them, each
+module can be built into its landing spot without a routing change. The
+placeholder page states plainly that it is not yet available, so it cannot be
+mistaken for a working feature.

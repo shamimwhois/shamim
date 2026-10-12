@@ -3,8 +3,6 @@
 namespace Database\Factories;
 
 use App\Enums\AccountRole;
-use App\Enums\TeamRole;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +21,9 @@ class UserFactory extends Factory
     /**
      * Define the model's default state.
      *
+     * The default role is `user` — the least-privileged — so a test that does
+     * not ask for privilege does not get it. `seller()` and `admin()` opt in.
+     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -38,24 +39,6 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ];
-    }
-
-    /**
-     * Configure the model factory.
-     */
-    public function configure(): static
-    {
-        return $this->afterCreating(function ($user) {
-            $team = Team::factory()->personal()->create([
-                'name' => $user->name."'s Team",
-            ]);
-
-            $team->members()->attach($user, [
-                'role' => TeamRole::Owner->value,
-            ]);
-
-            $user->switchTeam($team);
-        });
     }
 
     /**

@@ -10,10 +10,10 @@ use App\Models\User;
 /**
  * Account-level role and permission behaviour.
  *
- * Kept separate from {@see HasTeams} on purpose. Team membership answers "what
- * may I do inside this team"; this trait answers "what may I do at all". The
- * two are composed on {@see User} but never conflated, because a
- * user who owns a team is still not thereby an administrator of the platform.
+ * This trait answers a single question: "what may this account do at all",
+ * independent of any other account. It is the only authorisation axis in the
+ * application — the team-scoped role axis and the team feature itself were
+ * removed, so there is no longer a second, narrower role to reconcile against.
  *
  * @property AccountRole $role
  */

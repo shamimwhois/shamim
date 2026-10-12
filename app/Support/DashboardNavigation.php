@@ -143,13 +143,56 @@ final class DashboardNavigation
                     ],
                 ],
             ],
+            /*
+             * Platform modules. Each is a separate top-level URL space; none is
+             * nested under `/dashboard`. Items appear only for accounts that
+             * hold the module's permission, so a plain user sees the three they
+             * can reach and never the Marketplace.
+             */
+            [
+                'label' => __('Modules'),
+                'items' => [
+                    [
+                        'label' => __('Ideas'),
+                        'route' => 'ideas.index',
+                        'pattern' => 'ideas.*',
+                        'icon' => 'light-bulb',
+                        'permissions' => [AccountPermission::UseIdeas],
+                        'badge' => null,
+                    ],
+                    [
+                        'label' => __('Developer Lab'),
+                        'route' => 'dev-lab.index',
+                        'pattern' => 'dev-lab.*',
+                        'icon' => 'beaker',
+                        'permissions' => [AccountPermission::UseDeveloperLab],
+                        'badge' => null,
+                    ],
+                    [
+                        'label' => __('AI Hub'),
+                        'route' => 'ai-hub.index',
+                        'pattern' => 'ai-hub.*',
+                        'icon' => 'sparkles',
+                        'permissions' => [AccountPermission::UseAiHub],
+                        'badge' => null,
+                    ],
+                    [
+                        'label' => __('Marketplace'),
+                        'route' => 'marketplace.index',
+                        'pattern' => 'marketplace.*',
+                        'icon' => 'shopping-bag',
+                        'permissions' => [AccountPermission::UseMarketplace],
+                        'badge' => null,
+                    ],
+                ],
+            ],
             [
                 'label' => __('Selling'),
                 'items' => [
                     [
-                        'label' => __('Seller home'),
-                        'route' => 'dashboard.seller.index',
-                        'pattern' => 'dashboard.seller.*',
+                        'label' => __('Seller dashboard'),
+                        'route' => 'seller.dashboard',
+                        'pattern' => 'seller.*',
                         'icon' => 'building-storefront',
                         'permissions' => [AccountPermission::CreateProduct],
                         'badge' => null,
@@ -160,17 +203,17 @@ final class DashboardNavigation
                 'label' => __('Administration'),
                 'items' => [
                     [
-                        'label' => __('Admin home'),
-                        'route' => 'dashboard.admin.index',
-                        'pattern' => 'dashboard.admin.index',
+                        'label' => __('Admin dashboard'),
+                        'route' => 'admin.dashboard',
+                        'pattern' => 'admin.dashboard',
                         'icon' => 'shield-check',
                         'permissions' => [AccountPermission::AccessAdminPanel],
                         'badge' => null,
                     ],
                     [
                         'label' => __('Users'),
-                        'route' => 'dashboard.admin.users',
-                        'pattern' => 'dashboard.admin.users',
+                        'route' => 'admin.users',
+                        'pattern' => 'admin.users',
                         'icon' => 'users',
                         'permissions' => [AccountPermission::ManageUsers],
                         'badge' => null,

@@ -5,9 +5,10 @@ namespace App\Enums;
 /**
  * Account-level permissions.
  *
- * These are distinct from {@see TeamPermission}, which governs what a member
- * may do *inside one team*. Account permissions are global: they describe what
- * an account may do anywhere in the application, independent of any team.
+ * These describe what an account may do anywhere in the application. They are
+ * the only authorisation vocabulary in the system — the team-scoped permission
+ * set and the team feature itself were removed, so there is no second, narrower
+ * scope to reconcile against.
  *
  * Cases are namespaced `resource:action` so a permission name is unambiguous
  * when it appears in logs, policy checks, or a database seeder.
@@ -25,6 +26,12 @@ enum AccountPermission: string
     case ModerateComments = 'comment:moderate';
 
     case ManageTaxonomy = 'taxonomy:manage';
+
+    // --- Platform modules --------------------------------------------------
+    case UseDeveloperLab = 'dev-lab:use';
+    case UseAiHub = 'ai-hub:use';
+    case UseMarketplace = 'marketplace:use';
+    case UseIdeas = 'ideas:use';
 
     // --- Selling -----------------------------------------------------------
     case CreateProduct = 'product:create';
@@ -60,6 +67,10 @@ enum AccountPermission: string
             self::PublishPost => __('Publish posts'),
             self::ModerateComments => __('Moderate comments'),
             self::ManageTaxonomy => __('Manage categories and tags'),
+            self::UseDeveloperLab => __('Use the Developer Lab'),
+            self::UseAiHub => __('Use the AI Knowledge Hub'),
+            self::UseMarketplace => __('Use the Marketplace'),
+            self::UseIdeas => __('Use the Ideas workspace'),
             self::CreateProduct => __('Create products'),
             self::UpdateOwnProduct => __('Edit own products'),
             self::DeleteOwnProduct => __('Delete own products'),
@@ -94,6 +105,12 @@ enum AccountPermission: string
 
             self::ModerateComments,
             self::ManageTaxonomy => PermissionGroup::Moderation,
+
+            self::UseDeveloperLab,
+            self::UseAiHub,
+            self::UseIdeas => PermissionGroup::Platform,
+
+            self::UseMarketplace => PermissionGroup::Selling,
 
             self::CreateProduct,
             self::UpdateOwnProduct,

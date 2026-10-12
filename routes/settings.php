@@ -1,8 +1,19 @@
 <?php
 
-use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
+
+/*
+|--------------------------------------------------------------------------
+| Settings
+|--------------------------------------------------------------------------
+|
+| Account settings are shared by every role — a seller and an admin manage
+| their profile, security and appearance through the same screens as a reader.
+| There is no team-scoped settings surface: the team feature and its
+| `/settings/teams` routes were removed with the rest of the team context.
+|
+*/
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
@@ -23,12 +34,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ),
         )
         ->name('security.edit');
+});
 
-    Route::livewire('settings/teams', 'pages::teams.index')->name('teams.index');
+/*
+| Backward-compatible redirect for the removed team settings page. A bookmark
+| or an old link lands on the security screen rather than a 404 — the closest
+| surviving screen, since the team surface no longer exists.
+*/
 
-    Route::middleware(EnsureTeamMembership::class)->group(function () {
-        Route::livewire('settings/teams/{team}', 'pages::teams.edit')->name('teams.edit');
-    });
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::redirect('settings/teams', '/settings/security', 301)->name('teams.index.redirect');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {
