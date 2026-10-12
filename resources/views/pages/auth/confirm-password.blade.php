@@ -1,7 +1,9 @@
-<x-layouts::auth :title="__('Confirm password')">
+<x-layouts::auth :eyebrow="__('Security')"
+            :title="__('Confirm your password')">
     <div class="flex flex-col gap-6">
         <x-auth-header
-            :title="__('Confirm password')"
+            :eyebrow="__('Security')"
+            :title="__('Confirm your password')"
             :description="__('This is a secure area of the application. Please confirm your password before continuing.')"
         />
 
