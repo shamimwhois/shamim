@@ -30,7 +30,7 @@
                 </nav>
 
                 <div class="border-t border-ink-200 p-3 dark:border-ink-800">
-                    {{-- Author identity --}}
+                    {{-- Account identity, with the role that governs the menu above. --}}
                     <div class="flex items-center gap-3 rounded-md px-3 py-2">
                         <div class="grid size-8 shrink-0 place-items-center rounded-md border border-ink-200 bg-ink-50 font-mono text-xs font-semibold text-ink-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300">
                             {{ Str::of(auth()->user()->name)->substr(0, 1)->upper() }}
@@ -44,6 +44,21 @@
                             </p>
                         </div>
                     </div>
+
+                    {{-- Plan card: the account's commercial shape, one click from its dashboard home. --}}
+                    <a
+                        href="{{ route(auth()->user()->dashboardRoute()) }}"
+                        wire:navigate
+                        class="mt-1 block rounded-md border border-ink-200 p-3 transition-colors hover:border-ink-300 hover:bg-ink-50 dark:border-ink-800 dark:hover:border-ink-700 dark:hover:bg-ink-950/60"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <x-dashboard.role-badge size="md" />
+                        </div>
+
+                        <p class="mt-2 text-2xs leading-relaxed text-ink-500 dark:text-ink-400">
+                            {{ auth()->user()->plan()->tagline() }}
+                        </p>
+                    </a>
 
                     <div class="mt-1 space-y-0.5">
                         <a
@@ -94,20 +109,24 @@
                             Dashboard
                         </a>
 
-                        <button
-                            type="button"
-                            @click="open = ! open"
-                            :aria-expanded="open"
-                            class="grid size-9 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800"
-                            aria-label="Toggle dashboard navigation"
-                        >
-                            <svg x-show="! open" class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                            </svg>
-                            <svg x-show="open" x-cloak class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <x-dashboard.role-badge />
+
+                            <button
+                                type="button"
+                                @click="open = ! open"
+                                :aria-expanded="open"
+                                class="grid size-9 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800"
+                                aria-label="Toggle dashboard navigation"
+                            >
+                                <svg x-show="! open" class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                </svg>
+                                <svg x-show="open" x-cloak class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <nav

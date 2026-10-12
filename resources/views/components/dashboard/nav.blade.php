@@ -3,76 +3,60 @@
      * Dashboard navigation.
      *
      * Rendered twice (desktop rail and mobile panel), so it is a component
-     * rather than duplicated markup. Each item declares its own route-name
-     * pattern so the active state is derived, not hand-maintained.
+     * rather than duplicated markup.
+     *
+     * The items come from {@see \App\Support\DashboardNavigation}, which filters
+     * them by the signed-in account's permissions. This view does no access
+     * control of its own — it renders whatever it is given. That split is what
+     * keeps the menu and the route guards from disagreeing: there is one
+     * declaration, read by both the menu and the middleware.
+     *
+     * Each item declares a route-name *pattern* so the active state is derived
+     * from the current route rather than hand-maintained.
      */
-    $items = [
-        [
-            'label' => 'Overview',
-            'route' => 'dashboard.index',
-            'pattern' => 'dashboard.index',
-            'icon' => 'squares-2x2',
-        ],
-        [
-            'label' => 'Posts',
-            'route' => 'dashboard.posts.index',
-            'pattern' => 'dashboard.posts.*',
-            'icon' => 'document-text',
-        ],
-        [
-            'label' => 'Comments',
-            'route' => 'dashboard.comments',
-            'pattern' => 'dashboard.comments',
-            'icon' => 'chat-bubble-left-right',
-            'badge' => $pendingComments ?? 0,
-        ],
-        [
-            'label' => 'Taxonomy',
-            'route' => 'dashboard.taxonomy',
-            'pattern' => 'dashboard.taxonomy',
-            'icon' => 'tag',
-        ],
-    ];
+    $sections = \App\Support\DashboardNavigation::for(auth()->user());
 @endphp
 
-<div class="space-y-6">
-    @foreach ($items as $item)
-        @php $current = request()->routeIs($item['pattern']); @endphp
-
+<nav class="space-y-6" aria-label="Dashboard">
+    @foreach ($sections as $section)
         <div>
-            @if ($loop->first)
-                <p class="px-3 pb-2 font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                    Content
-                </p>
-            @endif
+            <p class="px-3 pb-2 font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                {{ $section['label'] }}
+            </p>
 
-            <a
-                href="{{ route($item['route']) }}"
-                wire:navigate
-                @if ($current) aria-current="page" @endif
-                @class([
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    'bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-950' => $current,
-                    'text-ink-600 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100' => ! $current,
-                ])
-            >
-                <flux:icon :name="$item['icon']" class="size-4 shrink-0" />
-                <span class="flex-1">{{ $item['label'] }}</span>
+            <div class="space-y-0.5">
+                @foreach ($section['items'] as $item)
+                    @php
+                        $current = request()->routeIs($item['pattern']);
+                        /* Always an int — DashboardNavigation resolves the marker. */
+                        $badge = $item['badge'];
+                    @endphp
 
-                @if (($item['badge'] ?? 0) > 0 && ! $current)
-                    <span class="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-amber-700 dark:bg-amber-950 dark:text-amber-400">
-                        {{ $item['badge'] }}
-                    </span>
-                @elseif (($item['badge'] ?? 0) > 0 && $current)
-                    <span class="rounded-full bg-white/20 px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums dark:bg-ink-950/20">
-                        {{ $item['badge'] }}
-                    </span>
-                @endif
-            </a>
+                    <a
+                        href="{{ route($item['route']) }}"
+                        wire:navigate
+                        @if ($current) aria-current="page" @endif
+                        @class([
+                            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            'bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-950' => $current,
+                            'text-ink-600 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100' => ! $current,
+                        ])
+                    >
+                        <flux:icon :name="$item['icon']" class="size-4 shrink-0" />
+                        <span class="flex-1">{{ $item['label'] }}</span>
+
+                        @if ($badge > 0 && ! $current)
+                            <span class="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                                {{ $badge }}
+                            </span>
+                        @elseif ($badge > 0 && $current)
+                            <span class="rounded-full bg-white/20 px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums dark:bg-ink-950/20">
+                                {{ $badge }}
+                            </span>
+                        @endif
+                    </a>
+                @endforeach
+            </div>
         </div>
-
-        @if ($loop->first)
-            <div class="hairline !my-4"></div>
-        @endif
     @endforeach
-</div>
+</nav>

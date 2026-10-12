@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\PostMetrics;
+use App\Enums\AccountRole;
 use App\Enums\CommentStatus;
 use App\Enums\PostStatus;
 use App\Models\Comment;
@@ -13,20 +14,40 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 /**
- * Author dashboard overview.
+ * Dashboard overview.
  *
- * Answers three questions in order of urgency:
- *   1. Is anything waiting on me? (moderation queue, drafts)
- *   2. How is the writing performing? (views, comments)
- *   3. What have I published recently?
+ * `/dashboard` is the single entry point every authenticated account reaches,
+ * but it is not the destination. Which dashboard an account actually needs
+ * depends on its role:
  *
- * Every number is computed from persisted data — no analytics service, no
- * sampling, no external dependency that can be wrong.
+ *   seller → redirects to the seller home
+ *   admin  → redirects to the admin home
+ *   user   → renders the author workspace below
+ *
+ * The redirect is a real HTTP redirect rather than a conditional render so the
+ * URL always names what is on screen, and so the sidebar's active state and
+ * browser history both stay honest.
+ *
+ * Every number on this page is computed from persisted data — no analytics
+ * service, no sampling, no external dependency that can be wrong.
  */
 new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Component
 {
     public function mount(): void
     {
+        $role = auth()->user()->accountRole();
+
+        if ($role !== AccountRole::User) {
+            /* Only redirect to a dashboard that is actually registered. */
+            $routeName = $role->dashboardRoute();
+
+            if (app('router')->has($routeName)) {
+                $this->redirectRoute($routeName, navigate: true);
+
+                return;
+            }
+        }
+
         app(Seo::class)->set([
             'title' => 'Dashboard',
             'description' => 'Author dashboard for '.config('portfolio.author.name'),

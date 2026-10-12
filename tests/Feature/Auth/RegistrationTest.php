@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AccountRole;
 use App\Models\User;
 
 test('registration screen can be rendered', function () {
@@ -18,9 +19,12 @@ test('new users can register', function () {
 
     $user = User::where('email', 'test@example.com')->first();
 
-    // Registration lands on the new user's personal team dashboard.
+    // Registration lands on the role dashboard. New accounts are always
+    // created as plain users, so that is the author workspace at /dashboard.
     $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
+        ->assertRedirect(route('dashboard.index'));
+
+    expect($user->role)->toBe(AccountRole::User);
 
     $this->assertAuthenticated();
 });

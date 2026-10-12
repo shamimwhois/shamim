@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAccountPermission;
 use App\Http\Middleware\SetTeamUrlDefaults;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             SetTeamUrlDefaults::class,
+        ]);
+
+        /*
+         * Account-level permission guard, used as `permission:post:publish` on
+         * routes that must not even render for an unauthorised account.
+         */
+        $middleware->alias([
+            'permission' => EnsureAccountPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

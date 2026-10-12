@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\AccountRole;
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
@@ -31,6 +32,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => AccountRole::User,
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
@@ -75,6 +77,36 @@ class UserFactory extends Factory
             'two_factor_secret' => encrypt('secret'),
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
+        ]);
+    }
+
+    /**
+     * Indicate that the account is a seller.
+     */
+    public function seller(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => AccountRole::Seller,
+        ]);
+    }
+
+    /**
+     * Indicate that the account is an administrator.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => AccountRole::Admin,
+        ]);
+    }
+
+    /**
+     * Indicate that the account holds the given role.
+     */
+    public function role(AccountRole $role): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => $role,
         ]);
     }
 }

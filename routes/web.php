@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AccountPermission;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
@@ -33,27 +34,56 @@ Route::get('robots.txt', RobotsController::class);
 
 /*
 |--------------------------------------------------------------------------
-| Author dashboard
+| Dashboard
 |--------------------------------------------------------------------------
 |
+| One URL space, three role-scoped homes. Every account reaches `/dashboard`,
+| but which page that renders — and which navigation it sees — depends on the
+| account's role:
+|
+|   user   → /dashboard          (author workspace)
+|   seller → /dashboard/seller   (products, sales, reviews)
+|   admin  → /dashboard/admin    (platform administration)
+|
 | Deliberately NOT nested under the `{current_team}` prefix used by the
-| starter kit's team routes. DevFolio is single-author: posts belong to a
-| user, not a team, and forcing a team slug into every authoring URL would
-| add a segment that carries no meaning. The starter kit's team routes are
-| left untouched below.
+| starter kit's team routes. This is a single-author portfolio: posts belong to
+| a user, not a team, and forcing a team slug into every URL would add a
+| segment that carries no meaning. The starter kit's team routes are left
+| untouched below.
+|
+| `permission:` is the account-level guard from `AccountPermission`. It is
+| enforced on the route as well as in the component, so an unauthorised account
+| never reaches the page at all.
 |
 */
 
 Route::middleware(['auth', 'verified'])->prefix('dashboard')->name('dashboard.')->group(function () {
+    /* Every role lands here; the component forwards to the role's own home. */
     Route::livewire('/', 'pages::dashboard.index')->name('index');
 
+    /* Author workspace — available to every authenticated account. */
     Route::livewire('posts', 'pages::dashboard.posts.index')->name('posts.index');
     Route::livewire('posts/create', 'pages::dashboard.posts.edit')->name('posts.create');
     Route::livewire('posts/{post:id}/edit', 'pages::dashboard.posts.edit')->name('posts.edit');
-
     Route::livewire('comments', 'pages::dashboard.comments')->name('comments');
-
     Route::livewire('taxonomy', 'pages::dashboard.taxonomy')->name('taxonomy');
+
+    /* Seller workspace. */
+    Route::middleware('permission:'.AccountPermission::CreateProduct->value)
+        ->prefix('seller')
+        ->name('seller.')
+        ->group(function () {
+            Route::livewire('/', 'pages::dashboard.seller.index')->name('index');
+        });
+
+    /* Admin workspace. */
+    Route::middleware('permission:'.AccountPermission::AccessAdminPanel->value)
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(function () {
+            Route::livewire('/', 'pages::dashboard.admin.index')->name('index');
+            Route::livewire('users', 'pages::dashboard.admin.users')->name('users');
+        });
 });
 
 /*

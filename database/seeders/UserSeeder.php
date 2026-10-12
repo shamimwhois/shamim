@@ -2,23 +2,46 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AccountRole;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Creates the site owner account.
+ * Creates the accounts used by the seeded application.
  *
- * PostSeeder resolves its author from the first user, so this must run before it.
- * Credentials are intentionally the same as Laravel's starter default so the
- * documented `composer setup` path lands on a known login.
+ * Three accounts, one per role, so every dashboard in the access model is
+ * reachable immediately after `composer setup` without hand-editing the
+ * database. The author account keeps Laravel's starter default credentials so
+ * the documented setup path lands on a known login; the seller and admin
+ * accounts are additional and clearly labelled.
+ *
+ * PostSeeder resolves its author from the first user, so the admin account is
+ * listed first and owns the seeded posts.
  */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::factory()->create([
-            'name' => config('portfolio.author.name', 'Test User'),
-            'email' => 'test@example.com',
-        ]);
+        $accounts = [
+            [
+                'name' => config('portfolio.author.name', 'Test User'),
+                'email' => 'test@example.com',
+                'role' => AccountRole::Admin,
+            ],
+            [
+                'name' => 'Sam Seller',
+                'email' => 'seller@example.com',
+                'role' => AccountRole::Seller,
+            ],
+            [
+                'name' => 'Robin Reader',
+                'email' => 'user@example.com',
+                'role' => AccountRole::User,
+            ],
+        ];
+
+        foreach ($accounts as $account) {
+            User::factory()->create($account);
+        }
     }
 }
