@@ -96,6 +96,114 @@
 
     --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+    /* ======================================================================
+       Soft UI (neumorphic) — the dashboard's own token set.
+
+       These are *additive*: nothing above changes. The values are the
+       dashboard spec's palette (docs/SOFT-UI.md §2), and they are re-scoped
+       per surface by the `[data-sui]` blocks further down, so a utility
+       such as `bg-sui-surface` means "the raised surface of whatever
+       surface tree I am standing in".
+
+       Naming rule: `--color-sui-*` is a semantic role (surface, ink, rail,
+       accent, status). Never reach for a raw hex in a component — if the
+       role you need does not exist yet, add it here first.
+       ====================================================================== */
+
+    /* --- Surfaces ------------------------------------------------------- */
+    --color-sui-canvas: #f8f9fa;         /* the page behind the cards */
+    --color-sui-surface: #ffffff;        /* the raised card */
+    --color-sui-well: #f8f9fa;           /* inset fields, same-colour as the canvas */
+    --color-sui-hover: #f1f3f5;          /* the wash a pointer leaves behind */
+    --color-sui-hairline: #e9ecef;       /* 1px separation, barely there */
+    --color-sui-border: #d2d6da;         /* the default interactive boundary */
+    --color-sui-border-strong: #6b7280;  /* focused / emphasised boundaries */
+
+    /* --- Text ----------------------------------------------------------- */
+    --color-sui-ink: #344767;            /* headings, values, anything you must read */
+    --color-sui-ink-secondary: #5f6b7e;  /* body copy — the AA-safe realisation of the
+                                            spec's #67748e (see the scope note below) */
+    --color-sui-ink-muted: #67748e;      /* the spec's secondary — white surfaces only */
+    --color-sui-ink-disabled: #8392ab;   /* non-essential, large text only */
+    --color-sui-ink-on-accent: #ffffff;
+
+    /* --- The rail ------------------------------------------------------- */
+    /* The one dark surface in the light theme. `#8392ab` on `#000000`
+       measures 6.66:1, which is why the rail's secondary text is the
+       spec's third text colour rather than its first. */
+    --color-sui-rail: #000000;
+    --color-sui-rail-ink: #ffffff;
+    --color-sui-rail-ink-secondary: #8392ab;
+    --color-sui-rail-hairline: rgb(255 255 255 / 0.10);
+    --color-sui-rail-accent: #5b76d6;    /* 5.0:1 on the rail — safe as a 3:1 bar */
+
+    /* --- Accent --------------------------------------------------------- */
+    /* Derived, not supplied: the spec fixes the neutrals but leaves the
+       accent open. #2b4acb measures 7.13:1 on white and 6.76:1 on the
+       canvas, so a white button label clears AA at 4.5:1 with room to
+       spare; the brighter indigos that usually fill this slot do not. */
+    --color-sui-accent: #2b4acb;
+    --color-sui-accent-hover: #2440b0;
+    --color-sui-accent-active: #1e3793;
+    --color-sui-accent-soft: #eef1fb;    /* the tint behind a selected row */
+    --color-sui-accent-softer: #f5f7fd;
+    --color-sui-accent-ink: #2440b0;     /* accent-coloured *text* on white */
+
+    /* --- Status --------------------------------------------------------- */
+    /* Tailwind's 700 family: the light 600s measure below 4.5:1 on white,
+       so every status colour that ever carries text is the 700. */
+    --color-sui-success: #15803d;
+    --color-sui-success-soft: #f0fdf4;
+    --color-sui-warning: #b45309;
+    --color-sui-warning-soft: #fffbeb;
+    --color-sui-warning-ink: #78350f;    /* on a light amber chip */
+    --color-sui-danger: #b91c1c;
+    --color-sui-danger-soft: #fef2f2;
+    --color-sui-info: #1d4ed8;
+    --color-sui-info-soft: #eff6ff;
+
+    /* --- Attention tone --------------------------------------------------- */
+    /* Needs attention, is not a problem: a scheduled post, a "planned" badge,
+       a count that wants looking at. Text reuses the warning family's AA-safe
+       values, so attention and warning measure identically; only the boundary,
+       the wash and the badge carry their own tokens, because those were
+       previously written as raw palette values — which is how a tone escapes
+       the scope and stops moving in dark mode. */
+    --color-sui-attention: #b45309;        /* amber-700 — attention text */
+    --color-sui-attention-ink: #92400e;    /* amber-800 — the strongest text */
+    --color-sui-attention-border: #fcd34d; /* amber-300 — the boundary */
+    --color-sui-attention-wash: #fffbeb;   /* amber-50  — the notice surface */
+    --color-sui-attention-badge: #fbbf24;  /* amber-400 — the badge fill */
+    --color-sui-attention-badge-ink: #451a03; /* amber-950 — ink on the badge */
+
+    /* --- Soft shadows --------------------------------------------------- */
+    /* Three levels, which is the whole vocabulary: resting, lifted,
+       floating. They are tinted with the neutral (#67748e) rather than
+       black, because a black shadow over a blue-grey surface reads as
+       dirt where a tinted one reads as depth. Borderless surfaces compose
+       `--shadow-soft-ring` in to keep their edge. */
+    --shadow-soft-1: 0 1px 2px rgb(103 116 142 / 0.06), 0 2px 6px -2px rgb(103 116 142 / 0.07);
+    --shadow-soft-2: 0 2px 4px rgb(103 116 142 / 0.06), 0 12px 24px -8px rgb(103 116 142 / 0.14);
+    --shadow-soft-3: 0 4px 8px rgb(103 116 142 / 0.06), 0 24px 48px -16px rgb(103 116 142 / 0.18);
+    --shadow-soft-ring: 0 0 0 1px rgb(103 116 142 / 0.06);
+    /* The neumorphic signature: a well pressed *into* a surface of the
+       same colour, so depth comes from light direction rather than from a
+       border or a different fill. */
+    --shadow-soft-well: inset 0 1px 2px rgb(103 116 142 / 0.10), inset 0 0 0 1px rgb(103 116 142 / 0.05);
+    /* A 1px highlight along the top edge of anything raised. */
+    --shadow-soft-highlight: inset 0 1px 0 rgb(255 255 255 / 0.85);
+
+    /* --- Motion --------------------------------------------------------- */
+    /* 150 / 200 / 250ms — three durations, one easing curve. */
+    --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* --- Spacing -------------------------------------------------------- */
+    /* The spec's rhythm is 2 / 4 / 8 / 10 / 10.8 / 12 / 16 / 20 px. Every
+       value except 10.8px already exists as a numeric Tailwind step
+       (0.5 / 1 / 2 / 2.5 / 3 / 4 / 5), so this single named token closes
+       the gap and gives `py-row` a name rather than an arbitrary value. */
+    --spacing-row: 0.675rem;
 }
 
 /* ==========================================================================
@@ -114,6 +222,313 @@
         --color-danger: #f87171;
         --color-info: #60a5fa;
     }
+}
+
+/* ==========================================================================
+   Soft UI scope — `data-sui`
+   --------------------------------------------------------------------------
+   Applied to the <body> of layouts/dashboard.blade.php.
+
+   The mechanism, because it is the only unusual thing in this file:
+
+   Tailwind v4 utilities emit `var(--color-ink-400)`, `var(--radius-xs)`,
+   `var(--text-sm)` as *runtime* references instead of baking values at
+   build time. Redefining those variables inside a scope therefore remaps
+   every existing utility in that subtree — `text-ink-600` becomes
+   `#344767`, `rounded-xl` becomes 16px, `font-sans` becomes Open Sans —
+   without rewriting a single component class. One block of declarations
+   recolours the whole dashboard.
+
+   Two consequences worth knowing before editing:
+
+     1. The cascade is load-bearing. Anything with `!important` or an
+        inline style in the dashboard tree will NOT follow this scope.
+     2. `--font-sans` alone is not enough: Tailwind's preflight sets
+        `font-family: var(--default-font-family)` on <html>, and that value
+        is already computed by the time a descendant overrides the
+        variable. So the scope sets `font-family` directly on the element.
+
+   Dark mode works because `.dark [data-sui]` outranks `[data-sui]`, so the
+   dark block can override anything the light block set.
+   ========================================================================== */
+
+[data-sui] {
+    /* --- Typography ----------------------------------------------------- */
+    /* Open Sans is set on the element as well as in the variable, per the
+       note above. Both are listed explicitly so neither can drift. */
+    font-family: 'Open Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Open Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    /* The dashboard is a single-family surface. Remapping mono keeps any
+       stray `font-mono` in-family rather than letting JetBrains Mono leak
+       out of the public editorial site into the workspace. */
+    --font-mono: 'Open Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* 16px / 25.6px base (1rem / 1.6). The 14px step is the UI-chrome
+       default, 12px is meta, 11px is the eyebrow. */
+    --text-2xs: 0.6875rem;   /* 11px */
+    --text-xs: 0.75rem;      /* 12px */
+    --text-sm: 0.875rem;     /* 14px */
+    --text-base: 1rem;       /* 16px */
+    --text-lg: 1.125rem;     /* 18px */
+    --text-xl: 1.25rem;      /* 20px */
+    --text-2xl: 1.5rem;      /* 24px — page titles */
+    --text-3xl: 2rem;        /* 32px — metric values */
+    --text-4xl: 2.5rem;
+    --text-5xl: 3rem;
+
+    --leading-tight: 1.25;
+    --leading-snug: 1.375;
+    --leading-normal: 1.6;   /* 25.6px at the 16px base — the spec's body rhythm */
+    --leading-relaxed: 1.7;
+
+    --tracking-tightest: -0.02em;
+    --tracking-tighter: -0.015em;
+    --tracking-tight: -0.01em;
+
+    /* --- Neutrals ------------------------------------------------------- */
+    /* The spec's three text colours, placed so that every pair clears
+       WCAG 2.2 AA (4.5:1) on the surface it is actually used on:
+
+         #344767  ink-600/900  9.36:1 on white, 8.89:1 on the canvas
+         #5f6b7e  ink-500    5.40:1 on white, 5.12:1 on the canvas
+         #67748e  ink-400    4.70:1 on white, 4.46:1 on the canvas
+
+       The last row is the reason the numbering runs "backwards": ink-400
+       is the spec's #67748e verbatim and is therefore restricted to white
+       surfaces, while ink-500 is the darkened derivation that is safe on
+       the canvas as well. Anything on the raised canvas must use ink-500
+       or darker. docs/SOFT-UI.md §3 records the measurements. */
+    --color-ink-50: #f8f9fa;
+    --color-ink-100: #f1f3f5;
+    --color-ink-200: #e9ecef;
+    --color-ink-300: #d2d6da;
+    --color-ink-400: #67748e;
+    --color-ink-500: #5f6b7e;
+    --color-ink-600: #344767;
+    --color-ink-700: #2c3a52;
+    --color-ink-800: #1f2a3d;
+    --color-ink-900: #344767;
+    --color-ink-950: #0b1526;
+
+    /* --- Radii: 8 / 16 / pill ------------------------------------------- */
+    /* 8px for anything you press or type into, 16px for anything that
+       holds content, `rounded-full` (9999px, untouched) for pills. */
+    --radius-xs: 0.5rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1rem;
+
+    /* --- Accent bridge for Flux ----------------------------------------- */
+    --color-accent: var(--color-sui-accent);
+    --color-accent-content: var(--color-sui-accent-hover);
+    --color-accent-foreground: var(--color-sui-ink-on-accent);
+
+    /* --- Semantic status ------------------------------------------------ */
+    --color-success: var(--color-sui-success);
+    --color-warning: var(--color-sui-warning);
+    --color-danger: var(--color-sui-danger);
+    --color-info: var(--color-sui-info);
+
+    /* --- Surfaces, re-scoped -------------------------------------------- */
+    --color-sui-canvas: #f8f9fa;
+    --color-sui-surface: #ffffff;
+    --color-sui-well: #f8f9fa;
+    --color-sui-hover: #f1f3f5;
+    --color-sui-hairline: #e9ecef;
+    --color-sui-border: #d2d6da;
+    --color-sui-border-strong: #6b7280;
+
+    --color-sui-ink: #344767;
+    --color-sui-ink-secondary: #5f6b7e;
+    --color-sui-ink-muted: #67748e;
+    --color-sui-ink-disabled: #8392ab;
+    --color-sui-ink-on-accent: #ffffff;
+
+    --color-sui-accent: #2b4acb;
+    --color-sui-accent-hover: #2440b0;
+    --color-sui-accent-active: #1e3793;
+    --color-sui-accent-soft: #eef1fb;
+    --color-sui-accent-softer: #f5f7fd;
+    --color-sui-accent-ink: #2440b0;
+
+    --color-sui-rail: #000000;
+    --color-sui-rail-ink: #ffffff;
+    --color-sui-rail-ink-secondary: #8392ab;
+    --color-sui-rail-hairline: rgb(255 255 255 / 0.10);
+    --color-sui-rail-accent: #5b76d6;
+
+    --color-sui-success-soft: #f0fdf4;
+    --color-sui-warning-soft: #fffbeb;
+    --color-sui-warning-ink: #78350f;
+    --color-sui-danger-soft: #fef2f2;
+    --color-sui-info-soft: #eff6ff;
+
+    /* --- Signal family follows the accent ------------------------------- */
+    /* `text-signal-700` is the dashboard's link colour, so the whole
+       signal scale is re-tuned to the accessible indigo rather than left
+       on the public site's green-teal. */
+    --color-signal-50: #eef1fb;
+    --color-signal-100: #e0e6f8;
+    --color-signal-200: #c7d2f2;
+    --color-signal-300: #a3b6ea;
+    --color-signal-400: #7d95e0;
+    --color-signal-500: #5b76d6;
+    --color-signal-600: #2b4acb;
+    --color-signal-700: #2440b0;
+    --color-signal-800: #1e3793;
+    --color-signal-900: #1b2f78;
+    --color-signal-950: #131f4d;
+
+    /* --- The legacy shadow names reuse the soft levels ------------------ */
+    --shadow-lift: var(--shadow-soft-1);
+    --shadow-raise: var(--shadow-soft-2);
+}
+
+/* --- Dark Soft UI -------------------------------------------------------- */
+/* Inverted surfaces: the rail sinks to near-black, cards become the
+   lightest thing on screen. Depth is carried by borders rather than
+   drop shadows, which read as mud on a dark field. */
+
+.dark [data-sui] {
+    --color-ink-50: #0b1526;
+    --color-ink-100: #16203a;
+    --color-ink-200: #22304f;
+    --color-ink-300: #33425f;
+    --color-ink-400: #94a3b8;   /* 6.09:1 on the dark card */
+    --color-ink-500: #8794ab;   /* 5.10:1 on the dark card */
+    --color-ink-600: #e2e8f0;
+    --color-ink-700: #cbd5e1;
+    --color-ink-800: #26324a;
+    --color-ink-900: #18233c;   /* the dark card surface */
+    --color-ink-950: #070f1d;
+
+    --color-sui-canvas: #0b1526;
+    --color-sui-surface: #18233c;
+    --color-sui-well: #101a2f;
+    --color-sui-hover: #1f2c48;
+    --color-sui-hairline: #22304f;
+    --color-sui-border: #33425f;
+    --color-sui-border-strong: #64748b;
+
+    --color-sui-ink: #f1f5f9;
+    --color-sui-ink-secondary: #b6c2d4;
+    --color-sui-ink-muted: #94a3b8;
+    --color-sui-ink-disabled: #6b7a94;
+    --color-sui-ink-on-accent: #0b1526;
+
+    --color-sui-rail: #070f1d;
+    --color-sui-rail-ink: #f8fafc;
+    --color-sui-rail-ink-secondary: #94a3b8;
+    --color-sui-rail-hairline: rgb(255 255 255 / 0.08);
+    --color-sui-rail-accent: #7d95e0;
+
+    --color-sui-accent: #7d95e0;
+    --color-sui-accent-hover: #9fb0ea;
+    --color-sui-accent-active: #b3c2f0;
+    --color-sui-accent-soft: #1b2a55;
+    --color-sui-accent-softer: #16223f;
+    --color-sui-accent-ink: #a9bcf0;
+
+    --color-sui-success: #4ade80;
+    --color-sui-success-soft: #10281c;
+    --color-sui-warning: #fbbf24;
+    --color-sui-warning-soft: #2a1f08;
+    --color-sui-warning-ink: #fcd34d;
+    --color-sui-danger: #f87171;
+    --color-sui-danger-soft: #2b1414;
+    --color-sui-info: #60a5fa;
+    --color-sui-info-soft: #101f38;
+
+    /* Attention inverts: the badge becomes a dark amber fill with a pale ink,
+       and the boundary steps up a weight so it can be used at /25 and /40
+       exactly as the light theme uses amber-300 at full strength. Text follows
+       the warning family's dark values so the two tones measure identically on
+       the dark card — #fbbf24 at ~9.4:1 and #fcd34d at ~10.5:1 on #18233c. */
+    --color-sui-attention: #fbbf24;
+    --color-sui-attention-ink: #fcd34d;
+    --color-sui-attention-border: #f59e0b;
+    --color-sui-attention-border-strong: #f59e0b;
+    --color-sui-attention-wash: #451a03;
+    --color-sui-attention-badge: #78350f;
+    --color-sui-attention-badge-ink: #fde68a;
+
+    --color-signal-50: #16223f;
+    --color-signal-100: #1b2a55;
+    --color-signal-200: #24356e;
+    --color-signal-300: #3a4d95;
+    --color-signal-400: #7d95e0;
+    --color-signal-500: #93a9e8;
+    --color-signal-600: #a9bcf0;
+    --color-signal-700: #bccdf5;
+    --color-signal-800: #d0dcf9;
+    --color-signal-900: #e2e9fc;
+    --color-signal-950: #eef2fe;
+
+    --shadow-soft-1: 0 1px 2px rgb(0 0 0 / 0.30), 0 2px 6px -2px rgb(0 0 0 / 0.35);
+    --shadow-soft-2: 0 2px 4px rgb(0 0 0 / 0.30), 0 12px 24px -8px rgb(0 0 0 / 0.45);
+    --shadow-soft-3: 0 4px 8px rgb(0 0 0 / 0.30), 0 24px 48px -16px rgb(0 0 0 / 0.55);
+    --shadow-soft-well: inset 0 1px 2px rgb(0 0 0 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.05);
+    --shadow-soft-highlight: inset 0 1px 0 rgb(255 255 255 / 0.06);
+
+    --color-accent: var(--color-sui-accent);
+    --color-accent-content: var(--color-sui-accent-ink);
+    --color-accent-foreground: var(--color-sui-ink-on-accent);
+}
+
+/* A handful of components are shared between the dashboard and the public
+   site — the empty state above all. Those need the same dark surfaces
+   *outside* the scope, so the `sui-*` surface tokens are also set on `.dark`
+   itself. Only the `sui-*` family travels: the `signal-*` and `accent` tokens
+   stay scoped, because the public site has its own green-teal accent and
+   must not inherit the dashboard's indigo. */
+.dark {
+    --color-sui-canvas: #0b1526;
+    --color-sui-surface: #18233c;
+    --color-sui-well: #101a2f;
+    --color-sui-hover: #1f2c48;
+    --color-sui-hairline: #22304f;
+    --color-sui-border: #33425f;
+    --color-sui-border-strong: #64748b;
+
+    --color-sui-ink: #f1f5f9;
+    --color-sui-ink-secondary: #b6c2d4;
+    --color-sui-ink-muted: #94a3b8;
+    --color-sui-ink-disabled: #6b7a94;
+    --color-sui-ink-on-accent: #0b1526;
+
+    --shadow-soft-1: 0 1px 2px rgb(0 0 0 / 0.30), 0 2px 6px -2px rgb(0 0 0 / 0.35);
+    --shadow-soft-2: 0 2px 4px rgb(0 0 0 / 0.30), 0 12px 24px -8px rgb(0 0 0 / 0.45);
+    --shadow-soft-3: 0 4px 8px rgb(0 0 0 / 0.30), 0 24px 48px -16px rgb(0 0 0 / 0.55);
+    --shadow-soft-well: inset 0 1px 2px rgb(0 0 0 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.05);
+    --shadow-soft-highlight: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* Focus rings follow the scope: the public site keeps its green-teal, the
+   dashboard gets the indigo, and the radius matches the 8px control radius
+   so the ring hugs a pill as cleanly as a square. */
+[data-sui] :focus-visible {
+    @apply outline-2 outline-offset-2 outline-sui-accent;
+    border-radius: var(--radius-xs);
+}
+
+.dark [data-sui] :focus-visible {
+    @apply outline-sui-accent;
+}
+
+/* The canvas and the default ink for the body the scope sits on. These are
+   set as properties rather than utilities on purpose: the base layer's
+   `body { @apply bg-white text-ink-800 }` and `.dark body { … }` both
+   outrank a lone attribute selector, so the dark variant is spelled out
+   here to win by specificity rather than by source order alone. */
+[data-sui] {
+    background-color: var(--color-sui-canvas);
+    color: var(--color-sui-ink-secondary);
+}
+
+.dark [data-sui] {
+    background-color: var(--color-sui-canvas);
+    color: var(--color-sui-ink-secondary);
 }
 
 /* ==========================================================================
@@ -184,7 +599,12 @@
         @apply bg-signal-800 text-ink-50;
     }
 
-    /* Respect the user's motion preference — no exceptions. */
+    /* Respect the user's motion preference — no exceptions.
+       The blanket transition/animation clamp below does not stop Alpine's
+       JS-driven x-transition classes (Alpine applies them regardless of the
+       media query), so any x-transition element is additionally collapsed to
+       an instant swap here. `!important` is required to beat the inline
+       classes Alpine writes. */
     @media (prefers-reduced-motion: reduce) {
         html { scroll-behavior: auto; }
         *, *::before, *::after {
@@ -192,6 +612,11 @@
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
             scroll-behavior: auto !important;
+        }
+
+        [x-transition\:enter],
+        [x-transition\:leave] {
+            transition-duration: 0ms !important;
         }
     }
 }
@@ -233,6 +658,291 @@ select:focus[data-flux-control] {
     /* Full-bleed 1px rule that matches the border colour in both themes. */
     @apply h-px w-full bg-ink-200 dark:bg-ink-800;
 }
+
+@utility focus-ring {
+    /* Opt-in focus treatment for elements that suppress the default outline
+       (rounded nav pills, icon buttons) and so must draw their own. The ring
+       is drawn with box-shadow rather than outline so it can follow a
+       non-square border-radius cleanly. */
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-signal-400 dark:focus-visible:ring-offset-ink-950;
+}
+
+@utility surface-raise {
+    /* Depth for grouped cards: a hairline border plus a shadow that is barely
+       there in light mode and carried by the border alone in dark mode, where
+       drop shadows read as mud. */
+    @apply rounded-xl border border-ink-200 bg-white shadow-soft-1 dark:border-ink-800 dark:bg-ink-900 dark:shadow-none;
+}
+
+/* ==========================================================================
+   Soft UI primitives
+   --------------------------------------------------------------------------
+   The dashboard's component vocabulary. Everything a component needs to
+   look like Soft UI lives here so no view ever has to invent a shadow, a
+   radius or a colour of its own — and so the three shadow levels, the two
+   radii and the accent have exactly one definition each.
+
+   Every value resolves through a `[data-sui]`-scoped variable, so these
+   primitives are theme-safe by construction: they render light outside the
+   dashboard, Soft UI inside it, and dark-appropriate when `.dark` is set.
+   ========================================================================== */
+
+@utility sui-canvas {
+    /* The page surface: the canvas colour, body ink, the 1.6 rhythm. */
+    @apply bg-ink-50 text-ink-600;
+}
+
+@utility sui-card {
+    /* The raised surface — the single most used primitive.
+       White fill, 16px radius, hairline boundary, one soft shadow.
+       The shadow is level 1 and the border is a hairline: together they
+       give a 4.5:1-visible edge without ever needing a heavy outline. */
+    @apply rounded-xl border border-sui-hairline bg-sui-surface shadow-soft-1;
+}
+
+@utility sui-card-lift {
+    /* For a card that is also a link or a button: it rises on hover. */
+    @apply sui-card transition duration-200 ease-soft hover:border-sui-border hover:shadow-soft-2;
+}
+
+@utility sui-well {
+    /* An inset field. Same colour as the canvas it sits on, so depth has to
+       come from the shadow — the well is pressed *into* the surface rather
+       than sitting on it. Used by inputs, selects, textareas, code panes
+       and anything else that accepts content. */
+    @apply rounded-md border border-sui-hairline bg-sui-well shadow-soft-well;
+}
+
+@utility sui-well-focus {
+    /* A well that is also a control: the boundary thickens on focus instead
+       of relying on the ring alone, because a 1px ring on a 4px edge is
+       easy to miss at 150% zoom. */
+    @apply sui-well transition duration-150 ease-soft focus:border-sui-border-strong;
+}
+
+@utility sui-focus {
+    /* Opt-in ring for elements that draw their own outline suppression.
+       Box-shadow rather than `outline` so it can follow a pill radius. */
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sui-accent focus-visible:ring-offset-2 focus-visible:ring-offset-sui-surface;
+}
+
+@utility sui-label {
+    /* The eyebrow: an 11px, uppercase, slightly tracked label. Open Sans
+       semibold — the size and the caps carry the emphasis, not the weight. */
+    @apply text-2xs font-semibold uppercase tracking-wide text-ink-400;
+}
+
+@utility sui-row {
+    /* List-row vertical rhythm. The 10.8px step is the spec's, not an
+       approximation of it — `py-row` is a named token, not `py-[0.675rem]`.
+
+       Compact rows: one line of primary text and one of meta. Anything
+       with two lines of body copy uses `sui-row-lg` — cramping a two-line
+       row to 10.8px is how a list starts to feel like a spreadsheet. */
+    @apply px-5 py-row;
+}
+
+@utility sui-row-lg {
+    /* Comfortable row: two lines of copy, or a row that carries actions. */
+    @apply px-5 py-4;
+}
+
+@utility sui-hairline {
+    @apply border-sui-hairline;
+}
+
+@utility sui-action {
+    /* A quiet control sitting on a raised surface: transparent until
+       touched, then a wash. Never a border — a bordered quiet control
+       competes with the real buttons around it. */
+    @apply inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-accent-ink;
+}
+
+@utility sui-rail {
+    /* The dark surface. Text defaults to the rail's secondary colour, so a
+       component that forgets to set a colour still clears AA. */
+    @apply bg-sui-rail text-sui-rail-ink-secondary;
+}
+
+@utility sui-rail-item {
+    /* A navigation destination on the rail. Hover is a translucent white
+       wash rather than a solid fill, because a solid fill on a black
+       surface either disappears or shouts. */
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sui-rail-ink-secondary transition duration-150 ease-soft hover:bg-white/10 hover:text-sui-rail-ink;
+}
+
+@utility sui-rail-item-active {
+    /* The current destination. The fill is the same translucent wash at a
+       higher opacity; the accent bar on the left edge is what makes it
+       unambiguous without a contrast-heavy solid pill. */
+    @apply bg-white/10 text-sui-rail-ink;
+}
+
+@utility sui-rail-group {
+    /* Section label on the rail. */
+    @apply px-3 pb-2 text-2xs font-semibold uppercase tracking-wide text-sui-rail-ink-secondary/80;
+}
+
+@utility sui-rail-hairline {
+    @apply border-sui-rail-hairline;
+}
+
+/* --- Form controls ------------------------------------------------------- */
+
+@utility sui-control {
+    /* Every text input, select and textarea in the dashboard.
+
+       A well, not a card: the inset shadow says "type here" in a way a
+       plain border cannot, and it stays legible against the white card
+       behind it because the two surfaces differ by fill rather than by
+       outline. Focus thickens the boundary *and* keeps the ring, so the
+       focused control is findable at 200% zoom where a 1px ring alone is
+       not. */
+    @apply rounded-md border border-sui-hairline bg-sui-well px-3 py-2 text-sm text-sui-ink shadow-soft-well transition duration-150 ease-soft placeholder:text-ink-400 focus:border-sui-border-strong;
+}
+
+@utility sui-control-label {
+    /* The label above a control. 14px, medium, the ink colour — never the
+       muted one, because a label at ink-400 fails AA at this size on the
+       canvas and a control you cannot name is a control you cannot use. */
+    @apply block text-sm font-medium text-ink-600;
+}
+
+@utility sui-help {
+    /* Helper / error text under a control. */
+    @apply text-xs leading-normal text-ink-500;
+}
+
+/* --- Filter pills -------------------------------------------------------- */
+
+@utility sui-tab {
+    /* A filter that swaps the list behind it. Pill radius, quiet by
+       default, and the active state is a *filled* pill rather than an
+       underline so it survives being wrapped onto a second row. */
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink;
+}
+
+@utility sui-tab-active {
+    @apply bg-sui-accent text-white shadow-soft-1 hover:bg-sui-accent-hover hover:text-white;
+}
+
+/* --- Chips --------------------------------------------------------------- */
+
+@utility sui-chip {
+    /* The small count / status pill. Shape only — the colour variants
+       below carry the tokens, so a chip is never hand-tinted. */
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold tabular-nums;
+}
+
+@utility sui-chip-accent {
+    @apply sui-chip border border-sui-accent/20 bg-sui-accent-soft text-sui-accent-ink;
+}
+
+@utility sui-chip-warning {
+    /* The boundary borrows the attention token: the warning family ships no
+       dedicated boundary value, and both are amber-300 in light mode, so the
+       chip renders identically while gaining the dark variant it was missing
+       (`border-amber-300 bg-amber-100/70` on a dark card was a light chip
+       stranded on black). */
+    @apply sui-chip border border-sui-attention-border bg-sui-warning-soft text-sui-warning-ink;
+}
+
+@utility sui-chip-neutral {
+    @apply sui-chip border border-sui-hairline bg-sui-well text-ink-500;
+}
+
+@utility sui-chip-success {
+    @apply sui-chip border border-emerald-200 bg-sui-success-soft text-sui-success;
+}
+
+/* --- Correction-type legend ---------------------------------------------- */
+
+/* The AI review panel's six correction categories need six distinguishable
+   colours. This is a *legend*, not a status scale: each badge carries its own
+   text label, so the colour only has to separate one category from the next
+   rather than carry meaning on its own. They are still defined here, once,
+   rather than picked per correction in the component — six ad-hoc tints
+   chosen at the point of use is how a palette starts drifting.
+
+   The tint/ink pairs come from the 100/700 families: light enough to read as
+   a wash on a white card, dark enough for the label to clear 4.5:1 on it. */
+@utility sui-type-spelling {
+    @apply sui-chip border-red-200 bg-red-100/70 text-red-700 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-300;
+}
+
+@utility sui-type-grammar {
+    @apply sui-chip border-amber-300 bg-amber-100/70 text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300;
+}
+
+@utility sui-type-punctuation {
+    @apply sui-chip border-orange-300 bg-orange-100/70 text-orange-800 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300;
+}
+
+@utility sui-type-style {
+    @apply sui-chip border-violet-300 bg-violet-100/70 text-violet-700 dark:border-violet-500/30 dark:bg-violet-950/40 dark:text-violet-300;
+}
+
+@utility sui-type-clarity {
+    @apply sui-chip border-sky-300 bg-sky-100/70 text-sky-700 dark:border-sky-500/30 dark:bg-sky-950/40 dark:text-sky-300;
+}
+
+@utility sui-type-tone {
+    @apply sui-chip border-teal-300 bg-teal-100/70 text-teal-700 dark:border-teal-500/30 dark:bg-teal-950/40 dark:text-teal-300;
+}
+
+/* --- Role legend ---------------------------------------------------------- */
+
+/* Two roles need two colours. Like the correction legend above this is a
+   legend rather than a status scale: the badge carries the role's own name, so
+   the colour only has to separate one role from the next.
+
+   These were previously written as raw palette values (`border-blue-200
+   bg-blue-50 text-blue-700`), which have one defect that a token fixes:
+   they do not move in dark mode, so the badge stayed a light chip stranded on
+   the dark rail. The `dark:` variants are what the tokens are for. */
+@utility sui-role-seller {
+    @apply border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300;
+}
+
+@utility sui-role-admin {
+    @apply border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-950/40 dark:text-violet-300;
+}
+
+/* --- Links and dividers -------------------------------------------------- */
+
+@utility sui-link {
+    @apply font-medium text-sui-accent-ink transition duration-150 ease-soft hover:text-sui-accent hover:underline hover:decoration-sui-accent/40 hover:underline-offset-2;
+}
+
+@utility sui-divider {
+    @apply border-sui-hairline;
+}
+
+/* --- Empty states -------------------------------------------------------- */
+
+@utility sui-empty {
+    /* The "nothing here yet" container. Generous vertical padding is
+       deliberate: an empty state that is cramped reads as a broken page
+       rather than as an intentional one. */
+    @apply px-6 py-16 text-center;
+}
+
+/* --- Table --------------------------------------------------------------- */
+
+@utility sui-table-head {
+    /* A column header inside a card. 11px, uppercase, tracked, and the
+       muted ink — it is the one place where the eyebrow treatment is also
+       functional, because it has to be scannable without dominating the
+       values underneath. */
+    @apply text-2xs font-semibold uppercase tracking-wide text-ink-400;
+}
+
+@utility sui-table-cell {
+    /* A data cell. Tabular figures so columns of numbers align optically
+       rather than by accident of glyph width. */
+    @apply text-sm tabular-nums text-ink-600;
+}
+
 
 @utility shell {
     /* The one horizontal container in the app. */

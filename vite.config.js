@@ -19,6 +19,12 @@ export default defineConfig({
                 bunny('JetBrains Mono', {
                     weights: [400, 500, 600],
                 }),
+                /* Soft UI dashboard typeface — scoped to the dashboard by
+                   `[data-sui]` in resources/css/app.css, so the public
+                   editorial site keeps Instrument Sans. */
+                bunny('Open Sans', {
+                    weights: [400, 500, 600, 700],
+                }),
             ],
         }),
         tailwindcss(),

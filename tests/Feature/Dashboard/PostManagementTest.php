@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Post;
 use App\Models\User;
 use App\Rules\PostSlug;
+use Livewire\Livewire;
 
 test('the posts index requires authentication', function () {
     $this->get(route('dashboard.posts.index'))->assertRedirect(route('login'));
@@ -222,4 +223,79 @@ test('a published post keeps its published_at when edited without a status chang
     app(UpdatePost::class)->handle($post, ['title' => 'A revised title']);
 
     expect($post->refresh()->published_at->equalTo($original))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| The rich text editor
+|--------------------------------------------------------------------------
+*/
+
+test('the edit screen mounts the rich text editor over the body field', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create(['body' => '# Existing draft']);
+
+    $this->actingAs($author)
+        ->get(route('dashboard.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('richTextEditor', escape: false)
+        ->assertSee('data-editor', escape: false);
+});
+
+test('the rich text editor is mounted on the create screen too', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('dashboard.posts.create'))
+        ->assertOk()
+        ->assertSee('richTextEditor', escape: false);
+});
+
+test('the editor receives the persisted body as its initial value', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create([
+        'body' => 'Body text that must survive into the editor',
+    ]);
+
+    $this->actingAs($author)
+        ->get(route('dashboard.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('Body text that must survive into the editor');
+});
+
+test('the editor toolbar no longer drives a Livewire mode property', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create();
+
+    $response = $this->actingAs($author)->get(route('dashboard.posts.edit', $post));
+
+    $response->assertOk();
+
+    // The mode switch is Alpine-owned now. A Livewire round trip per toggle
+    // would replace the textarea and drop the caret, which is the exact thing
+    // the editor was built to avoid.
+    expect($response->getContent())
+        ->not->toContain('setMode(&#039;')
+        ->not->toContain('setMode(\'');
+});
+
+test('the edit screen still renders the publishing sidebar', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create();
+
+    $this->actingAs($author)
+        ->get(route('dashboard.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('Status')
+        ->assertSee('Featured');
+});
+
+test('saving a post from the editor persists the body', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create(['body' => 'Original body']);
+
+    Livewire::actingAs($author)
+        ->test('pages::dashboard.posts.edit', ['post' => $post])
+        ->set('body', 'A completely rewritten body')
+        ->call('save');
+
+    expect($post->refresh()->body)->toBe('A completely rewritten body');
 });
