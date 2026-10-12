@@ -18,8 +18,9 @@ test('new users can register', function () {
 
     $user = User::where('email', 'test@example.com')->first();
 
+    // Registration lands on the new user's personal team dashboard.
     $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
 
     $this->assertAuthenticated();
 });

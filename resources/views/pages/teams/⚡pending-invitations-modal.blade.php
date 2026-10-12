@@ -48,10 +48,9 @@ new class extends Component {
         $invitation = $this->findPendingInvitation($code);
 
         $user = Auth::user();
+        $team = $invitation->team;
 
-        DB::transaction(function () use ($user, $invitation) {
-            $team = $invitation->team;
-
+        DB::transaction(function () use ($user, $invitation, $team) {
             $team->memberships()->firstOrCreate(
                 ['user_id' => $user->id],
                 ['role' => $invitation->role]
@@ -64,7 +63,10 @@ new class extends Component {
 
         session()->flash('team-invitation-accepted', true);
 
-        $this->redirectRoute('dashboard', navigate: true);
+        // The team dashboard, not the author dashboard: accepting an invitation
+        // switches the active team, and that team context lives under the
+        // {current_team} prefix.
+        $this->redirectRoute('team.dashboard', ['current_team' => $team->slug], navigate: true);
     }
 
     public function declineInvitation(string $code): void

@@ -19,9 +19,12 @@ test('users can authenticate using the login screen', function () {
         'password' => 'password',
     ]);
 
+    // Login lands on the user's current team dashboard, which is the starter
+    // kit's RedirectsToCurrentTeam behaviour and is independent of DevFolio's
+    // single-author authoring dashboard at /dashboard.
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
 
     $this->assertAuthenticated();
 });
@@ -37,7 +40,7 @@ test('passkey login response redirects to the current team dashboard', function 
 
     $jsonResponse = app(PasskeyLoginResponse::class)->toResponse($request);
 
-    expect($jsonResponse->getData()->redirect)->toBe(route('dashboard', ['current_team' => $user->personalTeam()->slug]));
+    expect($jsonResponse->getData()->redirect)->toBe(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
 });
 
 test('users can not authenticate with invalid password', function () {

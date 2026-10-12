@@ -8,51 +8,204 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   DevFolio design tokens
+   --------------------------------------------------------------------------
+   The visual thesis (docs/UI-UX-BRIEF.md §1): the site is the portfolio piece.
+   A near-monochrome editorial canvas, one terminal-tinted accent, and monospace
+   used as a structural device rather than decoration.
+   ========================================================================== */
+
 @theme {
+    /* --- Typography ------------------------------------------------------ */
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Editorial scale — 1.200 minor third, tuned for long-form reading. */
+    --text-2xs: 0.6875rem;   /* 11px — metadata, eyebrows */
+    --text-xs: 0.75rem;      /* 12px — labels, captions */
+    --text-sm: 0.8125rem;    /* 13px — UI chrome, nav */
+    --text-base: 1rem;       /* 16px — body */
+    --text-lg: 1.125rem;     /* 18px — lead paragraphs */
+    --text-xl: 1.375rem;     /* 22px — card titles */
+    --text-2xl: 1.75rem;     /* 28px — section headings */
+    --text-3xl: 2.25rem;     /* 36px — page titles */
+    --text-4xl: 3rem;        /* 48px — hero */
+    --text-5xl: 3.75rem;     /* 60px — hero display */
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    --leading-tight: 1.15;
+    --leading-snug: 1.35;
+    --leading-normal: 1.6;
+    --leading-relaxed: 1.75;
+
+    /* Tighter tracking as size grows — large type needs less letter-spacing. */
+    --tracking-tightest: -0.035em;
+    --tracking-tighter: -0.025em;
+    --tracking-tight: -0.015em;
+    --tracking-wide: 0.06em;
+    --tracking-widest: 0.14em;
+
+    /* --- Neutrals: a warm-shifted zinc so the canvas is not clinically grey */
+    --color-ink-50: #f7f7f6;
+    --color-ink-100: #eeeeec;
+    --color-ink-200: #e0e0dd;
+    --color-ink-300: #c6c6c1;
+    --color-ink-400: #9a9a94;
+    --color-ink-500: #71716b;
+    --color-ink-600: #575753;
+    --color-ink-700: #3f3f3c;
+    --color-ink-800: #262624;
+    --color-ink-900: #171716;
+    --color-ink-950: #0d0d0c;
+
+    /* --- Accent: terminal green-teal ------------------------------------- */
+    /* Signals "this person works in a shell" without becoming a theme colour. */
+    --color-signal-50: #ecfdf6;
+    --color-signal-100: #d1fae7;
+    --color-signal-200: #a7f3d2;
+    --color-signal-300: #6ee7b7;
+    --color-signal-400: #34d399;
+    --color-signal-500: #10b981;
+    --color-signal-600: #059669;
+    --color-signal-700: #047857;
+    --color-signal-800: #065f46;
+    --color-signal-900: #064e3b;
+    --color-signal-950: #022c22;
+
+    /* --- Semantic ------------------------------------------------------- */
+    --color-success: var(--color-signal-600);
+    --color-warning: #d97706;
+    --color-danger: #dc2626;
+    --color-info: #2563eb;
+
+    /* --- Flux accent bridge --------------------------------------------- */
+    /* Flux components inherit the site accent rather than the starter default. */
+    --color-accent: var(--color-signal-700);
+    --color-accent-content: var(--color-signal-700);
     --color-accent-foreground: var(--color-white);
+
+    /* --- Surface tokens ------------------------------------------------- */
+    --radius-xs: 0.25rem;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    --shadow-lift: 0 1px 2px 0 rgb(13 13 12 / 0.04), 0 1px 3px 0 rgb(13 13 12 / 0.06);
+    --shadow-raise: 0 4px 12px -2px rgb(13 13 12 / 0.08), 0 2px 4px -2px rgb(13 13 12 / 0.04);
+
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 }
+
+/* ==========================================================================
+   Dark theme
+   --color-accent flips to a lighter signal so it stays legible on dark ink.
+   ========================================================================== */
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: var(--color-signal-400);
+        --color-accent-content: var(--color-signal-300);
+        --color-accent-foreground: var(--color-ink-950);
+
+        --color-success: var(--color-signal-400);
+        --color-warning: #fbbf24;
+        --color-danger: #f87171;
+        --color-info: #60a5fa;
     }
 }
 
-@layer base {
+/* ==========================================================================
+   Base layer
+   ========================================================================== */
 
+@layer base {
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-ink-200, currentColor);
+    }
+
+    .dark *,
+    .dark ::after,
+    .dark ::before {
+        border-color: var(--color-ink-800, currentColor);
+    }
+
+    html {
+        scroll-behavior: smooth;
+        /* Anchor offset for the sticky header when jumping to a heading. */
+        scroll-padding-top: 6rem;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        @apply bg-white text-ink-800 antialiased;
+        font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+        text-rendering: optimizeLegibility;
+    }
+
+    .dark body {
+        @apply bg-ink-950 text-ink-200;
+    }
+
+    /* Headings are set tighter and darker than body copy. */
+    h1, h2, h3, h4 {
+        @apply text-ink-900 font-semibold tracking-tighter;
+        text-wrap: balance;
+    }
+
+    .dark h1, .dark h2, .dark h3, .dark h4 {
+        @apply text-ink-50;
+    }
+
+    p {
+        text-wrap: pretty;
+    }
+
+    /* A single visible focus treatment, used everywhere. */
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-signal-600;
+        border-radius: var(--radius-xs);
+    }
+
+    .dark :focus-visible {
+        @apply outline-signal-400;
+    }
+
+    ::selection {
+        @apply bg-signal-200 text-ink-900;
+    }
+
+    .dark ::selection {
+        @apply bg-signal-800 text-ink-50;
+    }
+
+    /* Respect the user's motion preference — no exceptions. */
+    @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
     }
 }
+
+/* ==========================================================================
+   Flux overrides — keep the starter kit's behaviour, restyle the edges.
+   ========================================================================== */
 
 [data-flux-field]:not(ui-radio, ui-checkbox) {
     @apply grid gap-2;
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
@@ -61,6 +214,247 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */
+/* ==========================================================================
+   Component utilities
+   --------------------------------------------------------------------------
+   Small, composable primitives. Anything repeated three times lives here.
+   ========================================================================== */
+
+@utility eyebrow {
+    /* The numbered monospace section marker — signature element #1. */
+    @apply font-mono text-2xs font-medium uppercase tracking-widest text-ink-400;
+}
+
+@utility eyebrow-accent {
+    @apply eyebrow text-signal-600 dark:text-signal-400;
+}
+
+@utility hairline {
+    /* Full-bleed 1px rule that matches the border colour in both themes. */
+    @apply h-px w-full bg-ink-200 dark:bg-ink-800;
+}
+
+@utility shell {
+    /* The one horizontal container in the app. */
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8 lg:px-10;
+}
+
+@utility shell-narrow {
+    /* Reading-width container for prose pages. */
+    @apply mx-auto w-full max-w-3xl px-5 sm:px-8;
+}
+
+@utility link-underline {
+    /* Accent underline that draws in on hover. */
+    @apply relative text-ink-900 no-underline transition-colors hover:text-signal-700 dark:text-ink-100 dark:hover:text-signal-400;
+}
+
+@utility grid-field {
+    /* Signature element #3 — hairline grid that fades out behind hero content. */
+    background-image:
+        linear-gradient(to right, var(--color-ink-200) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--color-ink-200) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 30%, transparent 100%);
+}
+
+.dark .grid-field,
+.dark.grid-field {
+    background-image:
+        linear-gradient(to right, var(--color-ink-800) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--color-ink-800) 1px, transparent 1px);
+}
+
+@utility tag-pill {
+    @apply inline-flex items-center gap-1 rounded-xs border border-ink-200 bg-ink-50 px-2 py-0.5 font-mono text-2xs font-medium text-ink-600 transition-colors hover:border-signal-400 hover:bg-signal-50 hover:text-signal-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-400 dark:hover:border-signal-600 dark:hover:bg-signal-950 dark:hover:text-signal-300;
+}
+
+@utility card-surface {
+    @apply rounded-lg border border-ink-200 bg-white transition-all duration-200 dark:border-ink-800 dark:bg-ink-900;
+}
+
+/* ==========================================================================
+   Prose — styles the sanitised `body_html` output of MarkdownRenderer
+   --------------------------------------------------------------------------
+   The renderer emits a small, predictable set of tags: h2, h3, p, ul, ol, li,
+   blockquote, pre>code, hr, a, strong, em, code. Nothing else is allowed
+   through the sanitiser, so this stylesheet can be exhaustive.
+   ========================================================================== */
+
+.prose-editorial {
+    @apply text-base leading-relaxed text-ink-700 dark:text-ink-300;
+}
+
+.prose-editorial > * + * {
+    @apply mt-6;
+}
+
+.prose-editorial p {
+    @apply leading-relaxed;
+}
+
+/* Lead-in paragraph gets a touch more presence. */
+.prose-editorial > p:first-of-type {
+    @apply text-lg text-ink-600 dark:text-ink-400;
+}
+
+.prose-editorial h2 {
+    @apply mt-14 mb-4 scroll-mt-28 text-2xl font-semibold tracking-tighter text-ink-900 dark:text-ink-50;
+}
+
+.prose-editorial h3 {
+    @apply mt-10 mb-3 scroll-mt-28 text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-50;
+}
+
+/* The monospace marker before a heading — signature element #1, inline form. */
+.prose-editorial h2::before {
+    content: '##';
+    @apply mr-2 font-mono text-sm font-medium text-signal-500/60 select-none;
+}
+
+.prose-editorial h3::before {
+    content: '###';
+    @apply mr-2 font-mono text-xs font-medium text-signal-500/50 select-none;
+}
+
+.prose-editorial a {
+    @apply font-medium text-ink-900 underline decoration-signal-400 decoration-2 underline-offset-[3px] transition-colors hover:text-signal-700 hover:decoration-signal-600 dark:text-ink-50 dark:hover:text-signal-300;
+}
+
+.prose-editorial strong {
+    @apply font-semibold text-ink-900 dark:text-ink-50;
+}
+
+.prose-editorial em {
+    @apply italic;
+}
+
+/* Inline code — visually distinct from fenced blocks. */
+.prose-editorial :where(p, li, blockquote) code {
+    @apply rounded-xs border border-ink-200 bg-ink-50 px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-ink-800 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-200;
+}
+
+.prose-editorial ul {
+    @apply list-none space-y-2.5 pl-0;
+}
+
+.prose-editorial ul > li {
+    @apply relative pl-6;
+}
+
+/* Monospace bullet to echo the terminal motif. */
+.prose-editorial ul > li::before {
+    content: '▸';
+    @apply absolute left-0 font-mono text-signal-500 dark:text-signal-400;
+}
+
+.prose-editorial ol {
+    @apply list-none space-y-2.5 pl-0;
+}
+
+.prose-editorial ol > li {
+    @apply relative pl-8 font-normal;
+    counter-increment: prose-ol;
+}
+
+.prose-editorial ol {
+    counter-reset: prose-ol;
+}
+
+.prose-editorial ol > li::before {
+    content: counter(prose-ol) '.';
+    @apply absolute left-0 w-5 text-right font-mono text-sm font-medium text-signal-600 dark:text-signal-400;
+}
+
+.prose-editorial blockquote {
+    @apply border-l-2 border-signal-500 pl-5 text-lg italic text-ink-600 not-italic dark:text-ink-400;
+}
+
+.prose-editorial blockquote p {
+    @apply m-0;
+}
+
+.prose-editorial hr {
+    @apply my-12 border-0 border-t border-ink-200 dark:border-ink-800;
+}
+
+/* --- Fenced code blocks ------------------------------------------------- */
+
+.prose-editorial pre {
+    @apply relative my-8 overflow-x-auto rounded-lg border border-ink-200 bg-ink-50 p-5 font-mono text-sm leading-relaxed dark:border-ink-800 dark:bg-ink-900;
+    tab-size: 4;
+}
+
+.prose-editorial pre code {
+    @apply block bg-transparent p-0 font-mono text-[0.8125rem] text-ink-800 dark:text-ink-200;
+    white-space: pre;
+}
+
+/* Language label rendered from the fence info string. */
+.prose-editorial pre[data-language]::before {
+    content: attr(data-language);
+    @apply absolute right-3 top-2.5 font-mono text-2xs font-medium uppercase tracking-wider text-ink-400 dark:text-ink-500;
+}
+
+/* --- Tables, if a post uses raw HTML that survives sanitisation --------- */
+
+.prose-editorial table {
+    @apply w-full border-collapse text-sm;
+}
+
+.prose-editorial th {
+    @apply border-b border-ink-300 px-3 py-2 text-left font-mono text-2xs uppercase tracking-wider text-ink-500 dark:border-ink-700;
+}
+
+.prose-editorial td {
+    @apply border-b border-ink-200 px-3 py-2 dark:border-ink-800;
+}
+
+/* --- Table of contents -------------------------------------------------- */
+
+.toc-link {
+    @apply block border-l-2 border-transparent py-1 pl-4 text-sm text-ink-500 transition-all hover:border-signal-400 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100;
+}
+
+.toc-link[data-active='true'] {
+    @apply border-signal-500 font-medium text-signal-700 dark:text-signal-300;
+}
+
+.toc-link[data-depth='3'] {
+    @apply pl-7 text-xs;
+}
+
+/* ==========================================================================
+   Reading progress — a 2px accent rule pinned to the top of the viewport.
+   ========================================================================== */
+
+.reading-progress {
+    @apply fixed left-0 top-0 z-50 h-0.5 origin-left bg-signal-500 dark:bg-signal-400;
+    width: 100%;
+    transform: scaleX(var(--progress, 0));
+    transition: transform 80ms linear;
+    will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reading-progress { transition: none; }
+}
+
+/* ==========================================================================
+   Reveal-on-scroll — opt in with `data-reveal`. JS toggles `data-visible`.
+   ========================================================================== */
+
+[data-reveal] {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 600ms var(--ease-out-quint), transform 600ms var(--ease-out-quint);
+}
+
+[data-reveal][data-visible='true'] {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-reveal] { opacity: 1; transform: none; transition: none; }
+}
