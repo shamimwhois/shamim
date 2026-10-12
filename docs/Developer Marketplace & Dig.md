@@ -1,5 +1,44 @@
 # shamimV3 — Developer Marketplace & Digital Product Ecosystem
 
+> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+>
+> This document is an **input**, not a description of the shipped system. It
+> specifies a commercial marketplace with purchasing, protected downloads,
+> licensing, and version management, and predates the current architecture.
+> None of it exists in the codebase today.
+>
+> Read it as: *what the module should become, once it is built.* Do not read it
+> as: *what the application currently does.*
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
+>
+> **Already built and deliberately shaped for this module.** The `seller` role
+> and its selling permissions (`product:create`, `product:update-own`,
+> `product:delete-own`, `product:submit`, `sale:view-own`,
+> `support:manage-own`) are defined; the admin review set (`product:review`,
+> `product:manage-any`, `sale:view-any`, `refund:process`,
+> `payment:configure`) is defined; and `RolePlan` already carries the first real
+> entitlement, `productListingLimit()` (Free 0, Seller 25, Platform unlimited)
+> alongside `commissionPercent()`. These were declared before the module existed
+> so that entitlements are read as data through the account
+> (`$user->plan()->productListingLimit()`) rather than inlined as conditionals
+> once code arrived.
+>
+> **What is genuinely missing before this module can ship:** payments (no
+> provider is integrated, and `payment:configure` has no surface), an order and
+> licence schema, and file storage with access control. See
+> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission) and
+> [audit §10](./audit/PHASE-0-AUDIT.md) for the recorded gaps.
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. Product Vision
 
 Build a professional developer-focused digital marketplace inside my existing portfolio website:

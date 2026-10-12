@@ -28,7 +28,9 @@ The product exists because senior engineers are routinely evaluated on two thing
 | Generic Laravel CMS (Filament panel + Wordpress-like UI) | The admin surface is a generic CRUD table, not a writing experience. Editing prose is the primary job and deserves a purpose-built editor. |
 | Static site generator (Hugo, Astro) | Excellent for reading, but cannot host the authenticated authoring workflow, comments, or post-authentication state that this product needs without bolting on a separate service. |
 
-DevFolio therefore optimizes for **one author writing well**, not for thousands of tenants. Every architectural decision follows from that constraint (see [TRD §3](./TRD.md#3-architecture-decisions)).
+DevFolio therefore optimizes for **one author writing well**, not for thousands of tenants: a single-person publishing workflow, not a multi-tenant CMS.
+
+**Revised (M6).** "One author" describes the *publishing workflow*, not the authorisation model. The system now distinguishes three account roles — `user`, `seller`, `admin` — because the deferred product modules (marketplace, Idea Bank, Developer Lab) need them, and because a reader who may comment is not the same principal as the author who may publish. The original intent still holds where it matters: there is no tenancy, no per-organisation data isolation, and no multi-tenant concern anywhere in the schema. See [TRD §2.5](./TRD.md#25-authorisation-model) and [PERMISSIONS.md](./PERMISSIONS.md).
 
 ---
 
@@ -47,7 +49,11 @@ DevFolio therefore optimizes for **one author writing well**, not for thousands 
 
 ### 2.2 Non-Goals (explicit scope exclusions)
 
-- **Multi-author publishing.** One primary author. The schema keeps a `user_id` foreign key on posts so multi-author is a future extension, but no roles, permissions, or co-authoring UI ships in v1.
+- **Multi-author publishing.** One primary author. The schema keeps a `user_id` foreign key on posts so multi-author is a future extension, and no co-authoring UI ships in v1.
+
+  > **Revised.** This exclusion originally read "no roles, permissions, or co-authoring UI ships in v1". The **roles and permissions model has since shipped** and is now a core part of the product: three account roles (`user`, `seller`, `admin`) with 24 derived permissions and role-scoped dashboards. Co-authoring remains out of scope. See [`PERMISSIONS.md`](PERMISSIONS.md).
+  >
+  > The distinction that matters: the role model governs *what an account may do on the platform*, not *who may collaborate on a given post*. A post still has one author.
 - **Newsletter delivery.** Email capture is limited to the contact form; no campaign tooling, no double opt-in list management.
 - **Full-text search engine.** Search is a scoped `LIKE`/indexed-column query over title, excerpt, and body. No Meilisearch, Algolia, or Typesense in v1.
 - **Rich text / WYSIWYG editing.** Markdown only. A WYSIWYG round-trip destroys the fidelity that technical writers need for code fences.
@@ -134,9 +140,15 @@ Requirements use MoSCoW priority. Each carries an ID for traceability into the [
 | ID | Priority | Requirement |
 | --- | --- | --- |
 | FR-4.1 | Must | Registration, login, logout, password reset, and email verification provided by the existing Fortify + Livewire stack. |
+| FR-4.1a | Must | **Every authentication flow lands the account on its role's dashboard**, resolved from the account role rather than a fixed path. |
+| FR-4.1b | Must | **One shared authentication layout** across all seven Fortify screens, respecting the visitor's light/dark preference and exposing a skip link to the form. |
 | FR-4.2 | Must | Authenticated dashboard showing content metrics and recent activity. |
+| FR-4.2a | Must | **Three account roles — `user`, `seller`, `admin` — with permissions derived from the role, and a sidebar that shows only what the account's routes will accept.** |
+| FR-4.2b | Must | **A seller dashboard** stating the plan's entitlements (listing limit, commission) even where the corresponding feature is not yet built. |
+| FR-4.2c | Must | **An admin dashboard** with platform metrics and an account list supporting role changes, refusing any change at or above the actor's own level. |
 | FR-4.3 | Must | Post list scoped to the author with status filters (draft, scheduled, published, archived). |
 | FR-4.4 | Must | Create and edit post with title, slug, excerpt, body, category, tags, status, and featured flag. |
+| FR-4.4a | Must | **Publishing requires at least a seller role.** A plain reader may draft and edit but cannot make a post public. |
 | FR-4.5 | Must | Live markdown preview while editing. |
 | FR-4.6 | Must | Autosaved drafts, with visible "saved / saving / unsaved" status. |
 | FR-4.7 | Must | Publish and unpublish transitions with confirmation. |
@@ -144,6 +156,7 @@ Requirements use MoSCoW priority. Each carries an ID for traceability into the [
 | FR-4.9 | Should | Reading-time and slug auto-derived from content, with manual override. |
 | FR-4.10 | Should | Category and tag management inline from the editor (create-on-the-fly). |
 | FR-4.11 | Should | Comment moderation queue with approve/reject. |
+| FR-4.11a | Should | **Moderation is restricted to the admin role**; an author sees pending comments on their own posts without being able to approve or reject. |
 | FR-4.12 | Could | Post view counter incremented on public read. |
 
 ### 4.5 Social sharing
@@ -224,13 +237,16 @@ Stories are written in the standard form and carry acceptance criteria that map 
 
 ### 5.2 Author stories
 
-**US-07 — Sign in securely** *(Must)*
-> As the **author**, I want to authenticate with email and password (plus two-factor where enabled), so that only I can publish.
+> **Scope note.** US-07 through US-12 were written when "the author" was the only privileged principal. The system now distinguishes three account roles, and the stories below have been restated in role terms so the acceptance criteria name the role that satisfies them. US-13 through US-18 are new and cover the role, permission, and dashboard behaviour that did not previously have a requirement. The full matrix is in [PERMISSIONS.md](./PERMISSIONS.md).
 
-- Unauthenticated access to any `/dashboard` route redirects to login with a return URL.
-- Successful authentication redirects to the intended destination, or the dashboard.
+**US-07 — Sign in securely** *(Must)*
+> As an **account holder of any role**, I want to authenticate with email and password (plus two-factor where enabled), so that only I can reach my own data.
+
+- Unauthenticated access to any `/dashboard` route redirects to login with a return URL. The redirect is a **redirect, not a 403** — the account may hold the permission once authenticated.
+- Successful authentication redirects to the intended destination, or to the dashboard **owned by the account's role**: `dashboard.index` (user), `dashboard.seller.index` (seller), `dashboard.admin.index` (admin).
 - Two-factor challenge and passkey flows continue to work unmodified.
 - Five failed attempts within a minute trigger rate limiting.
+- The sign-in screen renders in the application's active theme. It must not force dark mode.
 
 **US-08 — Write a post without friction** *(Must)*
 > As the **author**, I want to draft in markdown with a live preview and autosave, so that I can focus on the writing.
@@ -269,6 +285,55 @@ Stories are written in the standard form and carry acceptance criteria that map 
 - Post list shows per-post view and comment counts.
 - Metrics are computed from persisted data, not from a third-party service.
 
+### 5.3 Role and permission stories
+
+Added with M5. These did not previously have a requirement, which is how the system shipped for several milestones with an authorisation model that existed only in policies.
+
+**US-13 — Be recognised as a reader, not an author** *(Must)*
+> As a **registered reader**, I want a dashboard I am allowed to be on, so that signing in does not drop me on a page that refuses me.
+
+- A `user`-role account lands on `dashboard.index`, which is reachable with `post:create`.
+- The sidebar shows Content (posts, comments) and hides Selling and Administration entirely, **including their headings**.
+- No navigation entry is visible unless the account holds the permission its route requires.
+
+**US-14 — Own my writing without owning the platform** *(Must)*
+> As a **user-role account**, I want to edit and delete my own posts and nobody else's, so that the boundary is unambiguous.
+
+- `PostPolicy@update` and `@delete` allow the author, and any account holding `post:update-any` / `post:delete-any`.
+- Ownership resolves through `User::canActOn($owner)` — one rule, so the "admins can do anything" clause cannot be remembered in one policy and forgotten in another.
+- The post list shows only the account's own posts unless an `-any` permission is held.
+
+**US-15 — Operate as a seller** *(Must)*
+> As a **seller**, I want everything a reader has plus the ability to publish without review and to sell, so that I can run a commercial presence.
+
+- `seller` inherits the full `user` permission set by spreading it, not by restating it — a new baseline permission reaches both higher roles automatically.
+- `seller` additionally holds `post:publish`, `taxonomy:manage`, and the six selling permissions.
+- The Selling section appears in the sidebar; the seller home states the plan's entitlements (`25 listings`, `15 % commission`).
+- A `user`-role account attempting a seller route is refused with `403` before the component boots.
+
+**US-16 — Administer without becoming all-powerful by accident** *(Must)*
+> As an **admin**, I want full platform reach, but I want the guard-rails that stop me destroying the platform in one click.
+
+- `admin` holds `AccountPermission::cases()` — every permission, including `admin:access`, `user:manage`, and `role:manage`.
+- An admin **cannot delete themselves** through the user-management table; self-deletion is a separate confirmed flow.
+- An admin **cannot delete another admin** — `UserPolicy@delete` refuses any target at or above the actor's own level.
+- Role assignment is bounded: `AccountRole::assignableBy($actor)` never returns `Admin`, so no UI path exists to mint a peer or a superior. This is a deliberate constraint, and its consequence is recorded as a release blocker in §7.1.
+
+**US-17 — Understand what my role can do** *(Should)*
+> As an **account holder**, I want to see what my plan includes, so that I understand what I can and cannot do before I hit a wall.
+
+- The dashboard shows the account's role as a badge and its plan as a named set of features.
+- Plan limits are read **through** the account (`$user->plan()->productListingLimit()`), never inlined as a conditional at a call site — so a limit shown in the UI and a limit enforced in a policy cannot disagree.
+- A limit of `null` is rendered as "unlimited", not as `0` or blank.
+
+**US-18 — Have the dashboard shell adapt to my role** *(Must)*
+> As an **account holder of any role**, I want the dashboard chrome to match what I can do, so that I am not shown doors I cannot open.
+
+- One shell (`layouts/dashboard.blade.php`) serves all three roles; each page opts in with `#[Layout('layouts::dashboard')]`.
+- `DashboardNavigation::for($user)` filters items by permission and drops any section left empty, heading included.
+- The pending-comment badge is scoped to the viewer: comments on their own posts, or all comments if they hold `comment:moderate`. It means "work waiting for *you*".
+- The shell never branches on role directly; it branches on permission. Adding a fourth role is a change to `AccountRole` and its navigation items, and nothing in the shell.
+
 ---
 
 ## 6. Success Metrics
@@ -294,6 +359,15 @@ Stories are written in the standard form and carry acceptance criteria that map 
 | **M2 — Public surface** | Home, blog index, blog detail, about | All reader stories US-01 → US-06 accepted. |
 | **M3 — Authoring** | Dashboard, post CRUD, editor, taxonomy, moderation | All author stories US-07 → US-12 accepted. |
 | **M4 — Polish** | SEO metadata, sharing metadata, a11y pass, performance pass | Success metrics in §6 met. |
+| **M5 — Roles & access** | Account roles, permission matrix, role-scoped dashboards, shared auth layout, modal system | FR-4.1a → FR-4.2c accepted; 183 tests passing. |
+
+### 7.1 Post-M5 scope, not committed
+
+| Item | State |
+| --- | --- |
+| **Product listings** | The `seller` role, its six selling permissions and its plan limits (25 listings, 15 % commission) all ship and are enforced. There is **no `Product` model**, so the seller dashboard states entitlements against an empty feature. |
+| **Public API** | Specified in [`API.md`](API.md) and **deliberately unimplemented**. No `routes/api.php`, no Sanctum. |
+| **Admin bootstrap** | `AccountRole::assignableBy()` refuses to grant `admin` to anyone, so the role is reachable only via seeder or direct database write. Needs a deliberate answer before operation by anyone but the author. |
 
 ---
 

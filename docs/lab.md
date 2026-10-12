@@ -1,5 +1,39 @@
 # shamim.it Developer Lab — Master PRD & Implementation Prompt
 
+> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+>
+> This document is an **input**, not a description of the shipped system. It
+> specifies a browser-based coding and practice environment ("Developer Lab")
+> and predates the current architecture. No part of Developer Lab exists in the
+> codebase today — not the editor, not the runner, not the challenge system.
+>
+> Read it as: *what the module should become, once it is built.* Do not read it
+> as: *what the application currently does.*
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
+>
+> **Already built and reusable by this module:** the account-role and permission
+> substrate ([PERMISSIONS.md](./PERMISSIONS.md)), the dashboard shell with
+> permission-driven navigation, the shared modal system
+> ([COMPONENTS.md](./COMPONENTS.md)), and the `seller` role's product
+> permissions. See [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission)
+> for the deferral rationale.
+>
+> **A caution specific to this spec.** "Run arbitrary user code in a browser"
+> is the part that needs re-planning rather than porting: it implies a sandbox
+> boundary, a resource limit, and an abuse story that a Livewire monolith on
+> SQLite does not currently provide. Treat §"run supported programs" as an open
+> design question, not a settled requirement.
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. Project Overview
 
 Build a modern, secure, responsive, browser-based coding and practice environment named **Developer Lab** inside the existing **shamim.it** platform at `https://shamim.it`.

@@ -24,8 +24,8 @@ Companion documents: [PRD](./PRD.md) · [TRD](./TRD.md) · [Application Flow](./
 
 | Table | Purpose | Rows expected | Soft delete |
 | --- | --- | --- | --- |
-| `users`   | *(existing)* Authentication identity | 1–100 | No |
-| `teams`, `team_members`, `team_invitations` | *(existing)* Starter-kit teams; not used for content scoping | small | Yes (teams) |
+| `users`   | *(existing)* Authentication identity, **extended with `role`** | 1–100 | No |
+| `teams`, `team_members`, `team_invitations` | *(existing)* Team workspace; **`memberships` carries team roles** | small | Yes (teams) |
 | `cache`, `jobs`, `sessions`, `password_reset_tokens`, `passkeys` | *(existing)* Framework tables | — | No |
 | **`categories`** | ★ One-to-many grouping for posts | 5–20 | No |
 | **`tags`** | ★ Many-to-many labelling for posts | 20–200 | No |
@@ -34,6 +34,35 @@ Companion documents: [PRD](./PRD.md) · [TRD](./TRD.md) · [Application Flow](./
 | **`comments`** | ★ Moderated reader discussion | 0–10× posts | No |
 
 ★ = introduced by this feature set.
+
+---
+
+### 1.3 The `role` column on `users`
+
+Added by `2026_10_12_094528_add_role_to_users_table.php`.
+
+| Column | Type | Null | Default | Index |
+| --- | --- | --- | --- | --- |
+| `role` | `string(20)` | no | `'user'` | indexed |
+
+Placed `after('password')`. The index exists because the admin account list
+filters by role and the seller/admin dashboards count by it.
+
+**Why a string and not an enum column.** The column stores the backing value of
+`App\Enums\AccountRole` (`'user'`, `'seller'`, `'admin'`) and is cast on the
+model via `'role' => AccountRole::class`. A database `ENUM` would need a
+migration to add a role; a `string(20)` needs only a PHP enum case. Given that
+adding a role is an expected product change, the string is the lower-friction
+choice, and the cast is what keeps it type-safe.
+
+**Why no `permissions` table.** Permissions are **derived**, never stored —
+`AccountRole::permissions()` computes them. There is no pivot, no cache and no
+config to invalidate, so changing what a role may do is a one-method edit. See
+[`PERMISSIONS.md`](PERMISSIONS.md).
+
+`User` also carries `current_team_id` (existing starter-kit column) — a
+denormalised pointer to the active team, so a team-scoped URL can be generated
+without a session lookup.
 
 ---
 
@@ -74,7 +103,7 @@ The central entity. Stores the markdown source, the rendered HTML, a searchable 
 | `posts_status_is_featured_index` | `status`, `is_featured` | Featured-post selection |
 | `posts_category_id_index` | `category_id` | Category filtering |
 
-**A note on the search index.** `body_text` is searched with a case-insensitive `LIKE '%term%'`, which cannot use a standard B-tree index because of the leading wildcard. At the expected corpus size (50–5 000 rows) a scan of `body_text` is acceptable and is bounded by pagination. Adding a full-text index is the documented escalation path when the corpus grows; see [TRD §3.6](./TRD.md#36-search-strategy).
+**A note on the search index.** `body_text` is searched with a case-insensitive `LIKE '%term%'`, which cannot use a standard B-tree index because of the leading wildcard. At the expected corpus size (50–5 000 rows) a scan of `body_text` is acceptable and is bounded by pagination. Adding a full-text index is the documented escalation path when the corpus grows; the trade-off and its trigger threshold are recorded in [TRD §1.3](./TRD.md#13-data) and [TRD §1.4](./TRD.md#14-explicitly-rejected-dependencies).
 
 **Why `body`, `body_html`, and `body_text` coexist.**
 
@@ -175,6 +204,72 @@ Enum-like columns are backed by PHP enums cast on the model, giving exhaustive `
 
 The enum exposes `label(): string` (translatable) and `isPublic(): bool`.
 
+### 3.3 `App\Enums\AccountRole`
+
+Backs `users.role`.
+
+| Case | Value | Level | Plan |
+| --- | --- | --- | --- |
+| `User` | `user` | 1 | `free` |
+| `Seller` | `seller` | 2 | `seller` |
+| `Admin` | `admin` | 3 | `platform` |
+
+Exposes `label()`, `description()`, `badgeColor()`, `plan()`, `permissions()`,
+`hasPermission()`, `hasAllPermissions()`, `hasAnyPermission()`, `level()`,
+`isAtLeast()`, `canAccessAdminPanel()`, `dashboardRoute()`, and the static
+`assignableBy()`.
+
+`Seller::permissions()` **spreads** `User::permissions()`; `Admin::permissions()`
+returns `AccountPermission::cases()`. Both make inheritance structural — see
+[`PERMISSIONS.md`](PERMISSIONS.md) §2.
+
+### 3.4 `App\Enums\AccountPermission`
+
+24 cases in 4 groups (`PermissionGroup`): Content 6, Moderation 2, Selling 6,
+Administration 10.
+
+| Group | Count | Example |
+| --- | ---: | --- |
+| `content` | 6 | `post:create`, `post:publish` |
+| `moderation` | 2 | `comment:moderate`, `taxonomy:manage` |
+| `selling` | 6 | `product:create`, `sale:view-own` |
+| `administration` | 10 | `admin:access`, `role:manage` |
+
+Exposes `group(): PermissionGroup`, `groupLabel()`, and the static
+`grouped()` / `options()`.
+
+**No storage.** This enum is the entire permission model — no table, no pivot,
+no cache. `group()` is an exhaustive `match`, so adding a case without a group
+is a PHPStan error rather than a runtime surprise.
+
+### 3.5 `App\Enums\RolePlan`
+
+Commercial entitlements, deliberately separate from authorization.
+
+| Case | Value | Listing limit | Commission | Can sell |
+| --- | --- | ---: | ---: | --- |
+| `Free` | `free` | 0 | — | No |
+| `Seller` | `seller` | 25 | 15.0 % | Yes |
+| `Platform` | `platform` | `null` (unlimited) | 0.0 % | Yes |
+
+`productListingLimit()` distinguishes `null` (unlimited) from `0` (not
+permitted); the two are not collapsed.
+
+### 3.6 `App\Enums\TeamRole` and `TeamPermission`
+
+Backs the `memberships.role` column — the **second, independent** authorization
+axis.
+
+| Team role | Level | Team permissions |
+| --- | ---: | ---: |
+| `Owner` | 3 | 7 |
+| `Admin` | 2 | 3 |
+| `Member` | 1 | 0 |
+
+A team admin may update team settings and manage invitations; the member list
+belongs to the owner. A plain member holds no team permission — membership
+itself is the view grant.
+
 ### 3.2 `App\Enums\CommentStatus`
 
 | Case | Value | Publicly visible | UI treatment |
@@ -238,12 +333,51 @@ Note that `body_html`, `body_text`, `reading_time`, `word_count`, and `view_coun
 
 Cast: `status` → `CommentStatus`. `#[Fillable(['post_id', 'user_id', 'parent_id', 'body', 'status'])]`.
 
-### 4.5 Shared concerns
+### 4.5 `App\Models\User` and the account-role concern
+
+`User` is the starter-kit model extended with the platform role. It declares the role through the `#[Fillable]` / `#[Hidden]` attributes, casts `role` to `AccountRole`, and defaults it in `$attributes` — so a model instantiated in memory and never saved already reports `user`, matching the migration default (§1.3).
+
+```php
+#[Fillable(['name', 'email', 'password', 'role', 'current_team_id'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
+{
+    use HasAccountRole, HasFactory, HasTeams, Notifiable,
+        PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    protected $attributes = ['role' => AccountRole::User->value];
+}
+```
+
+The model body itself holds only the properties and `initials()`. Role behaviour lives in `App\Concerns\HasAccountRole` (§4.6) and team behaviour in the starter kit's `HasTeams`, so `User` stays close to the skeleton shape while both axes remain independently testable.
+
+**Role API provided by `HasAccountRole`.** Reach for these; do not compare `$user->role` to a string, and do not branch on role in a view when a permission check expresses the same intent.
+
+| Member | Returns | Notes |
+| --- | --- | --- |
+| `accountRole()` | `AccountRole` | The cast accessor, for null-safe reads |
+| `plan()` | `RolePlan` | The plan the role confers; see §3.5 |
+| `hasRole(AccountRole $role)` | `bool` | Exact match |
+| `isAtLeastRole(AccountRole $role)` | `bool` | Privilege ordering, not equality |
+| `isUser()` / `isSeller()` / `isAdmin()` | `bool` | Thin wrappers over `hasRole()` — the only role-identity checks views should use |
+| `hasPermission(AccountPermission $p)` | `bool` | Single permission |
+| `hasAllPermissions(AccountPermission ...$p)` | `bool` | Conjunction |
+| `hasAnyPermission(AccountPermission ...$p)` | `bool` | Disjunction |
+| `canAccessAdminPanel()` | `bool` | Gates the admin surface as a whole |
+| `canActOn(mixed $owner)` | `bool` | **The** ownership rule: the owner acting on their own record, or any admin. Guards the null-owner case so an ownerless record cannot be self-authorised |
+| `dashboardRoute()` | `string` | Route name of this role's dashboard home |
+
+### 4.6 Shared concerns
 
 | Concern | Responsibility | Why shared |
 | --- | --- | --- |
 | `App\Concerns\HasSlug` | Derives a unique slug from a source field; applies an incrementing suffix on collision; respects a manual override | Posts, categories, and tags all need identical collision behaviour. A per-model copy would drift. |
 | `App\Concerns\HasReadingTime` | Computes word count and reading minutes from plain text (200 wpm) | Used by the post pipeline and by tests that need the same algorithm. |
+| `App\Concerns\GeneratesUniqueTeamSlugs` | Team-name → collision-free slug | Team creation and rename share one rule; a per-call copy would drift. |
+| `App\Concerns\HasAccountRole` | `role` cast, the three role predicates, and the account permission check | Keeps platform-role behaviour out of the model body and testable on its own (§3.3). |
+| `App\Concerns\HasTeams` | Membership, current-team switching, invitations | Starter-kit capability, retained verbatim. |
+| `App\Concerns\PasswordValidationRules` | The single password rule set used by registration, reset, and profile updates | Three entry points must not enforce three different policies. |
+| `App\Concerns\ProfileValidationRules` | Name/email rules shared by registration and profile update | Same reason. |
 
 ---
 
@@ -359,23 +493,81 @@ Pending items sort first so the actionable work is always at the top. The `order
 
 Six cheap aggregates. If this ever became hot it would move behind a cached `PostMetrics` data object; it is not hot today, so it is not cached today.
 
+### 6.6 Role-scoped dashboard metrics
+
+Each role's dashboard reads a different slice, and the queries reflect that.
+
+**Seller dashboard** (`pages::dashboard.seller.index`) reads the account's plan
+rather than the database: `RolePlan::productListingLimit()` and
+`commissionPercent()`. No query — there is no `Product` model to count. The
+screen states entitlements against a feature that does not yet exist, which is
+why it is honest about being empty rather than showing a zero.
+
+**Admin dashboard** (`pages::dashboard.admin.index`) adds platform-wide counts
+that the author dashboard deliberately does not scope:
+
+| Metric | Query shape |
+| --- | --- |
+| Total accounts | `User::count()` |
+| Accounts by role | `User::selectRaw('role, count(*)')->groupBy('role')` |
+| Published posts | `Post::published()->count()` |
+| Awaiting moderation | `Comment::pending()->count()` |
+| Sellers | `User::where('role', 'seller')->count()` |
+
+**Why `users.role` is indexed.** The group-by above and the admin user list's
+role filter both scan on it. Without the index, a filtered list degrades to a
+full scan as accounts grow — the one table in this application that can
+realistically reach six figures.
+
 ---
 
 ## 7. Migration Plan
 
-Migrations are anonymous classes, created with `php artisan make:migration`, ordered so that foreign keys never reference a table that does not yet exist.
+Migrations are anonymous classes, created with `php artisan make:migration`,
+ordered so that foreign keys never reference a table that does not yet exist.
+
+### 7.1 Content migrations
 
 | # | Migration | Creates |
 | --- | --- | --- |
-| 1 | `2016_01_01_000010_create_categories_table` | `categories` |
-| 2 | `2016_01_01_000011_create_tags_table` | `tags` |
-| 3 | `2016_01_01_000012_create_posts_table` | `posts` (FKs → `users`, `categories`) |
-| 4 | `2016_01_01_000013_create_post_tag_table` | `post_tag` (FKs → `posts`, `tags`) |
-| 5 | `2016_01_01_000014_create_comments_table` | `comments` (FKs → `posts`, `users`, self) |
+| 1 | `2026_10_12_080202_create_categories_table` | `categories` |
+| 2 | `2026_10_12_080203_create_tags_table` | `tags` |
+| 3 | `2026_10_12_080204_create_posts_table` | `posts` (FKs → `users`, `categories`) |
+| 4 | `2026_10_12_080205_create_post_tag_table` | `post_tag` (FKs → `posts`, `tags`) |
+| 5 | `2026_10_12_080207_create_comments_table` | `comments` (FKs → `posts`, `users`, self) |
 
-**Ordering note.** The timestamps place these after the framework's `0001_01_01_*` tables but before the existing `2024`/`2025`/`2026` starter-kit migrations. That is safe here because none of these tables are referenced by the starter-kit migrations, and `users` — the only dependency — is already present. On a fresh `php artisan migrate` the order is: framework tables → content tables → starter-kit additions.
+`080206` is absent from the sequence — a gap from the authoring process, not a
+missing migration. Laravel orders by filename, so a gap is harmless.
 
-**Rollback.** Each `down()` drops exactly what its `up()` created, in reverse dependency order, so `migrate:rollback` on the batch leaves the starter kit intact.
+### 7.2 Access migration
+
+| # | Migration | Changes |
+| --- | --- | --- |
+| 6 | `2026_10_12_094528_add_role_to_users_table` | Adds `users.role` + index |
+
+### 7.3 Framework and starter-kit migrations
+
+These ship with Laravel and the starter kit and are unmodified.
+
+| Migration | Creates |
+| --- | --- |
+| `0001_01_01_000000_create_users_table` | `users`, `password_reset_tokens`, `sessions` |
+| `0001_01_01_000001_create_cache_table` | `cache` (`cache`, `cache_locks`) |
+| `0001_01_01_000002_create_jobs_table` | `jobs`, `job_batches`, `failed_jobs` |
+| `2024_01_01_000000_create_passkeys_table` | `passkeys` |
+| `2025_08_14_170933_add_two_factor_columns_to_users_table` | 2FA columns on `users` |
+| `2026_01_27_000001_create_teams_table` | `teams`, `memberships`, `team_invitations` |
+| `2026_01_27_000002_add_current_team_id_to_users_table` | `users.current_team_id` |
+
+**Ordering note.** The `2026_10_12_*` content migrations run after the
+starter-kit's `2026_01_27_*` team tables, so `users` and `teams` both exist
+before anything references them. On a fresh `php artisan migrate`: framework
+tables → passkeys and 2FA → teams → content → `users.role`.
+
+**Rollback.** Each `down()` drops exactly what its `up()` created. Rolling back
+the content batch leaves the framework and starter-kit tables intact, and
+`add_role_to_users_table::down()` drops the index before the column — dropping
+the column first would fail on SQLite.
 
 ---
 
@@ -383,15 +575,29 @@ Migrations are anonymous classes, created with `php artisan make:migration`, ord
 
 Seeders produce a site that is immediately browsable, because a portfolio with three lorem-ipsum posts is not demonstrable.
 
+`DatabaseSeeder` orders the calls deliberately: **users → taxonomies → posts →
+comments**. Posts reference categories and tags by name, and `PostSeeder`
+resolves its author from the first user, so `UserSeeder` must run first.
+
 | Seeder | Produces | Notes |
 | --- | --- | --- |
+| `UserSeeder` | **3 accounts, one per role** | `test@example.com` (admin, listed **first** so it owns the seeded posts), `seller@example.com` (seller), `user@example.com` (user). Password `password`. |
 | `CategorySeeder` | 6 categories: Architecture, Backend, Frontend, DevOps, Databases, Career | Real names — these read as a real engineer's taxonomy |
 | `TagSeeder` | ~24 tags: laravel, php, livewire, react, typescript, postgres, redis, docker, testing, performance, security, caching, queues, observability, … | Slug-normalised, de-duplicated |
-| `PostSeeder` | 12 posts: 9 published, 2 drafts, 1 featured | Real technical prose with prose bodies, code fences, and headings. Each post gets 1 category and 2–4 tags. `body_html`/`body_text`/`reading_time` produced by the same pipeline the editor uses |
-| `CommentSeeder` | ~30 comments across published posts: 20 approved, 10 pending | Divided across several users so the thread looks real |
-| `DatabaseSeeder` | Calls the above plus the existing user/team seeding | Keeps `composer setup` a one-command path to a working app |
+| `PostSeeder` | 12 posts: 9 published, 2 drafts, 1 featured | Real technical prose with code fences and headings. Each post gets 1 category and 2–4 tags. Created through the real `CreatePost` action — not raw inserts |
+| `CommentSeeder` | ~30 comments across published posts | Mixed approved/pending so the moderation queue is non-empty |
 
-**Why the seeder exercises the real pipeline.** `PostSeeder` calls the same `CreatePost` action the editor calls. Seeding through a shortened path would let a bug in the pipeline hide behind data that was written correctly by different code.
+**Why `PostSeeder` uses the action rather than `Post::create()`.** Every derived
+column (`body_html`, `body_text`, `word_count`, `reading_time`, `excerpt`) is
+produced by the same pipeline production uses. Seeding through a shortened path
+would let a bug in the pipeline hide behind data written correctly by different
+code — and would produce posts whose `body_html` was empty, so the first page
+anyone loaded would render blank.
+
+**Not for production.** These accounts exist so every dashboard in the access
+model is reachable immediately after setup. `composer setup` runs
+`migrate --force` **without** `--seed`; seeding is always a separate, explicit
+step.
 
 ---
 

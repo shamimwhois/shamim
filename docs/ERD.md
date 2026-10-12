@@ -16,7 +16,10 @@ Companion documents: [PRD](./PRD.md) · [TRD](./TRD.md) · [Application Flow](./
 | `PK` | Primary key |
 | `FK` | Foreign key |
 | `U` | Unique index |
+| `I` | Non-unique index |
 | `S` | Soft-delete column |
+
+A note on what this ERD deliberately does **not** draw: there is no `roles` table and no `permissions` table. Roles and permissions are enum-backed behaviour, not rows, and §5.9 argues that decision at length. An ERD that omitted them would look incomplete; one that drew them would be wrong. The `USERS` entity carries `role` as an indexed column, and that is the whole of the persistence.
 
 ---
 
@@ -46,6 +49,7 @@ erDiagram
         string      email               U
         timestamp   email_verified_at
         string      password
+        string(20)  role                I   "account role: user | seller | admin"
         string      two_factor_secret
         string      two_factor_recovery_codes
         timestamp   two_factor_confirmed_at
@@ -301,6 +305,52 @@ erDiagram
 
 **Why.** Native enums require an `ALTER TYPE` (PostgreSQL) or a table rebuild (SQLite/MySQL) to add a value, which is a migration risk for a change that should be a one-line enum edit. Integer constants are unreadable in a database client. A string column with a PHP enum cast gives type safety in application code, human-readable rows in the database, and a trivial path to adding `PostStatus::Scheduled` later.
 
+The same reasoning applies to `users.role`, which is a `string(20)` with an
+`AccountRole` cast.
+
+---
+
+### 5.9 Permissions are derived, so they have no entity
+
+**Decision.** There is no `permissions` table, no `role_permissions` pivot and
+no `roles` table. A `permissions` entity is the obvious thing to draw on an ERD,
+and it is deliberately absent.
+
+**Why.** The role → permission mapping is **behavioural**, not data. A
+`role_permissions` table would let a deployment grant `post:publish` to `user`
+through a database write, and the application — whose `PostPolicy`, sidebar and
+route guards all read `AccountRole::permissions()` — would not notice. The guard
+and the grant would disagree, and the disagreement would be silent.
+
+Modelling permissions in code makes that unrepresentable: changing what a role
+may do is a one-method edit that the type checker and the test suite both see.
+See [`PERMISSIONS.md`](PERMISSIONS.md).
+
+**The same decision applies to `RolePlan`.** Plans are commercial entitlements,
+not authorization, and they live in code for the same reason.
+
+---
+
+### 5.10 Two role columns that are not the same thing
+
+`users.role` and `memberships.role` are both called "role" and hold entirely
+different values.
+
+| Column | Values | Scope |
+| --- | --- | --- |
+| `users.role` | `user` \| `seller` \| `admin` | Platform-wide |
+| `memberships.role` | `owner` \| `admin` \| `member` | One team |
+
+**Why the name is reused.** Both answer "what is this account's role", just
+against different nouns — the platform, and a team. Two independent axes is the
+correct model; an `admin` of team A must not become an `admin` of team B, and a
+single shared column could not express that.
+
+The cost is ambiguity in prose, which is why every document that mentions a role
+states *which* axis it means. In code the two are never confused: they are
+different enums (`AccountRole` and `TeamRole`) and PHPStan would reject a
+substitution.
+
 ---
 
 ## 6. State Machine — Post Lifecycle
@@ -402,22 +452,80 @@ Which entity relationships each surface touches, and therefore which needs eager
 
 ## 9. Migration Dependency Order
 
+Fourteen migrations, in five waves. Arrows are hard dependencies: a table cannot be created before everything pointing at it exists. The filenames sort in exactly this order — that is not cosmetic, it is the execution order.
+
 ```mermaid
 flowchart LR
-    U[users<br/>pre-existing] --> P[posts]
-    U --> C[comments]
-    C1[categories] --> P
-    P --> PT[post_tag]
-    T[tags] --> PT
-    P --> C
+    subgraph W1["Wave 1 — framework baseline"]
+        direction TB
+        U[users]
+        CA[cache]
+        J[jobs]
+    end
 
-    P --> S1["index: status + published_at"]
-    C --> S2["index: post_id + status"]
-    T --> S3["index: slug unique"]
-    C1 --> S4["index: slug unique"]
+    subgraph W2["Wave 2 — identity extensions"]
+        direction TB
+        PK[passkeys] --> U
+        TFA["users: +two-factor columns"] --> U
+    end
+
+    subgraph W3["Wave 3 — teams"]
+        direction TB
+        TE[teams]
+        CT["users: +current_team_id"] --> U
+        CT --> TE
+    end
+
+    subgraph W4["Wave 4 — content"]
+        direction TB
+        C1[categories]
+        T[tags]
+        P[posts] --> U
+        P --> C1
+        PT[post_tag] --> P
+        PT --> T
+        C[comments] --> P
+        C --> U
+    end
+
+    subgraph W5["Wave 5 — account role"]
+        direction TB
+        R["users: +role"] --> U
+    end
+
+    W1 --> W2 --> W3 --> W4 --> W5
 ```
 
-Arrows are hard dependencies: a table cannot be created before everything pointing at it exists. The migration timestamps reflect this order (§7 of the [Schema document](./SCHEMA.md)).
+| Wave | Migration | Creates / alters | Depends on |
+| --- | --- | --- | --- |
+| 1 | `0001_01_01_000000_create_users_table` | `users`, `password_reset_tokens`, `sessions` | — |
+| 1 | `0001_01_01_000001_create_cache_table` | `cache`, `cache_locks` | — |
+| 1 | `0001_01_01_000002_create_jobs_table` | `jobs`, `job_batches`, `failed_jobs` | — |
+| 2 | `2024_01_01_000000_create_passkeys_table` | `passkeys` | `users` |
+| 2 | `2025_08_14_170933_add_two_factor_columns_to_users_table` | `users.two_factor_secret`, `two_factor_recovery_codes`, `two_factor_confirmed_at` | `users` |
+| 3 | `2026_01_27_000001_create_teams_table` | `teams`, `team_memberships`, `team_invitations` | `users` (all three carry a `user_id` foreign key) |
+| 3 | `2026_01_27_000002_add_current_team_id_to_users_table` | `users.current_team_id` | `users`, `teams` |
+| 4 | `2026_10_12_080202_create_categories_table` | `categories` | — |
+| 4 | `2026_10_12_080203_create_tags_table` | `tags` | — |
+| 4 | `2026_10_12_080204_create_posts_table` | `posts` (+ index `status, published_at`) | `users`, `categories` |
+| 4 | `2026_10_12_080205_create_post_tag_table` | `post_tag` | `posts`, `tags` |
+| 4 | `2026_10_12_080207_create_comments_table` | `comments` (+ index `post_id, status`) | `posts`, `users` |
+| 5 | `2026_10_12_094528_add_role_to_users_table` | `users.role` (+ index `role`) | `users` |
+
+### Why `role` is last and not first
+
+Adding `role` inside `0001_01_01_000000_create_users_table` would have been tidier, and it is the wrong call. The framework baseline migration is the one file every future Laravel upgrade expects to find untouched; the `users` table is also the highest-traffic table to alter under load. Keeping `role` in its own later migration means:
+
+- **The baseline stays stock.** Diffing against a fresh `laravel/laravel` skeleton still shows a clean `users` migration.
+- **The column default carries the policy.** `role` is `NOT NULL` with `default('user')`, so a row inserted by *any* path — registration, seeder, factory, artisan tinker, a raw import — is born least-privileged. Elevation is always an explicit act. See §5.9 for why the enum value and the policy are the same decision.
+- **It is reversible in isolation.** `down()` drops the index then the column and touches nothing else.
+
+### Ordering constraints worth naming
+
+- `post_tag` must come after both `posts` and `tags`; it is a pure pivot and has no other columns beyond the two timestamps.
+- `comments` must come after `posts` — and after `users`, because the `user_id` foreign key is `cascadeOnDelete`, so deleting an account removes their comments even on other people's posts (§10).
+- `add_current_team_id_to_users_table` must come after `create_teams_table`, or the foreign key has nothing to point at.
+- Wave 4 timestamps are milliseconds apart (`080202` … `080207`): the gap at `080206` is a migration that was authored and dropped during development. Left as-is rather than renumbered, because renaming an applied migration breaks `migrations` table bookkeeping on any database that has already run it.
 
 ---
 

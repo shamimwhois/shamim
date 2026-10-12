@@ -121,10 +121,38 @@ Semantic naming, not literal. Templates reference intent.
 | Shell | Used by | Structure |
 | --- | --- | --- |
 | **Public** | Home, blog index, blog detail, about | Skip-link → sticky header (logo, nav, theme toggle, auth action) → `main` → footer → back-to-top |
-| **Auth** | Login, register, reset, verify, 2FA | Existing starter-kit auth shells — **reuse, do not rebuild** |
-| **App** | Dashboard, post editor, settings | Existing starter-kit sidebar shell — **extend the nav, do not replace the shell** |
+| **Auth** | Login, register, reset, verify, 2FA | Split panel (editorial left, form right) collapsing to a centred card below `lg`; skip-link → `main#auth-form` |
+| **App** | Dashboard, post editor, settings | Sidebar shell with permission-filtered navigation and a role/plan card |
 
-**Rationale for reusing the existing shells.** The starter kit already ships accessible `auth` and `app` shells with working theme handling. Rebuilding them would be churn with a real risk of regressing focus order and landmark structure.
+> **Revised — the original guidance was wrong.** This table previously read
+> "Existing starter-kit auth shells — **reuse, do not rebuild**" and "Existing
+> starter-kit sidebar shell — **extend the nav, do not replace the shell**",
+> justified on the grounds that the starter kit "already ships accessible auth
+> and app shells **with working theme handling**".
+>
+> That premise was false. All three starter-kit auth layouts (and the app
+> shells) hardcoded `class="dark"` on `<html>`, **overriding the visitor's theme
+> choice**. Someone who had selected the light theme was shown a dark sign-in
+> page and then dropped into a light dashboard. The shells also rendered the
+> framework's placeholder branding (a random `Inspiring` quote) rather than
+> product copy, and only two of the three auth layouts were referenced at all —
+> the third was dead weight with the same bug.
+>
+> Rebuilding was therefore the correct call, not churn. The lesson worth
+> recording: "the framework starter kit handles this" is an assumption that
+> needs verifying, not a rationale. The `app` sidebar shell *was* worth
+> extending rather than replacing; the `auth` shells were not.
+
+**Current auth layout structure.** A two-column grid at `lg` and above — an
+editorial panel carrying the product's own copy, and the form column. Below
+`lg` the panel is dropped and the form is centred, because there is no room for
+a second column and no reason to make someone scroll past a manifesto to reach a
+password field.
+
+The layout is theme-neutral: it reads the visitor's preference through
+`@fluxAppearance` like every other page, and hardcodes nothing. `AuthLayoutTest`
+asserts this, because it is a regression that renders a perfectly usable form
+and is therefore invisible without a test.
 
 ### 3.2 Public header behaviour
 

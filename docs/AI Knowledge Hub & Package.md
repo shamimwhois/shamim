@@ -1,5 +1,39 @@
 # shamim V2 — AI Knowledge Hub & Package Marketplace
 
+> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+>
+> This document is an **input**, not a description of the shipped system. It
+> extends a "shamimsystem" that does not correspond to the current codebase and
+> predates the current architecture. Neither module it specifies — the AI
+> Knowledge Hub and the Package Marketplace — exists today.
+>
+> Read it as: *what the modules should become, once they are built.* Do not read
+> it as: *what the application currently does.*
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
+>
+> **Two premises in this spec that no longer hold.** First, it says to *preserve
+> the existing Ideas, Plans and Tasks modules* — there is nothing to preserve;
+> see the status banner in [Idea.md](./Idea.md) for why. Second, it assumes the
+> knowledge base is single-author. The current system has three account roles,
+> and a knowledge base with enrolled readers would need its own permission
+> additions to `AccountPermission` rather than reusing the publishing set.
+>
+> **Already built and reusable:** the modal system, the dashboard shell with
+> permission-driven navigation, and the `RolePlan` entitlements
+> (`productListingLimit()`, `commissionPercent()`, `canSell()`) that a package
+> marketplace would price against. See
+> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission).
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. Project Context
 
 Extend the existing shamimsystem inside `https://shamim.it`.

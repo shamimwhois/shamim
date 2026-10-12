@@ -1,5 +1,33 @@
 # Idea — Master Product & Development Prompt
 
+> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+>
+> This document is an **input**, not a description of the shipped system. It was
+> written as a build prompt for an "Ideas, Plans, Tasks, Projects &
+> Collaboration" module and predates the current architecture. Nothing described
+> here exists in the codebase today.
+>
+> Read it as: *what the module should become, once it is built.* Do not read it
+> as: *what the application currently does.*
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
+>
+> **Already built and reusable by this module:** three account roles and their
+> permission matrix ([PERMISSIONS.md](./PERMISSIONS.md)), the modal system
+> ([COMPONENTS.md](./COMPONENTS.md)), the dashboard shell with permission-driven
+> navigation, and teams/memberships. The module's deferred status and its
+> relationship to the rest of the roadmap are recorded in
+> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission).
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. AI Developer Role
 
 Act as a Senior Laravel Architect, Product Manager, UI/UX Designer, Database Engineer, Security Engineer, and Full-Stack Developer.
