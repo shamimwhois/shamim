@@ -134,7 +134,7 @@ new #[Title('About')] class extends Component
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
 
         <div class="shell relative py-16 lg:py-20">
-            <x-section-marker :number="1" label="About" accent />
+            <x-app.ui.section-marker :number="1" label="About" accent />
 
             <div class="mt-8 grid gap-10 lg:grid-cols-[1fr_280px] lg:items-start lg:gap-16">
                 <div>
@@ -149,9 +149,10 @@ new #[Title('About')] class extends Component
 
                 {{-- Profile card --}}
                 <aside class="rounded-lg border border-ink-200 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
-                    <div class="grid size-14 place-items-center rounded-md border border-ink-900/10 bg-ink-900 font-mono text-lg font-bold text-signal-400 dark:border-ink-50/10 dark:bg-ink-50 dark:text-ink-950">
-                        &gt;_
-                    </div>
+                    <x-app.icon.logo-mark
+                        size="lg"
+                        class="border border-ink-900/10 bg-ink-900 font-mono text-signal-400 dark:border-ink-50/10 dark:bg-ink-50 dark:text-ink-950"
+                    />
 
                     <p class="mt-5 text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">
                         {{ $this->profile()->name }}
@@ -205,7 +206,7 @@ new #[Title('About')] class extends Component
      | 02 — How I work
      --}}
     <section class="shell py-20" aria-labelledby="principles-heading">
-        <x-section-marker :number="2" label="How I work" />
+        <x-app.ui.section-marker :number="2" label="How I work" />
         <h2 id="principles-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
             The things I keep coming back to
         </h2>
@@ -232,7 +233,7 @@ new #[Title('About')] class extends Component
      --}}
     <section class="border-y border-ink-200 bg-ink-50/60 py-20 dark:border-ink-800 dark:bg-ink-900/30" aria-labelledby="expertise-heading">
         <div class="shell">
-            <x-section-marker :number="3" label="Expertise" />
+            <x-app.ui.section-marker :number="3" label="Expertise" />
             <h2 id="expertise-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 Where I am most useful
             </h2>
@@ -268,7 +269,7 @@ new #[Title('About')] class extends Component
      | 04 — Selected work
      --}}
     <section class="shell py-20" aria-labelledby="work-heading">
-        <x-section-marker :number="4" label="Selected work" />
+        <x-app.ui.section-marker :number="4" label="Selected work" />
         <h2 id="work-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
             Things I have built
         </h2>
@@ -317,7 +318,7 @@ new #[Title('About')] class extends Component
             <div class="shell">
                 <div class="flex flex-wrap items-end justify-between gap-6">
                     <div>
-                        <x-section-marker :number="5" label="Writing" />
+                        <x-app.ui.section-marker :number="5" label="Writing" />
                         <h2 id="recent-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                             Recently published
                         </h2>
@@ -335,7 +336,7 @@ new #[Title('About')] class extends Component
 
                 <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($this->recentPosts as $post)
-                        <x-post.card :post="$post" wire:key="about-post-{{ $post->id }}" />
+                        <x-app.ui.post.card :post="$post" wire:key="about-post-{{ $post->id }}" />
                     @endforeach
                 </div>
             </div>
@@ -347,7 +348,7 @@ new #[Title('About')] class extends Component
      --}}
     <section class="border-t border-ink-200 py-20 dark:border-ink-800" aria-labelledby="contact-heading">
         <div class="shell max-w-3xl">
-            <x-section-marker :number="6" label="Get in touch" />
+            <x-app.ui.section-marker :number="6" label="Get in touch" />
             <h2 id="contact-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 {{ $this->profile()->availability }}
             </h2>

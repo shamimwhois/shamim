@@ -357,22 +357,47 @@ would permit granting `seller`.
 ## 7. Navigation
 
 `app/Support/DashboardNavigation.php` is the single definition of the dashboard
-sidebar. Each entry declares the permission its route requires:
+sidebar. The definition is three levels deep — **section → group → item** — and
+only the leaf carries a permission:
 
 ```php
-[
-    'label'       => 'Comments',
-    'route'       => 'dashboard.comments',
-    'pattern'     => 'dashboard/comments',
-    'icon'        => 'chat-bubble-left-right',
-    'permissions' => [AccountPermission::ModerateComments],
-    'badge'       => self::BADGE_PENDING_COMMENTS,
+'key'   => 'content',                       // group
+'label' => 'Content',
+'icon'  => 'document-text',
+'items' => [
+    [
+        'label'       => 'Comments',
+        'route'       => 'dashboard.comments',
+        'pattern'     => 'dashboard.comments',
+        'icon'        => 'chat-bubble-left-right',
+        'permissions' => [AccountPermission::CreatePost],
+        'badge'       => self::BADGE_PENDING_COMMENTS,
+    ],
+    // …
 ]
 ```
 
-`for(User $user)` filters by permission, and **both the nav and the route guard
-read from this one source**. A menu item therefore cannot be visible to an
-account whose route would refuse it.
+Note that **Comments requires `CreatePost`, not `ModerateComments`**. Every
+account that can write a post has a moderation queue — its own. The
+`ModerateComments` permission widens the *scope* of that queue to the whole
+platform (see `pendingCommentCount()`), it does not gate access to the screen.
+
+`for(User $user)` filters by permission, drops any group left empty, then drops
+any section left empty, and **both the nav and the route guard read from this one
+source**. A menu item therefore cannot be visible to an account whose route
+would refuse it.
+
+### The one navigation map without permissions
+
+`app/Support/SettingsNavigation.php` deliberately carries **no permission
+filtering and takes no `User`**. Every account manages its own profile, security
+and appearance, so there is nothing to filter — and a `for(User $user)` signature
+would imply a role-dependent settings menu that does not exist. A test asserts
+the method takes no parameters, so that signature cannot be added casually.
+
+Everything else about the settings shell mirrors the dashboard nav: the same
+`route` + `pattern` pair per destination, the same `request()->routeIs()`
+resolution for the active state.
 
 Before this existed, a nav link and its route guard were two separate statements
 of the same rule, and they drifted. The failure is silent: a link that 403s, or
@@ -470,8 +495,10 @@ must read from the same permission, or a link can 403.
    `badgeColor()`, `plan()`, `permissions()`, `level()`, `dashboardRoute()`.
 2. Add a `RolePlan` case, or return an existing plan.
 3. Create `resources/views/pages/<role>/⚡dashboard.blade.php`, with
-   `#[Layout('layouts::dashboard')]` on the component — the Livewire default
-   layout is the public shell.
+   `#[Layout('layouts::<role>.dashboard')]` on the component — the Livewire
+   default layout is the public shell. The layout and the role's three chrome
+   components under `components/app/<role>/` follow the same pattern as the
+   existing three.
 4. Add a middleware-guarded group in `routes/web.php`, using a **permission**
    guard rather than a role check.
 5. Add `DashboardNavigation` entries.

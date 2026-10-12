@@ -13,7 +13,7 @@
      * enough that a page carried the same message twice.
      *
      * The optional `eyebrow` is the monospace ordinal used throughout the
-     * public site (`x-section-marker`), so the transition from marketing pages
+     * public site (`x-app.ui.section-marker`), so the transition from marketing pages
      * into authenticated screens reads as one continuous design rather than a
      * hand-off to a framework's default scaffolding.
      */

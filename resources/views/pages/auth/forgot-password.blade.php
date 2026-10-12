@@ -1,9 +1,9 @@
 <x-layouts::auth :title="__('Forgot password')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :eyebrow="__('Recovery')" :title="__('Forgot your password?')" :description="__('Enter your email and we will send you a reset link')" />
+        <x-app.ui.auth.header :eyebrow="__('Recovery')" :title="__('Forgot your password?')" :description="__('Enter your email and we will send you a reset link')" />
 
         <!-- Session Status -->
-        <x-auth-session-status class="text-center" :status="session('status')" />
+        <x-app.ui.auth.session-status class="text-center" :status="session('status')" />
 
         <form method="POST" action="{{ route('password.email') }}" class="flex flex-col gap-6">
             @csrf

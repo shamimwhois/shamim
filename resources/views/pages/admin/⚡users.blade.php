@@ -27,7 +27,7 @@ use Livewire\Component;
  * The role *picker* is filtered by rule 1, but the rule is re-checked in
  * `updateRole()`. The menu is a convenience; the check is the control.
  */
-new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
+new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Component
 {
     /** Search term, reflected in the URL so a filtered list is shareable. */
     #[Url(as: 'q', except: '')]
@@ -185,51 +185,52 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
 }; ?>
 
 <div>
-    <x-dashboard.header
+    <x-app.ui.header
         eyebrow="Administration"
         title="Users"
         description="Every registered account, and the role that governs what it can reach."
+        :breadcrumbs="[['label' => __('Administration')], ['label' => __('Users')]]"
     />
 
-    <div class="space-y-6 px-6 py-8 lg:px-10">
+    <x-app.ui.body>
         {{-- ============================================================= --
          | Filters
          --}}
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="w-full lg:max-w-xs">
-                <flux:input
-                    wire:model.live.debounce.300ms="search"
-                    icon="magnifying-glass"
-                    :placeholder="__('Search name or email…')"
-                    :label="__('Search')"
-                    label:sr-only
-                />
+                <label for="user-search" class="sr-only">{{ __('Search') }}</label>
+                <div class="relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400">
+                        <flux:icon name="magnifying-glass" class="size-4" />
+                    </span>
+
+                    <input
+                        id="user-search"
+                        type="search"
+                        wire:model.live.debounce.300ms="search"
+                        :placeholder="__('Search name or email…')"
+                        autocomplete="off"
+                        class="sui-control w-full pl-9"
+                    />
+                </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by role">
                 <button
                     type="button"
                     wire:click="$set('roleFilter', 'all')"
-                    @class([
-                        'rounded-full border px-3 py-1 font-mono text-2xs font-medium transition-colors',
-                        'border-ink-900 bg-ink-900 text-white dark:border-ink-50 dark:bg-ink-50 dark:text-ink-950' => $roleFilter === 'all',
-                        'border-ink-200 text-ink-600 hover:border-ink-300 hover:text-ink-900 dark:border-ink-700 dark:text-ink-400 dark:hover:text-ink-100' => $roleFilter !== 'all',
-                    ])
+                    @class(['sui-focus sui-tab', 'sui-tab-active' => $roleFilter === 'all'])
                 >
-                    {{ __('All') }} · {{ collect($this->roleCounts)->sum('count') }}
+                    {{ __('All') }} <span class="opacity-60 tabular-nums">{{ collect($this->roleCounts)->sum('count') }}</span>
                 </button>
 
                 @foreach ($this->roleCounts as $row)
                     <button
                         type="button"
                         wire:click="$set('roleFilter', '{{ $row['role']->value }}')"
-                        @class([
-                            'rounded-full border px-3 py-1 font-mono text-2xs font-medium transition-colors',
-                            'border-ink-900 bg-ink-900 text-white dark:border-ink-50 dark:bg-ink-50 dark:text-ink-950' => $roleFilter === $row['role']->value,
-                            'border-ink-200 text-ink-600 hover:border-ink-300 hover:text-ink-900 dark:border-ink-700 dark:text-ink-400 dark:hover:text-ink-100' => $roleFilter !== $row['role']->value,
-                        ])
+                        @class(['sui-focus sui-tab', 'sui-tab-active' => $roleFilter === $row['role']->value])
                     >
-                        {{ $row['role']->label() }} · {{ $row['count'] }}
+                        {{ $row['role']->label() }} <span class="opacity-60 tabular-nums">{{ $row['count'] }}</span>
                     </button>
                 @endforeach
 
@@ -237,7 +238,7 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
                     <button
                         type="button"
                         wire:click="clearFilters"
-                        class="font-mono text-2xs font-medium text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
+                        class="sui-focus sui-action !px-2.5 !py-1.5 !text-xs"
                     >
                         {{ __('Clear') }}
                     </button>
@@ -246,7 +247,7 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
         </div>
 
         @error('role')
-            <div class="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
+            <div class="rounded-md border border-sui-danger/30 bg-sui-danger-soft px-4 py-3 text-sm text-sui-danger">
                 {{ $message }}
             </div>
         @enderror
@@ -255,7 +256,7 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
          | Account table
          --}}
         @if ($this->accounts->isEmpty())
-            <x-empty-state
+            <x-app.ui.empty-state
                 icon="users"
                 title="No accounts match those filters"
                 description="Try a different search term, or clear the role filter."
@@ -263,25 +264,25 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
                 @if ($this->hasFilters)
                     <flux:button size="sm" wire:click="clearFilters">{{ __('Clear filters') }}</flux:button>
                 @endif
-            </x-empty-state>
+            </x-app.ui.empty-state>
         @else
-            <div class="overflow-hidden rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
+            <div class="sui-card overflow-hidden">
                 <table class="w-full text-left">
-                    <thead class="border-b border-ink-200 bg-ink-50/60 dark:border-ink-800 dark:bg-ink-950/40">
+                    <thead class="border-b border-sui-hairline bg-sui-well">
                         <tr>
-                            <th scope="col" class="px-5 py-3 font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                            <th scope="col" class="px-5 py-3 sui-table-head">
                                 {{ __('Account') }}
                             </th>
-                            <th scope="col" class="hidden px-5 py-3 font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 sm:table-cell dark:text-ink-500">
+                            <th scope="col" class="hidden px-5 py-3 sui-table-head sm:table-cell">
                                 {{ __('Joined') }}
                             </th>
-                            <th scope="col" class="px-5 py-3 text-right font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                            <th scope="col" class="px-5 py-3 text-right sui-table-head">
                                 {{ __('Role') }}
                             </th>
                         </tr>
                     </thead>
 
-                    <tbody class="divide-y divide-ink-200 dark:divide-ink-800">
+                    <tbody class="divide-y divide-sui-hairline">
                         @foreach ($this->accounts as $account)
                             @php
                                 $isSelf = $account->is(auth()->user());
@@ -289,48 +290,47 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
                                     && ! $account->accountRole()->isAtLeast(auth()->user()->accountRole());
                             @endphp
 
-                            <tr wire:key="account-{{ $account->id }}">
+                            <tr wire:key="account-{{ $account->id }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        <div class="grid size-8 shrink-0 place-items-center rounded-md border border-ink-200 bg-ink-50 font-mono text-xs font-semibold text-ink-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300">
+                                        <div class="grid size-8 shrink-0 place-items-center rounded-md border border-sui-hairline bg-sui-well text-xs font-semibold text-ink-500">
                                             {{ Str::of($account->name)->substr(0, 1)->upper() }}
                                         </div>
 
                                         <div class="min-w-0">
-                                            <p class="truncate text-sm font-medium text-ink-900 dark:text-ink-50">
+                                            <p class="truncate text-sm font-medium text-ink-900">
                                                 {{ $account->name }}
                                                 @if ($isSelf)
-                                                    <span class="ml-1 font-mono text-2xs text-ink-400 dark:text-ink-500">({{ __('you') }})</span>
+                                                    <span class="ml-1 text-2xs text-ink-400">({{ __('you') }})</span>
                                                 @endif
                                             </p>
-                                            <p class="truncate font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                            <p class="truncate text-2xs text-ink-400">
                                                 {{ $account->email }}
                                             </p>
                                         </div>
                                     </div>
                                 </td>
 
-                                <td class="hidden px-5 py-3.5 font-mono text-2xs text-ink-500 sm:table-cell dark:text-ink-400">
+                                <td class="hidden px-5 py-3.5 text-2xs text-ink-500 sm:table-cell">
                                     {{ $account->created_at->format('M j, Y') }}
                                 </td>
 
                                 <td class="px-5 py-3.5 text-right">
                                     @if ($canEdit)
-                                        <flux:select
+                                        <select
                                             wire:change="updateRole({{ $account->id }}, $event.target.value)"
-                                            size="sm"
-                                            class="ml-auto w-32"
+                                            class="sui-control w-auto !py-1.5 text-xs"
                                             :aria-label="__('Role for :name', ['name' => $account->name])"
                                         >
                                             @foreach ($this->assignableRoles as $option)
-                                                <flux:select.option
+                                                <option
                                                     value="{{ $option['value'] }}"
-                                                    :selected="$account->accountRole()->value === $option['value']"
+                                                    @selected($account->accountRole()->value === $option['value'])
                                                 >
                                                     {{ $option['label'] }}
-                                                </flux:select.option>
+                                                </option>
                                             @endforeach
-                                        </flux:select>
+                                        </select>
                                     @else
                                         <flux:badge :color="$account->accountRole()->badgeColor()" size="sm">
                                             {{ $account->accountRole()->label() }}
@@ -343,7 +343,7 @@ new #[Layout('layouts::dashboard')] #[Title('Users')] class extends Component
                 </table>
             </div>
 
-            <x-pagination :paginator="$this->accounts" />
+            <x-app.ui.pagination :paginator="$this->accounts" />
         @endif
-    </div>
+</x-app.ui.body>
 </div>

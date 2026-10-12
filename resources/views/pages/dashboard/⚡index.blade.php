@@ -31,7 +31,7 @@ use Livewire\Component;
  * Every number on this page is computed from persisted data — no analytics
  * service, no sampling, no external dependency that can be wrong.
  */
-new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Dashboard')] class extends Component
 {
     public function mount(): void
     {
@@ -136,27 +136,28 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
 }; ?>
 
 <div>
-    <x-dashboard.header
+    <x-app.ui.header
         eyebrow="Overview"
         :title="'Welcome back, '.Str::of(auth()->user()->name)->explode(' ')->first()"
         description="A snapshot of your writing: what is published, what is waiting, and what is getting read."
+        :breadcrumbs="[['label' => __('Overview')]]"
     >
         <x-slot:actions>
             <flux:button variant="primary" :href="route('dashboard.posts.create')" icon="plus" wire:navigate>
-                New post
+                {{ __('New post') }}
             </flux:button>
         </x-slot:actions>
-    </x-dashboard.header>
+    </x-app.ui.header>
 
-    <div class="space-y-8 px-6 py-8 lg:px-10">
+    <x-app.ui.body>
         {{-- ============================================================= --
          | Metrics
          --}}
         <section aria-labelledby="metrics-heading">
-            <h2 id="metrics-heading" class="sr-only">Content metrics</h2>
+            <h2 id="metrics-heading" class="sr-only">{{ __('Content metrics') }}</h2>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Published"
                     :value="$this->metrics->publishedPosts"
                     icon="globe-alt"
@@ -164,7 +165,7 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                     :href="route('dashboard.posts.index', ['status' => 'published'])"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Drafts"
                     :value="$this->metrics->draftPosts"
                     icon="pencil-square"
@@ -172,7 +173,7 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                     :href="route('dashboard.posts.index', ['status' => 'draft'])"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Awaiting moderation"
                     :value="$this->metrics->pendingComments"
                     icon="shield-exclamation"
@@ -181,14 +182,14 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                     :href="route('dashboard.comments')"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Total views"
                     :value="$this->metrics->totalViews"
                     icon="eye"
                     hint="Across all posts"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Comments"
                     :value="$this->metrics->totalComments"
                     icon="chat-bubble-left-right"
@@ -196,7 +197,7 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                     :href="route('dashboard.comments')"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Archived"
                     :value="$this->metrics->archivedPosts"
                     icon="archive-box"
@@ -206,46 +207,52 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
             </div>
         </section>
 
-        <div class="grid gap-8 xl:grid-cols-2">
+        <div class="grid gap-6 xl:grid-cols-2">
             {{-- ========================================================= --
              | Moderation queue
              --}}
-            <section aria-labelledby="queue-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-                <div class="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                    <h2 id="queue-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                        Moderation queue
-                    </h2>
-
+            <x-app.ui.section
+                :title="__('Moderation queue')"
+                icon="shield-exclamation"
+                :tone="$this->metrics->pendingComments > 0 ? 'attention' : 'default'"
+                :padded="false"
+                aria-labelledby="queue-heading"
+            >
+                <x-slot:actions>
                     @if ($this->metrics->pendingComments > 0)
-                        <span class="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-2xs font-semibold tabular-nums text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                        <span class="sui-chip-warning">
                             {{ $this->metrics->pendingComments }}
                         </span>
                     @endif
-                </div>
+                </x-slot:actions>
 
                 @if ($this->pendingComments->isEmpty())
-                    <div class="px-5 py-10 text-center">
-                        <p class="text-sm text-ink-500 dark:text-ink-400">Nothing waiting. The queue is clear.</p>
+                    <div class="sui-empty">
+                        <div class="mx-auto grid size-10 place-items-center rounded-full border border-emerald-200 bg-sui-success-soft text-sui-success">
+                            <flux:icon name="check" class="size-5" />
+                        </div>
+                        <p class="mt-3 text-sm font-medium text-ink-700">{{ __('The queue is clear.') }}</p>
+                        <p class="mt-1 text-xs leading-normal text-ink-500">{{ __('Nothing is waiting for your review.') }}</p>
                     </div>
                 @else
-                    <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                    <ul class="divide-y divide-sui-hairline">
                         @foreach ($this->pendingComments as $comment)
-                            <li class="px-5 py-4">
+                            <li class="sui-row-lg">
                                 <div class="flex items-start gap-3">
-                                    <div class="grid size-7 shrink-0 place-items-center rounded-md border border-ink-200 bg-ink-50 font-mono text-2xs font-semibold text-ink-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300">
+                                    <div class="grid size-7 shrink-0 place-items-center rounded-md border border-sui-hairline bg-sui-well text-2xs font-semibold text-ink-500">
                                         {{ Str::of($comment->user->name)->substr(0, 1)->upper() }}
                                     </div>
 
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-xs font-medium text-ink-900 dark:text-ink-50">
+                                        <p class="text-xs font-medium text-ink-900">
                                             {{ $comment->user->name }}
-                                            <span class="font-normal text-ink-400 dark:text-ink-500">on</span>
+                                            <span class="font-normal text-ink-400">{{ __('on') }}</span>
                                             {{ Str::limit($comment->post->title, 42) }}
                                         </p>
-                                        <p class="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
+                                        <p class="mt-1.5 line-clamp-2 text-sm leading-normal text-ink-500">
                                             {{ $comment->body }}
                                         </p>
-                                        <p class="mt-2 font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                        <p class="mt-2 text-2xs text-ink-500">
                                             {{ $comment->created_at->diffForHumans() }}
                                         </p>
                                     </div>
@@ -254,59 +261,63 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                         @endforeach
                     </ul>
 
-                    <div class="border-t border-ink-200 px-5 py-3 dark:border-ink-800">
+                    <div class="border-t border-sui-hairline px-5 py-3">
                         <a
                             href="{{ route('dashboard.comments') }}"
                             wire:navigate
-                            class="font-mono text-2xs font-medium text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
+                            class="sui-link text-xs"
                         >
-                            Review all →
+                            {{ __('Review all') }} &rarr;
                         </a>
                     </div>
                 @endif
-            </section>
+            </x-app.ui.section>
 
             {{-- ========================================================= --
              | Recently edited
              --}}
-            <section aria-labelledby="recent-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-                <div class="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                    <h2 id="recent-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                        Recently edited
-                    </h2>
-
+            <x-app.ui.section
+                :title="__('Recently edited')"
+                icon="pencil-square"
+                :padded="false"
+                aria-labelledby="recent-heading"
+            >
+                <x-slot:actions>
                     <a
                         href="{{ route('dashboard.posts.index') }}"
                         wire:navigate
-                        class="font-mono text-2xs font-medium text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
+                        class="sui-link text-xs"
                     >
-                        All posts →
+                        {{ __('All posts') }} &rarr;
                     </a>
-                </div>
+                </x-slot:actions>
 
                 @if ($this->recentPosts->isEmpty())
-                    <div class="px-5 py-10 text-center">
-                        <p class="text-sm text-ink-500 dark:text-ink-400">No posts yet.</p>
+                    <div class="sui-empty">
+                        <div class="mx-auto grid size-10 place-items-center rounded-md border border-sui-hairline bg-sui-well text-ink-400">
+                            <flux:icon name="document-text" class="size-5" />
+                        </div>
+                        <p class="mt-3 text-sm font-medium text-ink-700">{{ __('No posts yet.') }}</p>
                         <flux:button class="mt-4" variant="primary" size="sm" :href="route('dashboard.posts.create')" icon="plus" wire:navigate>
-                            Write the first one
+                            {{ __('Write the first one') }}
                         </flux:button>
                     </div>
                 @else
-                    <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                    <ul class="divide-y divide-sui-hairline">
                         @foreach ($this->recentPosts as $post)
                             <li>
                                 <a
                                     href="{{ route('dashboard.posts.edit', $post) }}"
                                     wire:navigate
-                                    class="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50 dark:hover:bg-ink-950/60"
+                                    class="sui-row-lg flex items-center gap-4 transition duration-150 ease-soft hover:bg-sui-hover"
                                 >
                                     <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-medium text-ink-900 dark:text-ink-50">
+                                        <p class="truncate text-sm font-medium text-ink-900">
                                             {{ $post->title }}
                                         </p>
-                                        <p class="mt-0.5 font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                        <p class="mt-0.5 text-2xs text-ink-500">
                                             {{ $post->category?->name ?? 'Uncategorised' }}
-                                            · updated {{ $post->updated_at->diffForHumans() }}
+                                            &middot; {{ __('updated') }} {{ $post->updated_at->diffForHumans() }}
                                         </p>
                                     </div>
 
@@ -318,24 +329,18 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                         @endforeach
                     </ul>
                 @endif
-            </section>
+            </x-app.ui.section>
         </div>
 
         {{-- ============================================================= --
          | Most read
          --}}
         @if ($this->topPosts->isNotEmpty())
-            <section aria-labelledby="top-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-                <div class="border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                    <h2 id="top-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                        Most read
-                    </h2>
-                </div>
-
-                <ol class="divide-y divide-ink-200 dark:divide-ink-800">
+            <x-app.ui.section :title="__('Most read')" icon="eye" :padded="false" aria-labelledby="top-heading">
+                <ol class="divide-y divide-sui-hairline">
                     @foreach ($this->topPosts as $index => $post)
-                        <li class="flex items-center gap-4 px-5 py-3.5">
-                            <span class="w-6 shrink-0 font-mono text-2xs tabular-nums text-ink-400 dark:text-ink-600">
+                        <li class="sui-row-lg flex items-center gap-4">
+                            <span class="w-6 shrink-0 text-2xs tabular-nums text-ink-500">
                                 {{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}
                             </span>
 
@@ -343,46 +348,47 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
                                 href="{{ route('blog.show', $post) }}"
                                 target="_blank"
                                 rel="noopener"
-                                class="min-w-0 flex-1 truncate text-sm text-ink-700 transition-colors hover:text-signal-700 dark:text-ink-300 dark:hover:text-signal-400"
+                                class="min-w-0 flex-1 truncate text-sm text-ink-700 transition duration-150 ease-soft hover:text-sui-accent-ink"
                             >
                                 {{ $post->title }}
                             </a>
 
-                            <span class="shrink-0 font-mono text-2xs tabular-nums text-ink-500 dark:text-ink-400">
+                            <span class="shrink-0 text-2xs tabular-nums text-ink-600">
                                 {{ number_format($post->view_count) }}
                             </span>
                         </li>
                     @endforeach
                 </ol>
-            </section>
+            </x-app.ui.section>
         @endif
 
         {{-- ============================================================= --
          | Posts needing moderation, grouped by post
          --}}
         @if ($this->postsNeedingModeration->isNotEmpty())
-            <section aria-labelledby="by-post-heading" class="rounded-lg border border-amber-300/60 bg-amber-50/40 p-5 dark:border-amber-500/30 dark:bg-amber-950/20">
-                <h2 id="by-post-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                    Posts with comments waiting
-                </h2>
-
-                <ul class="mt-4 space-y-2">
+            <x-app.ui.section
+                :title="__('Posts with comments waiting')"
+                icon="chat-bubble-left-right"
+                tone="attention"
+                aria-labelledby="by-post-heading"
+            >
+                <ul class="space-y-2">
                     @foreach ($this->postsNeedingModeration as $post)
-                        <li class="flex items-center justify-between gap-4">
+                        <li class="sui-row !py-2 flex items-center justify-between gap-4">
                             <a
                                 href="{{ route('dashboard.comments', ['post' => $post->id]) }}"
                                 wire:navigate
-                                class="min-w-0 truncate text-sm text-ink-700 transition-colors hover:text-signal-700 dark:text-ink-300 dark:hover:text-signal-400"
+                                class="min-w-0 truncate text-sm text-ink-700 transition duration-150 ease-soft hover:text-sui-accent-ink"
                             >
                                 {{ $post->title }}
                             </a>
-                            <span class="shrink-0 font-mono text-2xs tabular-nums text-amber-700 dark:text-amber-400">
-                                {{ $post->pending_count }} waiting
+                            <span class="sui-chip-warning">
+                                {{ $post->pending_count }} {{ __('waiting') }}
                             </span>
                         </li>
                     @endforeach
                 </ul>
-            </section>
+            </x-app.ui.section>
         @endif
-    </div>
+    </x-app.ui.body>
 </div>

@@ -33,16 +33,30 @@ return [
     ],
 
     /*
-    |--------------------------------------------------------------------------
-    | Page Layout
-    |--------------------------------------------------------------------------
-    |
-    | The layout a single-file component is wrapped in when rendered as a full
-    | page via Route::livewire(). Public pages use the marketing shell.
-    |
-    */
+|--------------------------------------------------------------------------
+| Page Layout
+|--------------------------------------------------------------------------
+|
+| The layout a single-file component is wrapped in when rendered as a full
+| page via Route::livewire(). Public pages use the guest shell — the public
+| header, the page, the public footer.
+|
+| There are five audiences in `resources/views/layouts`, and this is the one
+| that answers pages that have not said otherwise:
+|
+|   guest.home   — unauthenticated visitors; this default
+|   auth         — an unauthenticated visitor proving who they are
+|   app          — the general authenticated dashboard
+|   seller       — the selling workspace
+|   admin        — platform administration
+|
+| Page components that need a workspace shell opt in explicitly with
+| `#[Layout('layouts::seller.dashboard')]` and so on. See the docblock at the
+| foot of each layout for what it owns and what it delegates.
+|
+*/
 
-    'component_layout' => 'layouts::public',
+    'component_layout' => 'layouts::guest.home',
 
     /*
     |--------------------------------------------------------------------------

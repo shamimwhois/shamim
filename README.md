@@ -154,7 +154,7 @@ All four must be green before a change is considered finished.
 
 | Gate | Command | Current state |
 | --- | --- | --- |
-| Tests | `php artisan test` | **165 passing**, 490 assertions |
+| Tests | `php artisan test` | **248 passing**, 823 assertions |
 | Types | `vendor/bin/phpstan analyse` | **No errors** (level 7) |
 | Style | `vendor/bin/pint --dirty` | **Clean** |
 | Build | `npm run build` | **Green** |
@@ -190,6 +190,27 @@ The `⚡` prefix marks a **Livewire single-file component**. These are anonymous
 classes living beside their template, which is why tests address them by
 **name string** (`'pages::blog.show'`) and never by `::class`.
 
+The view layer mirrors the audience-first shape of the URL space:
+
+```
+resources/views/
+├── components/app/
+│   ├── home/          guest chrome — header, footer
+│   ├── ui/            shared primitives, incl. the dashboard shell
+│   ├── icon/          glyph-only components
+│   └── user|seller|admin/   each role's three chrome components
+├── layouts/
+│   ├── guest/home     the default shell
+│   ├── auth/          every Fortify screen
+│   └── app|seller|admin/dashboard   the three workspace layouts
+└── pages/             Livewire single-file components (⚡ prefix)
+```
+
+Every component is namespaced under `app/` so `<x-app.ui.modal>` can never be
+shadowed by a package's `<x-modal>`, and the three workspace layouts compose one
+shell — `components/app/ui/dashboard-shell.blade.php` — rather than each
+carrying a copy of ~270 lines of rail, drawer and focus-trap machinery.
+
 Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 
 ---
@@ -206,6 +227,7 @@ Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 | [`docs/ERD.md`](docs/ERD.md) | Entity relationships |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organised and why |
 | [`docs/COMPONENTS.md`](docs/COMPONENTS.md) | Every Blade and Livewire component |
+| [`docs/SOFT-UI.md`](docs/SOFT-UI.md) | The dashboard design system — tokens, states, rules |
 | [`docs/ROUTES.md`](docs/ROUTES.md) | Every route, its middleware and its guard |
 | [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) | Roles, permissions and plans |
 | [`docs/API.md`](docs/API.md) | Intended API surface — **not implemented** |
@@ -242,11 +264,11 @@ the same rule, and they drifted.
 ### Modals go through one shell
 
 Eight modals existed as copies of each other. They are now all
-`<x-modal>` + `<x-modal.actions>` + `<x-modal.trigger>`. The value is not
-avoided duplication — it is that the four decisions every modal makes (reopen
-on validation failure, accessible name, destructive signalling, focus
-behaviour) are made **once**. Copy-pasted dialogs do not drift loudly; the odd
-one out is invisible until someone is stuck in a dialog they cannot close.
+`<x-app.ui.modal>` + `<x-app.ui.modal.actions>` + `<x-app.ui.modal.trigger>`.
+The value is not avoided duplication — it is that the four decisions every modal
+makes (reopen on validation failure, accessible name, destructive signalling,
+focus behaviour) are made **once**. Copy-pasted dialogs do not drift loudly; the
+odd one out is invisible until someone is stuck in a dialog they cannot close.
 
 Measured effect: this migration surfaced four **non-existent icon names**
 (`storefront`, `book-open-text`, `folder-git-2`, `layout-grid`) that threw hard

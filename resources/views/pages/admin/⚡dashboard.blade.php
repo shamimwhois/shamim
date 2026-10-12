@@ -24,7 +24,7 @@ use Livewire\Component;
  * (products, orders, payments) land in later phases. No card on this page
  * claims a feature that does not exist.
  */
-new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Component
+new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class extends Component
 {
     public function mount(): void
     {
@@ -110,19 +110,20 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
 }; ?>
 
 <div>
-    <x-dashboard.header
+    <x-app.ui.header
         eyebrow="Administration"
         :title="'Welcome back, '.Str::of(auth()->user()->name)->explode(' ')->first()"
         description="Platform health, accounts, and the moderation queue."
+        :breadcrumbs="[['label' => __('Administration')]]"
     >
         <x-slot:actions>
             <flux:button :href="route('admin.users')" icon="users" wire:navigate>
                 Manage users
             </flux:button>
         </x-slot:actions>
-    </x-dashboard.header>
+    </x-app.ui.header>
 
-    <div class="space-y-8 px-6 py-8 lg:px-10">
+    <x-app.ui.body>
         {{-- ============================================================= --
          | Platform metrics
          --}}
@@ -130,7 +131,7 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
             <h2 id="metrics-heading" class="sr-only">Platform metrics</h2>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Accounts"
                     :value="$this->totalAccounts"
                     icon="users"
@@ -138,14 +139,14 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
                     :href="route('admin.users')"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Published posts"
                     :value="$this->publishedPosts"
                     icon="globe-alt"
                     hint="Live on the public site"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Awaiting moderation"
                     :value="$this->pendingComments"
                     icon="shield-exclamation"
@@ -154,7 +155,7 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
                     :href="route('dashboard.comments')"
                 />
 
-                <x-dashboard.stat
+                <x-app.ui.stat
                     label="Sellers"
                     :value="collect($this->accountsByRole)->firstWhere('role', AccountRole::Seller)['count'] ?? 0"
                     icon="building-storefront"
@@ -167,26 +168,26 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
             {{-- ========================================================= --
              | Accounts by role
              --}}
-            <section aria-labelledby="roles-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-                <div class="border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                    <h2 id="roles-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+            <x-app.ui.section :padded="false">
+                <div class="border-b border-sui-hairline px-5 py-4">
+                    <h2 id="roles-heading" class="text-sm font-semibold tracking-tight text-ink-900">
                         Accounts by role
                     </h2>
                 </div>
 
-                <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                <ul class="divide-y divide-sui-hairline">
                     @foreach ($this->accountsByRole as $row)
                         <li class="flex items-center justify-between gap-4 px-5 py-4">
                             <div class="min-w-0">
-                                <p class="text-sm font-medium text-ink-900 dark:text-ink-50">
+                                <p class="text-sm font-medium text-ink-900">
                                     {{ $row['role']->label() }}
                                 </p>
-                                <p class="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                                <p class="mt-0.5 text-xs leading-normal text-ink-500">
                                     {{ $row['role']->description() }}
                                 </p>
                             </div>
 
-                            <span class="shrink-0 font-mono text-lg font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                            <span class="shrink-0 text-lg font-semibold tabular-nums text-ink-900">
                                 {{ number_format($row['count']) }}
                             </span>
                         </li>
@@ -197,33 +198,33 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
             {{-- ========================================================= --
              | Recently created accounts
              --}}
-            <section aria-labelledby="recent-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-                <div class="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                    <h2 id="recent-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+            <x-app.ui.section :padded="false">
+                <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
+                    <h2 id="recent-heading" class="text-sm font-semibold tracking-tight text-ink-900">
                         Recently created
                     </h2>
 
                     <a
                         href="{{ route('admin.users') }}"
                         wire:navigate
-                        class="font-mono text-2xs font-medium text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
+                        class="sui-focus sui-link text-xs"
                     >
                         All users →
                     </a>
                 </div>
 
-                <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                <ul class="divide-y divide-sui-hairline">
                     @foreach ($this->recentAccounts as $account)
-                        <li class="flex items-center gap-3.5 px-5 py-3.5">
-                            <div class="grid size-7 shrink-0 place-items-center rounded-md border border-ink-200 bg-ink-50 font-mono text-2xs font-semibold text-ink-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300">
+                        <li class="flex items-center gap-3.5 px-5 py-3">
+                            <div class="grid size-7 shrink-0 place-items-center rounded-md border border-sui-hairline bg-sui-well text-2xs font-semibold text-ink-500">
                                 {{ Str::of($account->name)->substr(0, 1)->upper() }}
                             </div>
 
                             <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-medium text-ink-900 dark:text-ink-50">
+                                <p class="truncate text-sm font-medium text-ink-900">
                                     {{ $account->name }}
                                 </p>
-                                <p class="truncate font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                <p class="truncate text-2xs text-ink-400">
                                     {{ $account->email }}
                                 </p>
                             </div>
@@ -240,12 +241,12 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
         {{-- ============================================================= --
          | The admin permission set, made visible
          --}}
-        <section aria-labelledby="permissions-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-            <div class="border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                <h2 id="permissions-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+        <x-app.ui.section :padded="false">
+            <div class="border-b border-sui-hairline px-5 py-4">
+                <h2 id="permissions-heading" class="text-sm font-semibold tracking-tight text-ink-900">
                     What the admin role can do
                 </h2>
-                <p class="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                <p class="mt-1 text-xs leading-normal text-ink-500">
                     Rendered from the permission matrix, so this list cannot drift from the code that enforces it.
                 </p>
             </div>
@@ -253,14 +254,14 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
             <div class="grid gap-x-8 gap-y-6 px-5 py-5 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($this->permissionGroups as $group => $permissions)
                     <div>
-                        <p class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                        <p class="sui-label">
                             {{ collect($permissions)->first()->groupLabel() }}
                         </p>
 
                         <ul class="mt-3 space-y-1.5">
                             @foreach ($permissions as $permission)
-                                <li class="flex items-start gap-2 text-xs text-ink-600 dark:text-ink-400">
-                                    <flux:icon name="check" class="mt-0.5 size-3.5 shrink-0 text-signal-600 dark:text-signal-400" />
+                                <li class="flex items-start gap-2 text-xs text-ink-600">
+                                    <flux:icon name="check" class="mt-0.5 size-3.5 shrink-0 text-sui-success" />
                                     <span>{{ $permission->label() }}</span>
                                 </li>
                             @endforeach
@@ -269,5 +270,5 @@ new #[Layout('layouts::dashboard')] #[Title('Admin dashboard')] class extends Co
                 @endforeach
             </div>
         </section>
-    </div>
+</x-app.ui.body>
 </div>

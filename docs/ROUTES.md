@@ -178,7 +178,7 @@ answered by `PostPolicy` inside the component.
 
 Four product modules, each with its own top-level URL space and its own
 permission. The modules are **not built yet** — each route renders a placeholder
-page (via `resources/views/components/module-placeholder.blade.php`) stating
+page (via `resources/views/components/app/ui/module-placeholder.blade.php`) stating
 what is planned. The routes and guards resolve today, and the sidebar points at
 them, so each module has a landing spot to be built into rather than needing a
 routing change later.
@@ -197,7 +197,52 @@ permission after authenticating.
 
 ---
 
-## 6. Backward-compatible redirects
+## 6. Editor AI routes
+
+Six JSON endpoints backing the rich text editor's AI features. They live under
+`/editor/ai` and are grouped by a single `auth`, `verified`,
+`permission:post:create` middleware stack — anyone who can write a post can use
+the editor's AI, and nobody else can.
+
+| Method | URI | Name | Throttle |
+| --- | --- | --- | --- |
+| `GET` | `/editor/ai/capabilities` | `editor.ai.capabilities` | — |
+| `POST` | `/editor/ai/preview` | `editor.ai.preview` | 120/min |
+| `POST` | `/editor/ai/correct` | `editor.ai.correct` | 20/min |
+| `POST` | `/editor/ai/generate` | `editor.ai.generate` | 10/min |
+| `POST` | `/editor/ai/image-prompt` | `editor.ai.image-prompt` | 15/min |
+| `POST` | `/editor/ai/image` | `editor.ai.image` | 5/min |
+
+**Why JSON and not Livewire.** These actions fire from inside a text editor that
+owns its own selection and cursor state. A Livewire round trip re-renders the
+DOM and loses the textarea's caret position — the single most irritating thing a
+writing tool can do. The editor keeps its own state client-side and calls these
+endpoints with `fetch()`, syncing the finished value back through `$wire.set()`.
+
+Throttles are per-minute and deliberately tight on the expensive endpoints:
+image generation in particular is billed per call, and 5/min is generous for
+authoring while useless for draining a budget.
+
+**Error shape.** Every failure returns the same body, so the front end has one
+code path:
+
+```json
+{ "message": "AI features are not configured…", "reason": "not_configured" }
+```
+
+`reason` maps to a status: `not_configured` → 503, `provider_failed` → 502,
+`malformed_response` → 502, `storage_failed` → 500. See
+`app/Services/EditorAiException.php`.
+
+**Preview works with no provider configured.** It touches no model — it routes
+Markdown through `App\Support\MarkdownRenderer`, the same renderer that serves
+the published post. A client-side renderer would be a second sanitiser
+implementation and the two would drift, at which point the preview stops
+predicting the published output.
+
+---
+
+## 7. Backward-compatible redirects
 
 The role dashboards moved from nested paths to role-owned top-level spaces.
 These redirects keep existing bookmarks, external links and in-flight email
@@ -219,7 +264,7 @@ security screen — the closest surviving screen, since no team surface remains.
 
 ---
 
-## 7. Settings routes
+## 8. Settings routes
 
 Two groups with **different** guards. The split is deliberate. Account settings
 are shared by every role — there is no team-scoped settings surface; the team
@@ -262,7 +307,7 @@ unauthenticated.
 
 ---
 
-## 8. Passkey routes
+## 9. Passkey routes
 
 Provided by `laravel/passkeys`. Two groups: unauthenticated (login) and
 authenticated (registration and management).
@@ -284,7 +329,7 @@ not by application code.
 
 ---
 
-## 9. Two-factor management routes
+## 10. Two-factor management routes
 
 Fortify's management endpoints. All require `auth`; those that change state are
 additionally behind password confirmation.
@@ -307,7 +352,7 @@ where that state persists between requests.
 
 ---
 
-## 10. Password confirmation routes
+## 11. Password confirmation routes
 
 | Method | URI | Name |
 | --- | --- | --- |
@@ -322,7 +367,7 @@ confirmed — the screen exists to *establish* the state, not to re-assert it.
 
 ---
 
-## 11. The removed team routes
+## 12. The removed team routes
 
 The team feature was deleted **entirely**, and with it every team-scoped route.
 Nothing in the current route table carries a `current_team` or `team`
@@ -347,11 +392,11 @@ a two-axis (account + team) model is stale.
 
 Two routes survive as redirects so old links resolve — `/teams/dashboard` →
 `/dashboard` (`team.dashboard`) and `/settings/teams` → `/settings/security`
-(`teams.index.redirect`); see §6.
+(`teams.index.redirect`); see §7.
 
 ---
 
-## 12. Package routes (not listed individually)
+## 13. Package routes (not listed individually)
 
 | Prefix | Source | Count |
 | --- | --- | --- |
@@ -365,7 +410,7 @@ that changes between releases.
 
 ---
 
-## 13. Conventions
+## 14. Conventions
 
 **Route names mirror URIs, with dots for nesting.**
 
@@ -399,14 +444,14 @@ must be edited every time a role's permissions change.
 
 ---
 
-## 14. Known issues
+## 15. Known issues
 
 | # | Issue | Impact |
 | --- | --- | --- |
 | 1 | `dashboard.posts.create` and `.edit` differ only by a bound model | Intentional, but means the "create" guard cannot be expressed in middleware. §4. |
 | 2 | `dashboard.index` is unguarded by permission | Intentional — it is the forwarding entry point for every role. §4. |
 | 3 | Modules render placeholders, not features | Intentional. The routes and guards are real; the modules are unbuilt. §5. |
-| 4 | `team.dashboard` and `teams.index.redirect` name routes that no longer match their behaviour | Historic names kept so old links and docs resolve. §6, §13. |
+| 4 | `team.dashboard` and `teams.index.redirect` name routes that no longer match their behaviour | Historic names kept so old links and docs resolve. §7, §14. |
 
 On issue 3: because the routes exist and the navigation points at them, each
 module can be built into its landing spot without a routing change. The

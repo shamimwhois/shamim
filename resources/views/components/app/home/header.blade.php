@@ -22,14 +22,12 @@
         <a
             href="{{ route('home') }}"
             wire:navigate
-            class="group flex items-center gap-2.5 font-mono text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50"
+            class="focus-ring group flex items-center gap-2.5 rounded-sm font-mono text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50"
         >
-            <span
-                aria-hidden="true"
-                class="grid size-7 place-items-center rounded-xs border border-ink-900/15 bg-ink-900 font-mono text-xs font-bold text-signal-400 transition-colors group-hover:border-signal-500/40 dark:border-ink-50/15 dark:bg-ink-50 dark:text-ink-950"
-            >
-                &gt;_
-            </span>
+            <x-app.icon.logo-mark
+                size="md"
+                class="border border-ink-900/15 bg-ink-900 font-mono text-signal-400 transition-colors group-hover:border-signal-500/40 dark:border-ink-50/15 dark:bg-ink-50 dark:text-ink-950"
+            />
             <span>{{ config('portfolio.author.short_name', config('app.name')) }}</span>
         </a>
 
@@ -42,7 +40,7 @@
                     wire:navigate
                     @if ($current) aria-current="page" @endif
                     @class([
-                        'relative rounded-sm px-3 py-2 text-sm font-medium transition-colors',
+                        'focus-ring relative rounded-sm px-3 py-2 text-sm font-medium transition-colors',
                         'text-ink-900 dark:text-ink-50' => $current,
                         'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100' => ! $current,
                     ])
@@ -80,7 +78,7 @@
         {{-- Mobile trigger --}}
         <button
             type="button"
-            class="-mr-2 grid size-10 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 md:hidden dark:text-ink-300 dark:hover:bg-ink-900"
+            class="focus-ring -mr-2 grid size-10 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 md:hidden dark:text-ink-300 dark:hover:bg-ink-900"
             @click="open = ! open"
             :aria-expanded="open"
             aria-controls="mobile-nav"
@@ -116,7 +114,7 @@
                     wire:navigate
                     @if ($current) aria-current="page" @endif
                     @class([
-                        'rounded-sm px-3 py-3 text-base font-medium transition-colors',
+                        'focus-ring rounded-sm px-3 py-3 text-base font-medium transition-colors',
                         'bg-ink-50 text-ink-900 dark:bg-ink-900 dark:text-ink-50' => $current,
                         'text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900' => ! $current,
                     ])
@@ -128,12 +126,19 @@
             <div class="hairline my-3"></div>
 
             @auth
-                <a href="{{ route(auth()->user()->dashboardRoute()) }}" wire:navigate class="rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900">
-                    Dashboard
+                <a
+                    href="{{ route(auth()->user()->dashboardRoute()) }}"
+                    wire:navigate
+                    class="focus-ring rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900"
+                >
+                    {{ __('Dashboard') }}
                 </a>
             @else
-                <a href="{{ route('login') }}" class="rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900">
-                    Sign in
+                <a
+                    href="{{ route('login') }}"
+                    class="focus-ring rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900"
+                >
+                    {{ __('Sign in') }}
                 </a>
             @endauth
         </nav>

@@ -236,7 +236,7 @@ new #[Title('Writing')] class extends Component
      --}}
     <section class="border-b border-ink-200 dark:border-ink-800">
         <div class="shell py-14 lg:py-16">
-            <x-section-marker :number="1" label="Writing" accent />
+            <x-app.ui.section-marker :number="1" label="Writing" accent />
 
             <div class="mt-6 flex flex-wrap items-end justify-between gap-6">
                 <div>
@@ -409,7 +409,7 @@ new #[Title('Writing')] class extends Component
 
         <div wire:loading.remove wire:target="search, category, tag">
             @if ($this->posts->isEmpty())
-                <x-empty-state
+                <x-app.ui.empty-state
                     icon="magnifying-glass"
                     title="No posts match those filters"
                     description="{{ $this->search !== '' ? 'Try a broader search term, or browse everything instead.' : 'Nothing has been published under this filter yet.' }}"
@@ -417,15 +417,15 @@ new #[Title('Writing')] class extends Component
                     <flux:button variant="primary" wire:click="clearFilters" icon="arrow-path">
                         Reset filters
                     </flux:button>
-                </x-empty-state>
+                </x-app.ui.empty-state>
             @else
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($this->posts as $post)
-                        <x-post.card :post="$post" wire:key="post-{{ $post->id }}" />
+                        <x-app.ui.post.card :post="$post" wire:key="post-{{ $post->id }}" />
                     @endforeach
                 </div>
 
-                <x-pagination :paginator="$this->posts" label="Blog pagination" class="mt-12" />
+                <x-app.ui.pagination :paginator="$this->posts" label="Blog pagination" class="mt-12" />
             @endif
         </div>
     </section>

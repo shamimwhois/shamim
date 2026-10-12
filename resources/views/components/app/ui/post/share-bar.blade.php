@@ -102,7 +102,7 @@
                 class="inline-flex items-center gap-1.5 rounded-xs border border-ink-200 px-2.5 py-1.5 font-mono text-2xs font-medium text-ink-600 transition-colors hover:border-signal-400 hover:bg-signal-50 hover:text-signal-700 dark:border-ink-700 dark:text-ink-400 dark:hover:border-signal-600 dark:hover:bg-signal-950 dark:hover:text-signal-300"
                 title="Share on {{ $target['label'] }}"
             >
-                <x-share-icon :name="$target['icon']" />
+                <x-app.icon.share :name="$target['icon']" />
                 <span class="max-sm:hidden">{{ $target['label'] }}</span>
                 <span class="sr-only max-sm:inline">Share on {{ $target['label'] }}</span>
             </a>
@@ -150,7 +150,7 @@
                         rel="noopener noreferrer"
                         class="inline-flex items-center gap-1.5 rounded-xs border border-ink-200 px-2.5 py-1.5 font-mono text-2xs text-ink-500 transition-colors hover:border-ink-400 hover:text-ink-800 dark:border-ink-800 dark:text-ink-400 dark:hover:border-ink-600 dark:hover:text-ink-100"
                     >
-                        <x-share-icon :name="$target['icon']" />
+                        <x-app.icon.share :name="$target['icon']" />
                         {{ $target['label'] }}
                     </a>
                 @endforeach

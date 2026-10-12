@@ -55,7 +55,7 @@ new #[Title('Profile settings')] class extends Component {
         $user = Auth::user();
 
         if ($user->hasVerifiedEmail()) {
-            $this->redirectIntended(default: route('dashboard', absolute: false));
+            $this->redirectIntended(default: route(auth()->user()->dashboardRoute(), absolute: false));
 
             return;
         }
@@ -81,10 +81,6 @@ new #[Title('Profile settings')] class extends Component {
 }; ?>
 
 <section class="w-full">
-    @include('partials.settings-heading')
-
-    <flux:heading level="2" class="sr-only">{{ __('Profile settings') }}</flux:heading>
-
     <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name and email address')">
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
@@ -104,7 +100,12 @@ new #[Title('Profile settings')] class extends Component {
                         </flux:text>
 
                         @if (session('status') === 'verification-link-sent')
-                            <flux:text class="mt-2 font-medium !dark:text-green-400 !text-green-600">
+                            {{-- `signal-700`, not the 600: the 600 measures
+                                 3.30:1 on white and fails AA at this size. The
+                                 screen renders inside the public shell, so the
+                                 public accent is the right token here rather
+                                 than the dashboard's `sui-success`. --}}
+                            <flux:text class="mt-2 font-medium !dark:text-signal-400 !text-signal-700">
                                 {{ __('A new verification link has been sent to your email address.') }}
                             </flux:text>
                         @endif

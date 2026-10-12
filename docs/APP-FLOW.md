@@ -2,105 +2,85 @@
 
 User journeys and key interactions for every actor in the system.
 
-> **Scoped by role.** This document was originally written for a single-author
-> product with no role model. The shipped application has three account roles
-> (`user`, `seller`, `admin`), each with its own dashboard. §1 and §2 were
-> revised to match; the journey narratives in §3 onward remain accurate for the
+> **Scoped by role.** This document was originally written for a single-author  
+> product with no role model. The shipped application has three account roles  
+> (`user`, `seller`, `admin`), each with its own dashboard. §1 and §2 were  
+> revised to match; the journey narratives in §3 onward remain accurate for the  
 > authoring flows they describe.
 >
-> Authoritative references: [`ROUTES.md`](ROUTES.md) for the full route map,
+> Authoritative references: [`ROUTES.md`](ROUTES.md) for the full route map,  
 > [`PERMISSIONS.md`](PERMISSIONS.md) for the role model.
 
 ---
 
 ## 1. Actors and Surfaces
 
-Roles are defined in `app/Enums/AccountRole.php`. Permissions are **derived**
+Roles are defined in `app/Enums/AccountRole.php`. Permissions are **derived**  
 from the role, never stored — see [`PERMISSIONS.md`](PERMISSIONS.md).
 
-| Actor | Role | Surfaces | Land |
-| --- | --- | --- | --- |
-| **Guest** | — | Home, blog index, blog detail, about, auth pages | — |
-| **Reader** | `user` | All guest surfaces + comment submission + authoring workspace | `/dashboard` |
-| **Seller** | `seller` | Everything a reader has, plus taxonomy and publishing rights | `/seller/dashboard` |
-| **Admin** | `admin` | Everything, plus comment moderation and account administration | `/admin/dashboard` |
+| Actor      | Role     | Surfaces                                                       | Land                |
+| ---------- | -------- | -------------------------------------------------------------- | ------------------- |
+| **Guest**  | —        | Home, blog index, blog detail, about, auth pages               | —                   |
+| **Reader** | `user`   | All guest surfaces + comment submission + authoring workspace  | `/dashboard`        |
+| **Seller** | `seller` | Everything a reader has, plus taxonomy and publishing rights   | `/dashboard/seller` |
+| **Admin**  | `admin`  | Everything, plus comment moderation and account administration | `/dashboard/admin`  |
 
 ### Role capabilities
 
-| Capability | `user` | `seller` | `admin` |
-| --- | :---: | :---: | :---: |
-| Write and edit own posts | ✓ | ✓ | ✓ |
-| **Publish** a post | | ✓ | ✓ |
-| Manage taxonomy | | ✓ | ✓ |
-| **Moderate comments** | | | ✓ |
-| Manage accounts and roles | | | ✓ |
+| Capability                | `user` | `seller` | `admin` |
+| ------------------------- | :----: | :------: | :-----: |
+| Write and edit own posts  |    ✓   |     ✓    |    ✓    |
+| **Publish** a post        |        |     ✓    |    ✓    |
+| Manage taxonomy           |        |     ✓    |    ✓    |
+| **Moderate comments**     |        |          |    ✓    |
+| Manage accounts and roles |        |          |    ✓    |
 
 Two restrictions are deliberate and worth noting when reading the journeys:
 
-- **A plain reader cannot publish.** They may draft and edit their own writing,
-  but making it public requires at least a seller role. This is the boundary
+- **A plain reader cannot publish.** They may draft and edit their own writing,  
+  but making it public requires at least a seller role. This is the boundary  
   that keeps arbitrary content off the public site.
-- **Comment moderation is admin-only.** Sellers do not moderate, even though
+- **Comment moderation is admin-only.** Sellers do not moderate, even though  
   they can manage taxonomy.
 
 ---
 
 ## 2. Route Map
 
-The complete, verified route map lives in [`ROUTES.md`](ROUTES.md) — 77 routes
-with their enforced middleware. The table below is the subset that matters for
+The complete, verified route map lives in [`ROUTES.md`](ROUTES.md) — 77 routes  
+with their enforced middleware. The table below is the subset that matters for  
 these journeys.
 
-| Route | Name | Guard | Component |
-| --- | --- | --- | --- |
-| `GET /` | `home` | — | `pages::home` |
-| `GET /blog` | `blog.index` | — | `pages::blog.index` |
-| `GET /blog/{post:slug}` | `blog.show` | — | `pages::blog.show` |
-| `GET /about` | `about` | — | `pages::about` |
-| `GET /feed.xml` | `feed` | — | `FeedController` |
-| `GET /sitemap.xml` | `sitemap` | — | `SitemapController` |
-| `GET /robots.txt` | — | — | `RobotsController` |
-| Auth routes | `login`, `register`, `logout`, `password.*`, `verification.*`, `two-factor.*` | — | Fortify + `pages::auth.*` |
-| `GET /settings/profile` | `profile.edit` | `auth` | `pages::settings.profile` |
-| `GET /settings/security` | `security.edit` | `auth`, `verified`, `password.confirm` | `pages::settings.security` |
-| `GET /settings/teams` | `teams.index.redirect` | `auth`, `verified` | *301 → `/settings/security`* |
-| `GET /dashboard` | `dashboard.index` | `auth`, `verified` | `pages::dashboard.index` |
-| `GET /dashboard/posts` | `dashboard.posts.index` | `auth`, `verified` | `pages::dashboard.posts.index` |
-| `GET /dashboard/posts/create` | `dashboard.posts.create` | `auth`, `verified` | `pages::dashboard.posts.edit` |
-| `GET /dashboard/posts/{post:id}/edit` | `dashboard.posts.edit` | `auth`, `verified` | `pages::dashboard.posts.edit` |
-| `GET /dashboard/comments` | `dashboard.comments` | `auth`, `verified` | `pages::dashboard.comments` |
-| `GET /dashboard/taxonomy` | `dashboard.taxonomy` | `auth`, `verified` | `pages::dashboard.taxonomy` |
-| `GET /seller/dashboard` | `seller.dashboard` | `auth`, `verified`, `permission:product:create` | `pages::seller.dashboard` |
-| `GET /admin/dashboard` | `admin.dashboard` | `auth`, `verified`, `permission:admin:access` | `pages::admin.dashboard` |
-| `GET /admin/users` | `admin.users` | `auth`, `verified`, `permission:admin:access` | `pages::admin.users` |
-| `GET /ideas` | `ideas.index` | `auth`, `verified`, `permission:ideas:use` | `pages::ideas.index` |
-| `GET /dev-lab` | `dev-lab.index` | `auth`, `verified`, `permission:dev-lab:use` | `pages::dev-lab.index` |
-| `GET /ai-hub` | `ai-hub.index` | `auth`, `verified`, `permission:ai-hub:use` | `pages::ai-hub.index` |
-| `GET /marketplace` | `marketplace.index` | `auth`, `verified`, `permission:marketplace:use` | `pages::marketplace.index` |
-| `GET /dashboard/seller` | `dashboard.seller.redirect` | — | *301 → `/seller/dashboard`* |
-| `GET /dashboard/admin` | `dashboard.admin.redirect` | — | *301 → `/admin/dashboard`* |
-| `GET /teams/dashboard` | `team.dashboard` | `auth`, `verified` | *301 → `/dashboard`* |
+| Route                                 | Name                                                                          | Guard                                  | Component                       |
+| ------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------- | ------------------------------- |
+| `GET /`                               | `home`                                                                        | —                                      | `pages::home`                   |
+| `GET /blog`                           | `blog.index`                                                                  | —                                      | `pages::blog.index`             |
+| `GET /blog/{post:slug}`               | `blog.show`                                                                   | —                                      | `pages::blog.show`              |
+| `GET /about`                          | `about`                                                                       | —                                      | `pages::about`                  |
+| `GET /feed.xml`                       | `feed`                                                                        | —                                      | `FeedController`                |
+| `GET /sitemap.xml`                    | `sitemap`                                                                     | —                                      | `SitemapController`             |
+| `GET /robots.txt`                     | —                                                                             | —                                      | `RobotsController`              |
+| Auth routes                           | `login`, `register`, `logout`, `password.*`, `verification.*`, `two-factor.*` | —                                      | Fortify + `pages::auth.*`       |
+| `GET /settings/profile`               | `profile.edit`                                                                | `auth`                                 | `pages::settings.profile`       |
+| `GET /settings/security`              | `security.edit`                                                               | `auth`, `verified`, `password.confirm` | `pages::settings.security`      |
+| `GET /settings/teams`                 | `teams.index`                                                                 | `auth`, `verified`                     | `pages::teams.index`            |
+| `GET /dashboard`                      | `dashboard.index`                                                             | `auth`, `verified`                     | `pages::dashboard.index`        |
+| `GET /dashboard/posts`                | `dashboard.posts.index`                                                       | `auth`, `verified`                     | `pages::dashboard.posts.index`  |
+| `GET /dashboard/posts/create`         | `dashboard.posts.create`                                                      | `auth`, `verified`                     | `pages::dashboard.posts.edit`   |
+| `GET /dashboard/posts/{post:id}/edit` | `dashboard.posts.edit`                                                        | `auth`, `verified`                     | `pages::dashboard.posts.edit`   |
+| `GET /dashboard/comments`             | `dashboard.comments`                                                          | `auth`, `verified`                     | `pages::dashboard.comments`     |
+| `GET /dashboard/taxonomy`             | `dashboard.taxonomy`                                                          | `auth`, `verified`                     | `pages::dashboard.taxonomy`     |
+| `GET /dashboard/seller`               | `dashboard.seller.index`                                                      | `permission:product:create`            | `pages::dashboard.seller.index` |
+| `GET /dashboard/admin`                | `dashboard.admin.index`                                                       | `permission:admin:access`              | `pages::dashboard.admin.index`  |
+| `GET /dashboard/admin/users`          | `dashboard.admin.users`                                                       | `permission:admin:access`              | `pages::dashboard.admin.users`  |
 
-> **On the new route shape.** Role dashboards are **role-owned top-level
-> spaces**: the role is the first path segment, so `/dashboard` is the reader
-> and author workspace, `/seller/dashboard` is the selling workspace, and
-> `/admin/dashboard` is platform administration. No role's home is nested
-> inside another's. The shared authoring workspace stays on `/dashboard` for
-> every authenticated account — a seller and an admin still write posts there —
-> and only the *homes* are distinct.
->
-> Four product modules are additionally exposed as permission-guarded top-level
-> routes: `/ideas`, `/dev-lab`, `/ai-hub` and `/marketplace`. The modules are
-> not built yet, so each renders a placeholder page, but the URL space and the
-> permission guard are real and the sidebar points at them.
->
-> The team feature — `teams`, `team_memberships`, `team_invitations`,
-> `users.current_team_id` and the `{current_team}` route prefix — has been
-> removed entirely. The former `team.dashboard` name survives only as a **301
-> redirect to `/dashboard`**, so an old bookmark resolves rather than 404s;
-> likewise `/settings/teams` redirects to `/settings/security`, and the old
-> nested `dashboard/seller` and `dashboard/admin` paths redirect to the new
-> role-owned URLs. See [`ROUTES.md`](ROUTES.md) for the full map.
+> **On the `{current_team}` prefix.** The starter kit scopes `dashboard` under a  
+> team slug at `/{current_team}/dashboard` (route name `team.dashboard`). It is  
+> still registered, so the team flows continue to work, but it renders  
+> starter-kit scaffolding rather than the application. **Login, registration and  
+> e-mail verification no longer send anyone there** — each resolves the role's  
+> own dashboard through `AccountRole::dashboardRoute()`. See  
+> [`ROUTES.md`](ROUTES.md) §9 for why the route remains.
 
 ---
 
@@ -131,12 +111,12 @@ Entry: external link → https://<site>/
 
 **Key interactions.**
 
-| Trigger | Response |
-| --- | --- |
-| Page load | CSS-driven entrance animation, suppressed under `prefers-reduced-motion`. |
-| Hover a post card | Card lifts slightly; title underlines; category chip brightens. |
-| Keyboard tab | Focus follows DOM order: skip-link → nav → hero CTAs → content. |
-| Click "Read the blog" | Client-side navigation preserves scroll position policy (top). |
+| Trigger               | Response                                                                  |
+| --------------------- | ------------------------------------------------------------------------- |
+| Page load             | CSS-driven entrance animation, suppressed under `prefers-reduced-motion`. |
+| Hover a post card     | Card lifts slightly; title underlines; category chip brightens.           |
+| Keyboard tab          | Focus follows DOM order: skip-link → nav → hero CTAs → content.           |
+| Click "Read the blog" | Client-side navigation preserves scroll position policy (top).            |
 
 ### 3.2 Journey B — Browsing the blog
 
@@ -171,23 +151,23 @@ Entry: nav [Blog] or home CTA
 
 **State model (all held in the Livewire component, reflected in the URL).**
 
-| Property | Type | Default | URL key |
-| --- | --- | --- | --- |
-| `search` | `string` | `''` | `q` |
-| `category` | `?string` (slug) | `null` | `category` |
-| `tag` | `?string` (slug) | `null` | `tag` |
-| `page` | `int` | `1` | `page` |
+| Property   | Type             | Default | URL key    |
+| ---------- | ---------------- | ------- | ---------- |
+| `search`   | `string`         | `''`    | `q`        |
+| `category` | `?string` (slug) | `null`  | `category` |
+| `tag`      | `?string` (slug) | `null`  | `tag`      |
+| `page`     | `int`            | `1`     | `page`     |
 
 **Filter semantics.** All three predicates are combined with logical AND. Changing `search`, `category`, or `tag` resets `page` to 1 — otherwise a reader narrowing results would land on an empty page 3.
 
 **Interaction timing.**
 
-| Interaction | Debounce | Loading affordance |
-| --- | --- | --- |
-| Search typing | 300 ms | Results area dims; spinner on the search field |
-| Category click | none | Immediate; chips show `data-loading` |
-| Tag toggle | none | Immediate |
-| Pagination | none | Scroll to top of grid |
+| Interaction    | Debounce | Loading affordance                             |
+| -------------- | -------- | ---------------------------------------------- |
+| Search typing  | 300 ms   | Results area dims; spinner on the search field |
+| Category click | none     | Immediate; chips show `data-loading`           |
+| Tag toggle     | none     | Immediate                                      |
+| Pagination     | none     | Scroll to top of grid                          |
 
 ### 3.3 Journey C — Reading a post
 
@@ -222,12 +202,12 @@ Entry: blog.index card, home card, related post, or external share link
 
 **Code block behaviour.**
 
-| Condition | Behaviour |
-| --- | --- |
-| Long line | Horizontal scroll within the block; the page itself never scrolls sideways. |
-| Copy button | Present on every `pre > code`; copies raw source. |
-| Narrow viewport | Reduced padding and font size; no wrapping of code lines. |
-| Reduced motion | No animation on the copy confirmation. |
+| Condition       | Behaviour                                                                   |
+| --------------- | --------------------------------------------------------------------------- |
+| Long line       | Horizontal scroll within the block; the page itself never scrolls sideways. |
+| Copy button     | Present on every `pre > code`; copies raw source.                           |
+| Narrow viewport | Reduced padding and font size; no wrapping of code lines.                   |
+| Reduced motion  | No animation on the copy confirmation.                                      |
 
 ### 3.4 Journey D — Sharing a post
 
@@ -253,16 +233,17 @@ Reader wants to share
 
 **Metadata contract.** Every share destination and every unfurl relies on the same server-generated values:
 
-| Value | Source | Constraint |
-| --- | --- | --- |
-| `og:title` | `post.title` | ≤ 95 chars for full display |
-| `og:description` | `post.excerpt` | ≤ 200 chars |
-| `og:url` | `route('blog.show', $post)` | Absolute, canonical |
-| `og:type` | `article` for posts, `website` elsewhere | — |
-| `og:image` | site OG image (no per-post uploads in v1) | 1200×630 |
-| `article:published_time` | `post.published_at` | ISO 8601 |
-| `article:tag` | repeated per tag | — |
-| `twitter:card` | `summary_large_image` | — |
+| Value                    | Source                                    | Constraint                  |
+| ------------------------ | ----------------------------------------- | --------------------------- |
+| `og:title`               | `post.title`                              | ≤ 95 chars for full display |
+| `og:description`         | `post.excerpt`                            | ≤ 200 chars                 |
+| `og:url`                 | `route('blog.show', $post)`               | Absolute, canonical         |
+| `og:type`                | `article` for posts, `website` elsewhere  | —                           |
+| `og:image`               | site OG image (no per-post uploads in v1) | 1200×630                    |
+| `article:published_time` | `post.published_at`                       | ISO 8601                    |
+| `article:tag`            | repeated per tag                          | —                           |
+| `twitter:card`           | `summary_large_image`                     | —                           |
+
 
 ### 3.5 Journey E — Commenting
 
@@ -315,15 +296,15 @@ Entry: [Register] from a comment prompt or a direct auth link
 
 > **Reading note on this section.** Journeys G–K describe the **intended** author experience end to end. Some steps are shipped and some are design intent for surfaces that do not exist yet. Rather than silently presenting both as fact, here is the split:
 >
-> | Shipped | Design intent (not built) |
-> | --- | --- |
-> | Sign-in, including 2FA and passkey paths (`pages/auth/*`) | The block editor's live preview pane |
-> | Role-aware post-login redirect | Debounced autosave with a save-state indicator |
-> | Dashboard shell, permission-driven sidebar, role homes | The `beforeunload` guard for unsaved changes |
-> | Post list at `dashboard.posts.index` | Live filtering (All / Draft / Published / Archived) |
-> | Post editor at `dashboard.posts.edit` (create + edit) | Live slug derivation as the title is typed |
-> | Comment moderation queue at `dashboard.comments` | The two-pane 7/12 + 5/12 editor layout |
-> | Taxonomy management at `dashboard.taxonomy` | — |
+> | Shipped                                                   | Design intent (not built)                           |
+> | --------------------------------------------------------- | --------------------------------------------------- |
+> | Sign-in, including 2FA and passkey paths (`pages/auth/*`) | The block editor's live preview pane                |
+> | Role-aware post-login redirect                            | Debounced autosave with a save-state indicator      |
+> | Dashboard shell, permission-driven sidebar, role homes    | The `beforeunload` guard for unsaved changes        |
+> | Post list at `dashboard.posts.index`                      | Live filtering (All / Draft / Published / Archived) |
+> | Post editor at `dashboard.posts.edit` (create + edit)     | Live slug derivation as the title is typed          |
+> | Comment moderation queue at `dashboard.comments`          | The two-pane 7/12 + 5/12 editor layout              |
+> | Taxonomy management at `dashboard.taxonomy`               | —                                                   |
 >
 > The dashboard **routes** for every step below exist and are guarded; what is incomplete in places is the depth of the interaction, not its addressability. Read the journeys as the contract the editor is being built toward.
 
@@ -332,7 +313,7 @@ Entry: [Register] from a comment prompt or a direct auth link
 ```
 Entry: /login (layouts/auth/split.blade.php)
   │
-  ├─► [Optional] Passkey login offered via <x-passkey-verify />
+  ├─► [Optional] Passkey login offered via <x-app.ui.auth.passkey-verify />
   │
   ├─► Email + password submit → POST /login (Fortify)
   │     ├─ rate limited: 5/min per transliterated email + IP
@@ -344,8 +325,8 @@ Entry: /login (layouts/auth/split.blade.php)
         ├─ session intended URL present → redirect there
         └─ otherwise                    → $user->dashboardRoute()
                                             user   → dashboard.index
-                                            seller → seller.dashboard
-                                            admin  → admin.dashboard
+                                            seller → dashboard.seller.index
+                                            admin  → dashboard.admin.index
 ```
 
 **Two notes that matter here.** The layout is a split shell driven by the application's theme tokens — it does **not** force dark mode, and a test asserts that no `class="dark"` appears in the rendered auth pages. The redirect is resolved from the account's **role**, not from a fixed path: `config/fortify.php` has no `redirects` map, only `home`, and nothing in the codebase hardcodes `/dashboard` as a post-login destination.
@@ -357,13 +338,33 @@ Entry: /login (layouts/auth/split.blade.php)
 Identical to Journey G through authentication. The divergence is entirely in step 5 and in what the shell renders afterwards:
 
 ```
-seller.dashboard  → Selling section visible in the sidebar
-                    (requires product:create)
-admin.dashboard   → Selling AND Administration sections visible
-                    (requires admin:access)
+dashboard.seller.index  → Selling section visible in the sidebar
+                          (requires product:create)
+dashboard.admin.index   → Selling AND Administration sections visible
+                          (requires admin:access)
 ```
 
 A `user` account sees neither section, and the navigation drops the heading along with its items — so a plain user never meets an "Administration" heading with nothing under it. This is why the sidebar is generated from `DashboardNavigation` rather than written into the Blade template: the menu and the route guards read from the same source and cannot disagree.
+
+The sidebar has three levels — **section → group → item**. A *group* is a
+collapsible cluster inside a section (`Content`, `Modules`, `Administration`).
+Filtering is applied per *item*, then a group that emptied out is dropped, then a
+section that emptied out is dropped. A group left holding exactly one visible
+item renders as a plain link with no disclosure control.
+
+Two rules keep the highlight honest:
+
+* **A group containing the current route is forced open**, whatever the stored
+  collapse state says. A collapsed group holding the page you are on would hide
+  the very link the sidebar exists to highlight.
+* **Active state resolves against each item's `pattern`** via
+  `request()->routeIs()`, so a nested route (`ideas.index` under `ideas.*`) lights
+  its group without anyone maintaining a second list.
+
+Collapse state and the desktop rail preference are per-account presentation
+state, persisted to `localStorage` under `df.nav.groups.{userId}` and
+`df.rail.{userId}` — never in the database, because the server has no opinion
+about which menu a person left open.
 
 ### 4.2 Journey H — Authoring a post
 
@@ -402,10 +403,10 @@ Entry: dashboard → [+ New post]
 
 **Editor layout.**
 
-| Breakpoint | Layout |
-| --- | --- |
-| `< lg` | Single column: form, then a preview toggle button. Preview replaces the form rather than stacking below it, so the author is never scrolling 4 000 px to see the top of the preview. |
-| `≥ lg` | Two columns: form (7/12) · preview (5/12), both independently scrollable. |
+| Breakpoint | Layout                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `< lg`     | Single column: form, then a preview toggle button. Preview replaces the form rather than stacking below it, so the author is never scrolling 4 000 px to see the top of the preview. |
+| `≥ lg`     | Two columns: form (7/12) · preview (5/12), both independently scrollable.                                                                                                            |
 
 ### 4.3 Journey I — Managing posts
 
@@ -483,13 +484,14 @@ Entry: dashboard
                     └───────────────[restore]──────────────────────┘
 ```
 
-| Transition | Trigger | Side effects | Reversible |
-| --- | --- | --- | --- |
-| ∅ → Draft | Create post | Row inserted; slug assigned | n/a |
-| Draft → Published | `PublishPost` | `published_at = now()`, public listings now include the post | Yes |
-| Published → Draft | `UnpublishPost` | `published_at = null`, removed from public surfaces | Yes |
-| Any → Archived | Archive action | Hidden from the author's default list, still in the DB | Yes |
-| Any → Trashed | Delete | Soft delete; public URL 404s | Yes, from the DB |
+| Transition        | Trigger         | Side effects                                                 | Reversible       |
+| ----------------- | --------------- | ------------------------------------------------------------ | ---------------- |
+| ∅ → Draft         | Create post     | Row inserted; slug assigned                                  | n/a              |
+| Draft → Published | `PublishPost`   | `published_at = now()`, public listings now include the post | Yes              |
+| Published → Draft | `UnpublishPost` | `published_at = null`, removed from public surfaces          | Yes              |
+| Any → Archived    | Archive action  | Hidden from the author's default list, still in the DB       | Yes              |
+| Any → Trashed     | Delete          | Soft delete; public URL 404s                                 | Yes, from the DB |
+
 
 **Invariant.** A post appears on a public surface **if and only if** `status = published` **and** `published_at` is not null **and** `deleted_at` is null. Every public query enforces all three conditions.
 
@@ -517,32 +519,32 @@ Verified ──[logout]──► Guest ◄──[session expiry]─────�
 
 ## 6. Edge Cases and Failure Modes
 
-| Scenario | Expected behaviour | Rationale |
-| --- | --- | --- |
-| Draft URL requested by a guest | `404` | A `403` confirms the resource exists; drafts are private, so they should be indistinguishable from nothing. |
-| Post unpublished while a reader has it open | Reader's tab still shows the cached HTML; a refresh yields `404` | No websocket channel exists to push the change; forcing a refresh would be worse. |
-| Search term with regex metacharacters | Treated as a literal; `%` and `_` escaped before reaching `LIKE` | Prevents wildcard injection and full-table scans. |
-| Simultaneous autosave and manual save | The later-issued write wins; the earlier is discarded by timestamp check | Prevents a stale autosave clobbering a deliberate save. |
-| Slug collision on publish | Suffix appended (`my-post-2`) | Never blocks publishing on a cosmetic conflict. |
-| Comment submitted while logged out in another tab | Session is gone; submission redirects to login | Standard session behaviour; no special handling. |
-| JS disabled | All public pages render and navigate; share intents work as links; filtering falls back to a full-page form submission | Progressive enhancement is a hard requirement for the read path. |
-| Clipboard API blocked by permissions policy | Fallback selects the URL and shows "Press Ctrl+C to copy" | Silent failure would look like a broken button. |
-| Web Share API cancelled by the user | Nothing happens; no error state | Cancellation is a normal user action, not a failure. |
-| Very long post body (10 000+ words) | Editor and preview remain usable; TOC paginates visually with max-height and scroll | The TOC must never push the article off-screen. |
-| Empty blog (no published posts) | Index shows a friendly empty state, not a broken grid | First-run experience matters. |
+| Scenario                                          | Expected behaviour                                                                                                     | Rationale                                                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Draft URL requested by a guest                    | `404`                                                                                                                  | A `403` confirms the resource exists; drafts are private, so they should be indistinguishable from nothing. |
+| Post unpublished while a reader has it open       | Reader's tab still shows the cached HTML; a refresh yields `404`                                                       | No websocket channel exists to push the change; forcing a refresh would be worse.                           |
+| Search term with regex metacharacters             | Treated as a literal; `%` and `_` escaped before reaching `LIKE`                                                       | Prevents wildcard injection and full-table scans.                                                           |
+| Simultaneous autosave and manual save             | The later-issued write wins; the earlier is discarded by timestamp check                                               | Prevents a stale autosave clobbering a deliberate save.                                                     |
+| Slug collision on publish                         | Suffix appended (`my-post-2`)                                                                                          | Never blocks publishing on a cosmetic conflict.                                                             |
+| Comment submitted while logged out in another tab | Session is gone; submission redirects to login                                                                         | Standard session behaviour; no special handling.                                                            |
+| JS disabled                                       | All public pages render and navigate; share intents work as links; filtering falls back to a full-page form submission | Progressive enhancement is a hard requirement for the read path.                                            |
+| Clipboard API blocked by permissions policy       | Fallback selects the URL and shows "Press Ctrl+C to copy"                                                              | Silent failure would look like a broken button.                                                             |
+| Web Share API cancelled by the user               | Nothing happens; no error state                                                                                        | Cancellation is a normal user action, not a failure.                                                        |
+| Very long post body (10 000+ words)               | Editor and preview remain usable; TOC paginates visually with max-height and scroll                                    | The TOC must never push the article off-screen.                                                             |
+| Empty blog (no published posts)                   | Index shows a friendly empty state, not a broken grid                                                                  | First-run experience matters.                                                                               |
 
 ### 6.1 Authorisation failure modes
 
 Added with the role model. These are the cases where the answer is not obvious and a wrong choice leaks information or strands a user.
 
-| Scenario | Expected behaviour | Rationale |
-| --- | --- | --- |
-| Guest requests a dashboard route | Redirect to `/login`, **not** `403` | They may hold the permission once authenticated. A `403` is a dead end with no way forward. |
-| Authenticated `user` requests `admin.dashboard` | `403` before the component boots | The route middleware (`permission:admin:access`) refuses it. A rendered admin shell with hidden buttons would still leak the layout and any data the component loads. |
-| `seller` requests a route needing `payment:configure` | `403` | `seller` holds nine permissions beyond the user baseline, none of which configure payments. Enumerated in [PERMISSIONS.md](./PERMISSIONS.md). |
-| Admin attempts to delete another admin | Refused (`UserPolicy@delete`) | `$account->accountRole()->isAtLeast($user->accountRole())` refuses any target at or above the actor's level. Without it, two admins could delete each other. |
-| Admin attempts to delete their own account | Refused through the admin path | Self-deletion is a separate, confirmed flow. Allowing it through the user-management table would make it a one-click irreversible act. |
-| An account whose role was just downgraded has an open dashboard tab | The next Livewire request re-checks permission and fails | Livewire re-authorises on every round-trip rather than trusting the snapshot. A demoted admin does not keep admin rights for the session. |
-| Route declares a misspelled permission (`permission:prodcut:create`) | `500` with "Route declares no valid permission" | Being permissive on an unresolvable alias would turn a typo into "everyone is allowed". Failing loudly at the route is the only safe direction. |
-| An account holds a permission whose module is not built | Nothing — the permission is inert | `product:review` exists in the enum but no route consumes it yet. Declared ahead of the module by design; see [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission). |
-| A `seller` has `product:create` and no listings | Seller dashboard renders an empty state, not an error | The role is a capability, not a guarantee of data. |
+| Scenario                                                             | Expected behaviour                                       | Rationale                                                                                                                                                                   |
+| -------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guest requests a dashboard route                                     | Redirect to `/login`, **not** `403`                      | They may hold the permission once authenticated. A `403` is a dead end with no way forward.                                                                                 |
+| Authenticated `user` requests `dashboard.admin.index`                | `403` before the component boots                         | The route middleware (`permission:admin:access`) refuses it. A rendered admin shell with hidden buttons would still leak the layout and any data the component loads.       |
+| `seller` requests a route needing `product:configure`                | `403`                                                    | `seller` holds seven selling permissions, none of which configure payments. Enumerated in [PERMISSIONS.md](./PERMISSIONS.md).                                               |
+| Admin attempts to delete another admin                               | Refused (`UserPolicy@delete`)                            | `$account->accountRole()->isAtLeast($user->accountRole())` refuses any target at or above the actor's level. Without it, two admins could delete each other.                |
+| Admin attempts to delete their own account                           | Refused through the admin path                           | Self-deletion is a separate, confirmed flow. Allowing it through the user-management table would make it a one-click irreversible act.                                      |
+| An account whose role was just downgraded has an open dashboard tab  | The next Livewire request re-checks permission and fails | Livewire re-authorises on every round-trip rather than trusting the snapshot. A demoted admin does not keep admin rights for the session.                                   |
+| Route declares a misspelled permission (`permission:prodcut:create`) | `500` with "Route declares no valid permission"          | Being permissive on an unresolvable alias would turn a typo into "everyone is allowed". Failing loudly at the route is the only safe direction.                             |
+| An account holds a permission whose module is not built              | Nothing — the permission is inert                        | `product:review` exists in the enum but no route consumes it yet. Declared ahead of the module by design; see [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission). |
+| A `seller` has `product:create` and no listings                      | Seller dashboard renders an empty state, not an error    | The role is a capability, not a guarantee of data.                                                                                                                          |

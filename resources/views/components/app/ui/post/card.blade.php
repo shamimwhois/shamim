@@ -49,7 +49,7 @@
 
             @if ($post->is_featured)
                 <span aria-hidden="true" class="text-ink-300 dark:text-ink-700">/</span>
-                <span class="font-mono text-2xs font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                <span class="font-mono text-2xs font-medium uppercase tracking-widest text-amber-700 dark:text-amber-400">
                     Featured
                 </span>
             @endif

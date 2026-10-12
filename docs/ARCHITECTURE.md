@@ -56,10 +56,33 @@ HTTP request
   │    ├─ render() ............. implicit, returns the same file
   │    └─ actions .............. methods invoked via wire:click / wire:submit
   │
-  └─ layouts::public ....... the single application shell
-       └─ components/dashboard/nav.blade.php
-            └─ Support/DashboardNavigation::for($user)
+  └─ layouts::guest.home .... the default shell
+       └─ components/app/home/{header,footer}
 ```
+
+and the authenticated path:
+
+```
+  ├─ middleware
+  │    ├─ auth ................. Fortify session guard
+  │    ├─ verified ............. email verification
+  │    └─ permission:xxx ....... EnsureAccountPermission
+  │
+  ├─ Livewire mounts the SFC ... resources/views/pages/**/⚡*.blade.php
+  │    ├─ mount() .............. authorization, initial state, SEO
+  │    ├─ render() ............. implicit, returns the same file
+  │    └─ actions .............. methods invoked via wire:click / wire:submit
+  │
+  └─ layouts::app|seller|admin.dashboard ... one per audience
+       └─ components/app/ui/dashboard-shell.blade.php
+            └─ components/app/{user,seller,admin}/* ... the role's chrome
+                 └─ Support/DashboardNavigation::for($user)
+```
+
+A workspace page names its layout with `#[Layout('layouts::app.dashboard')]`;
+anything that names none lands in the guest shell, which is why the settings
+pages — the one authenticated surface that wants the quiet public frame around
+it — render there by default.
 
 The one non-Livewire path is the syndication trio — `FeedController`,
 `SitemapController`, `RobotsController` — which return raw responses and are
@@ -99,18 +122,32 @@ syncing, and fires no events. A caller cannot half-create a post.
 
 ### `app/Enums/`
 
-`app/Enums/`
-
 Six enums carry the application's closed sets.
 
 | Enum | Cases | Purpose |
 | --- | --- | --- |
 | `AccountRole` | 3 | `user`, `seller`, `admin` — the account's role |
-| `AccountPermission` | 26 | Every grantable ability, in 5 groups |
+| `AccountPermission` | 28 | Every grantable ability, in 5 groups |
 | `PermissionGroup` | 5 | `content`, `moderation`, `selling`, `platform`, `administration` |
 | `RolePlan` | 3 | `free`, `seller`, `platform` — commercial entitlements |
 | `PostStatus` | 3 | `draft`, `published`, `archived` |
 | `CommentStatus` | 3 | `pending`, `approved`, `rejected` |
+| `ContentCategory` | 8 | What the editor's generator can produce |
+| `ContentTone` | 6 | The register it writes in |
+| `CorrectionType` | 6 | The kinds of correction the copy editor suggests |
+
+The last three are the editor's vocabulary. Each carries its own `label()`,
+`icon()` and `toArray()`, and its own prompt fragment —
+`ContentCategory::instruction()`, `CorrectionType::guidance()`. Keeping the
+prompt copy on the enum is what stops the agent's instructions from listing a
+category the caller filtered out: the list is built **from** the requested
+types, so the two cannot disagree.
+
+`CorrectionType` also carries `isMechanical()` and `weight()`. Those drive real
+behaviour: mechanical corrections are applied by "fix all", judgement calls are
+not, and the weight orders suggestions so the uncontroversial fixes appear
+first. Bundling spelling and style behind one button would silently rewrite an
+author's voice.
 
 There is a single role axis. The team-scoped `TeamRole` and `TeamPermission`
 enums were removed along with the team feature, so `AccountRole` +
@@ -142,10 +179,57 @@ authorization questions, and every other layer delegates to it.
 
 ### `app/Data/`
 
-Immutable read-only DTOs — `AuthorProfile`, `PostMetrics`. They exist to stop
-**arrays with implicit shapes** crossing layer boundaries. When a Blade template
-does `$post->metrics->wordCount` instead of `$metrics['word_count']`, a typo is a
-static-analysis error rather than a blank space on a page.
+Immutable read-only DTOs — `AuthorProfile`, `PostMetrics`, `TextCorrection`.
+They exist to stop **arrays with implicit shapes** crossing layer boundaries.
+When a Blade template does `$post->metrics->wordCount` instead of
+`$metrics['word_count']`, a typo is a static-analysis error rather than a blank
+space on a page.
+
+`TextCorrection` does more than carry data: it is where the model's arithmetic
+is checked. The copy editor agent returns `start`/`end` offsets alongside the
+text it wants to change, and **those offsets are never trusted**.
+`fromArray()` verifies the span against the source (`substr($source, $start,
+$end - $start) === $original`) and recomputes it with `strpos` when they
+disagree, dropping any suggestion it cannot place. Splicing at a wrong offset
+corrupts the document, so the repair belongs here — once — rather than at every
+call site.
+
+### `app/Ai/`
+
+The Laravel AI SDK agents. One class per task, each implementing
+`Laravel\Ai\Contracts\Agent` and `use Laravel\Ai\Promptable;`:
+
+| Agent | Returns |
+| --- | --- |
+| `CopyEditorAgent` | Correction suggestions as a structured list |
+| `ContentWriterAgent` | `title`, `summary`, `body` for a category |
+| `ImagePromptAgent` | A refined image prompt, alt text, summary |
+
+They declare `HasStructuredOutput` rather than asking for JSON in prose, so the
+SDK enforces the shape and a malformed reply is a caught exception rather than a
+parse failure. Provider and model come from `config('ai.editor.*')`, never from
+a hardcoded vendor, so the whole editor repoints with an env change.
+
+**Do not pass a dynamic name to `<flux:icon>`.** A `<flux:icon ::name="…">`
+binding makes Blaze re-enter the compiled icon template forever and exhausts
+memory. Resolve the name server-side instead.
+
+### `app/Services/`
+
+`EditorAiService` is the editor's single door to the AI provider. Every AI
+feature goes through it for two reasons:
+
+**One place to be unavailable.** No provider key is configured on a fresh
+checkout, and that must not be a 500. `isConfigured()` gates every operation,
+the controller turns a `false` into a clear 503, and the editor hides its AI
+affordances rather than rendering buttons that fail. It treats Ollama and
+`openai-compatible` as valid with only a `url` set, because neither takes a key.
+
+**One place to be wrong safely.** A malformed response, an upstream timeout, a
+rate limit — all routine, and none should surface a stack trace to an author
+mid-sentence. Failures are caught, logged with context, and rethrown as
+`EditorAiException` carrying a message written for a person. Timeouts, 429s and
+401s each get their own message; everything else gets a generic one.
 
 ### `app/Http/Responses/`
 
@@ -229,6 +313,39 @@ pointing at `pages::dashboard.⚡index` means
 Because a missing view is a runtime error rather than a build error, route
 names and file paths are asserted in tests — see `docs/ROUTES.md`.
 
+### The component tree
+
+Every Blade component lives under `resources/views/components/app/`, and the
+second path segment names its audience:
+
+```
+components/app/
+├── home/          the guest chrome — header, footer
+├── ui/            shared primitives: header, body, section, stat, nav, modal,
+│                  post/*, editor/*, auth/*, and the dashboard-shell itself
+├── icon/          components whose whole body is a glyph
+├── user/          the author workspace's chrome: header, footer, sidebar
+├── seller/        the selling workspace's chrome
+└── admin/         the administration workspace's chrome
+```
+
+The prefix is a namespace, not decoration: `<x-app.ui.modal>` can never be
+shadowed by a package's anonymous `<x-modal>`. The directory rule is the
+important part — **a component goes in `ui/` unless a role owns it**, and `ui/`
+may not branch on role.
+
+The load-bearing consequence is the shell. There are three workspace layouts and
+one implementation: `components/app/ui/dashboard-shell.blade.php` holds the
+rail, the mobile drawer, the focus trap and the `data-sui` scope, and each role
+layout composes it with its own three one-line chrome components. Triplicating
+~270 lines of Alpine layout machinery would mean three places to fix the same
+bug. Role differentiation comes from *composing* permission-filtered navigation
+under a role-specific accessible name — `DashboardNavigation::for($user)`
+already filters, so an admin's Administration group appears in the admin sidebar
+and nowhere else without the admin sidebar knowing any other role exists.
+
+Full inventory with every prop: [`COMPONENTS.md`](COMPONENTS.md).
+
 ### Role-owned URL spaces
 
 Each role owns a **top-level** path; the role is the first segment of the URL,
@@ -254,9 +371,9 @@ account, because a seller and an admin both still write posts:
 
 Four modules each claim a top-level URL space, guarded by their own permission.
 They are not built yet, so each renders a placeholder page via the shared
-`resources/views/components/module-placeholder.blade.php` — the routes are real
-and the navigation points at them, so each has a landing spot to be built into
-rather than needing a routing change later.
+`resources/views/components/app/ui/module-placeholder.blade.php` — the routes
+are real and the navigation points at them, so each has a landing spot to be
+built into rather than needing a routing change later.
 
 | Module | Path | Route name | Permission |
 | --- | --- | --- | --- |
@@ -279,9 +396,9 @@ Eight modals were independent copies of the same pattern. They now share one
 shell.
 
 ```
-<x-modal>               shell: focus, width, accessible name, reopen-on-error
-<x-modal.actions>       footer row; cancel defaults to a closing button
-<x-modal.trigger>       thin pass-through, keeps the modal name in one place
+<x-app.ui.modal>               shell: focus, width, accessible name, reopen-on-error
+<x-app.ui.modal.actions>       footer row; cancel defaults to a closing button
+<x-app.ui.modal.trigger>       thin pass-through, keeps the modal name in one place
 ```
 
 `tone="danger"` changes the header icon treatment only. The button that
@@ -432,19 +549,45 @@ The editorial type scale is a 1.200 minor third from `--text-2xs` (11px) to
 this was a real bug in the inherited auth layouts, which forced `class="dark"`
 and overrode the choice.
 
+**Custom utilities.** Anything repeated three times is promoted to a `@utility`
+so it cannot drift between call sites. Tailwind tree-shakes an unused `@utility`
+out of the build entirely, so an unreferenced one costs nothing and a
+*grep-missing* one in `public/build` means "unused", not "broken".
+
+| Utility | Purpose |
+| --- | --- |
+| `eyebrow` / `eyebrow-accent` | Numbered monospace section marker |
+| `hairline` | Full-bleed 1 px rule, theme-aware |
+| `shell` / `shell-narrow` | The one horizontal container (public) |
+| `link-underline` | Accent underline that draws in on hover |
+| `grid-field` | Hairline grid fading out behind hero content |
+| `tag-pill` | Category / tag chip |
+| `card-surface` | Bordered card surface |
+| `surface-raise` | Bordered card + shadow so faint it only reads as separation |
+| `focus-ring` | Opt-in ring for elements that suppress the default outline |
+
+`focus-ring` exists because the base layer's `:focus-visible` outline does not
+follow a non-square `border-radius`. It draws its ring with `box-shadow` instead,
+and flips its offset colour to `ink-950` in dark mode.
+
+**Reduced motion.** The base layer clamps animation and transition durations
+under `prefers-reduced-motion`. That clamp does **not** stop Alpine from applying
+its `x-transition` classes, so those elements are additionally neutralised in the
+same block. Verified against a real drawer, not assumed.
+
 Full design language: [`UI-UX-BRIEF.md`](UI-UX-BRIEF.md).
 
 ---
 
 ## 8. Testing strategy
 
-Pest 5, 169 passing tests, 403 assertions.
+Pest 5, 255 passing tests, 903 assertions.
 
 | Suite | Covers |
 | --- | --- |
 | `Feature/Auth/*` | Login, register, reset, verification, 2FA, passkeys, layout contract |
 | `Feature/Blog/*` | Index, show, sharing, drafts, previews |
-| `Feature/Dashboard/*` | Post management, moderation, taxonomy |
+| `Feature/Dashboard/*` | Post management, moderation, taxonomy, shell structure |
 | `Feature/DashboardTest` | Role-scoped dashboards, nav filtering, role badges |
 | `Feature/Settings/*` | Profile, security, 2FA lifecycle |
 
@@ -498,11 +641,19 @@ Where a new feature plugs in, in the order you would touch them.
 1. `app/Enums/AccountRole.php` — add the case and its permissions
 2. `dashboardRoute()` — return the route name
 3. `RolePlan` — associate a plan, or return `null`
-4. `resources/views/pages/dashboard/<role>/⚡index.blade.php` — the dashboard
-5. `routes/web.php` — a middleware-guarded sub-group
-6. `DashboardNavigation` — section entries
-7. `UserSeeder`, `UserFactory` — a state and a demo account
+4. `resources/views/pages/<role>/⚡dashboard.blade.php` — the dashboard, with
+   `#[Layout('layouts::<role>.dashboard')]`
+5. `resources/views/layouts/<role>/dashboard.blade.php` — the role's layout,
+   composing `<x-app.ui.dashboard-shell>` with the role's chrome
+6. `components/app/<role>/{header,footer,sidebar}.blade.php` — three one-line
+   components labelling the shell's regions for this role
+7. `routes/web.php` — a middleware-guarded sub-group
+8. `DashboardNavigation` — section entries
+9. `UserSeeder`, `UserFactory` — a state and a demo account
 
-Step 2 is enough for the role to *work*: `RedirectsToRoleDashboard` uses
-`router->has()` so a role can be declared before its dashboard exists, and the
-login redirect will fall back rather than 500.
+Steps 1–2 are enough for the role to *work*: `RedirectsToRoleDashboard` uses
+`router->has()` so the login redirect falls back rather than 500s even before
+the dashboard route exists. A page whose `#[Layout]` names a view that does not
+exist is a hard runtime error rather than a silent fallback — the graceful
+degradation is the *other* direction, where a page declaring no layout at all
+lands in the guest shell, which is exactly how the settings pages are built.

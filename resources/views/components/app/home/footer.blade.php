@@ -74,7 +74,7 @@
                                         href="{{ $link['url'] }}"
                                         target="_blank"
                                         rel="noopener noreferrer me"
-                                        class="text-sm text-ink-600 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
+                                        class="focus-ring rounded-xs text-sm text-ink-600 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
                                     >
                                         {{ $link['label'] }}<span class="sr-only"> (opens in a new tab)</span>
                                     </a>
@@ -82,7 +82,7 @@
                                     <a
                                         href="{{ isset($link['route']) ? route($link['route']) : $link['url'] }}"
                                         @if (isset($link['route'])) wire:navigate @endif
-                                        class="text-sm text-ink-600 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
+                                        class="focus-ring rounded-xs text-sm text-ink-600 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
                                     >
                                         {{ $link['label'] }}
                                     </a>

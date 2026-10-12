@@ -15,14 +15,14 @@ use Livewire\Component;
  * what an account may do to its own content, not what it may share with, or
  * see of, another account.
  */
-new #[Layout('layouts::dashboard')] #[Title('Ideas')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Ideas')] class extends Component
 {
     //
 };
 ?>
 
 <div>
-    <x-module-placeholder
+    <x-app.ui.module-placeholder
         :title="__('Ideas, Plans & Projects')"
         :description="__('Capture ideas, shape them into plans, break plans into tasks, and track projects through to delivery.')"
         icon="light-bulb"

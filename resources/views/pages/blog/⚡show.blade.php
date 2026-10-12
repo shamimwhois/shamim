@@ -223,7 +223,7 @@ new #[Title('Post')] class extends Component
 }; ?>
 
 <div>
-    <x-post.reading-progress />
+    <x-app.ui.post.reading-progress />
 
     <article>
         {{-- ============================================================== --
@@ -306,7 +306,7 @@ new #[Title('Post')] class extends Component
                         <ul class="mt-6 flex flex-wrap gap-1.5">
                             @foreach ($post->tags as $tag)
                                 <li>
-                                    <x-tag-pill :tag="$tag" />
+                                    <x-app.ui.tag-pill :tag="$tag" />
                                 </li>
                             @endforeach
                         </ul>
@@ -322,7 +322,7 @@ new #[Title('Post')] class extends Component
             <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16">
                 <div class="min-w-0">
                     {{-- Share bar sits above the fold of the article body --}}
-                    <x-post.share-bar :post="$post" class="mb-10 pb-8 border-b border-ink-200 dark:border-ink-800" />
+                    <x-app.ui.post.share-bar :post="$post" class="mb-10 pb-8 border-b border-ink-200 dark:border-ink-800" />
 
                     {{-- Rendered, sanitised article content --}}
                     <div class="prose-editorial" data-reading-target>
@@ -330,14 +330,14 @@ new #[Title('Post')] class extends Component
                     </div>
 
                     {{-- Share bar repeated at the end, where intent is highest --}}
-                    <x-post.share-bar :post="$post" class="mt-14 border-t border-ink-200 pt-8 dark:border-ink-800" />
+                    <x-app.ui.post.share-bar :post="$post" class="mt-14 border-t border-ink-200 pt-8 dark:border-ink-800" />
                 </div>
 
                 {{-- Sticky sidebar: TOC on desktop --}}
                 <aside class="hidden lg:block">
                     <div class="sticky top-24 space-y-8">
                         @if (count($this->outline) >= 2)
-                            <x-post.toc :items="$this->outline" />
+                            <x-app.ui.post.toc :items="$this->outline" />
                         @endif
 
                         @if ($post->tags->isNotEmpty())
@@ -348,7 +348,7 @@ new #[Title('Post')] class extends Component
                                 <ul class="mt-4 flex flex-wrap gap-1.5">
                                     @foreach ($post->tags as $tag)
                                         <li>
-                                            <x-tag-pill :tag="$tag" />
+                                            <x-app.ui.tag-pill :tag="$tag" />
                                         </li>
                                     @endforeach
                                 </ul>
@@ -364,7 +364,7 @@ new #[Title('Post')] class extends Component
                     <summary class="cursor-pointer font-mono text-2xs font-medium uppercase tracking-widest text-ink-500 dark:text-ink-400">
                         On this page
                     </summary>
-                    <x-post.toc :items="$this->outline" id="toc-mobile" class="mt-4" />
+                    <x-app.ui.post.toc :items="$this->outline" id="toc-mobile" class="mt-4" />
                 </details>
             @endif
         </div>
@@ -376,14 +376,14 @@ new #[Title('Post')] class extends Component
     @if ($this->related->isNotEmpty())
         <section class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="related-heading">
             <div class="shell">
-                <x-section-marker :number="2" label="Keep reading" />
+                <x-app.ui.section-marker :number="2" label="Keep reading" />
                 <h2 id="related-heading" class="mt-5 text-2xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                     Related posts
                 </h2>
 
                 <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($this->related as $related)
-                        <x-post.card :post="$related" wire:key="related-{{ $related->id }}" />
+                        <x-app.ui.post.card :post="$related" wire:key="related-{{ $related->id }}" />
                     @endforeach
                 </div>
             </div>
@@ -395,7 +395,7 @@ new #[Title('Post')] class extends Component
      --}}
     <section class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="comments-heading">
         <div class="shell max-w-3xl">
-            <x-section-marker :number="3" label="Discussion" />
+            <x-app.ui.section-marker :number="3" label="Discussion" />
             <h2 id="comments-heading" class="mt-5 text-2xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 {{ $this->commentCount }} {{ Str::plural('comment', $this->commentCount) }}
             </h2>
@@ -494,7 +494,7 @@ new #[Title('Post')] class extends Component
 
             {{-- Thread --}}
             @if ($this->comments->isEmpty())
-                <x-empty-state
+                <x-app.ui.empty-state
                     class="mt-8"
                     icon="chat-bubble-left-right"
                     title="No comments yet"
@@ -504,14 +504,14 @@ new #[Title('Post')] class extends Component
                 <ol class="mt-10 space-y-8">
                     @foreach ($this->comments as $comment)
                         <li wire:key="comment-{{ $comment->id }}">
-                            <x-comment :comment="$comment" />
+                            <x-app.ui.comment :comment="$comment" />
 
                             {{-- Replies --}}
                             @if ($comment->replies->isNotEmpty())
                                 <ol class="mt-6 space-y-6 border-l-2 border-ink-100 pl-6 dark:border-ink-800">
                                     @foreach ($comment->replies as $reply)
                                         <li wire:key="reply-{{ $reply->id }}">
-                                            <x-comment :comment="$reply" :is-reply="true" />
+                                            <x-app.ui.comment :comment="$reply" :is-reply="true" />
                                         </li>
                                     @endforeach
                                 </ol>

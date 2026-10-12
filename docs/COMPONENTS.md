@@ -8,16 +8,62 @@ Naming follows Laravel's convention throughout:
 
 | Directory | Tag |
 | --- | --- |
-| `components/foo.blade.php` | `<x-foo />` |
-| `components/foo/bar.blade.php` | `<x-foo.bar />` |
+| `components/app/ui/foo.blade.php` | `<x-app.ui.foo />` |
+| `components/app/icon/logo-mark.blade.php` | `<x-app.icon.logo-mark />` |
+| `components/app/user/sidebar.blade.php` | `<x-app.user.sidebar />` |
 | `layouts/auth/split.blade.php` | `<x-layouts::auth.split />` |
 | `pages/blog/⚡index.blade.php` | `pages::blog.index` (route target) |
 
 ---
 
+## 0. The directory map
+
+Every component lives under `components/app/`. That prefix is not decoration:
+it namespaces this application's components away from every package's anonymous
+components, so `<x-app.ui.modal>` can never be shadowed by a vendor package
+registering `<x-modal>` — which is exactly the collision the old flat
+`components/modal.blade.php` was exposed to.
+
+```
+components/app/
+├── home/          guest chrome — the public header and footer
+├── ui/            shared primitives, role-agnostic by definition
+│   ├── auth/      authentication screens
+│   ├── editor/    the Markdown editor and its AI affordances
+│   ├── modal/     the shared modal system
+│   └── post/      post cards, TOC, share bar
+├── icon/          icon components — brand marks and the wordmark glyph
+├── user/          the author workspace's chrome
+├── seller/        the selling workspace's chrome
+└── admin/         the administration workspace's chrome
+```
+
+The rule that keeps it clean: **a component goes in `ui/` unless a role owns
+it.** `ui/` is the only directory that may not branch on role — the moment a
+component needs to know whether it is rendering for a seller, it belongs in
+that role's directory. `icon/` holds components whose entire body is a glyph.
+
+The layouts mirror the same audience-first shape:
+
+```
+layouts/
+├── guest/         unauthenticated visitors — home, blog, about
+│   └── home       the default layout (config/livewire.php component_layout)
+├── auth/          every authenticated account, on the way in
+│   └── split      the implementation behind layouts::auth
+├── app/           the general authenticated workspace
+│   └── dashboard  /dashboard and the four platform modules
+├── seller/        the seller role
+│   └── dashboard  /seller/dashboard
+└── admin/         the admin role
+    └── dashboard  /admin/dashboard, /admin/users
+```
+
+---
+
 ## 1. Shared components
 
-### `<x-section-marker>`
+### `<x-app.ui.section-marker>`
 
 The numbered monospace marker — the site's signature element. `01 — Selected
 work` renders as a two-character ordinal, a hairline rule and a tracked
@@ -31,7 +77,7 @@ visible ribcage.
 | `accent` | `bool` | `false` | Uses `signal-*` instead of `ink-*` |
 
 ```blade
-<x-section-marker number="2" label="Recent writing" accent />
+<x-app.ui.section-marker number="2" label="Recent writing" accent />
 ```
 
 `accent` should mark at most one section per page. If everything is accented,
@@ -39,7 +85,7 @@ nothing is.
 
 ---
 
-### `<x-empty-state>`
+### `<x-app.ui.empty-state>`
 
 The one sanctioned way to render "there is nothing here". Central to the
 project's stance that an empty state is a design opportunity, not an accident.
@@ -51,11 +97,11 @@ project's stance that an empty state is a design opportunity, not an accident.
 | `icon` | `string` | `'magnifying-glass'` |
 
 The default `icon` must be a real Flux icon name. Several invalid names were
-found in this codebase — see [§8](#8-known-issues).
+found in this codebase — see [§11](#11-known-issues).
 
 ---
 
-### `<x-tag-pill>`
+### `<x-app.ui.tag-pill>`
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -65,7 +111,7 @@ found in this codebase — see [§8](#8-known-issues).
 
 ---
 
-### `<x-pagination>`
+### `<x-app.ui.pagination>`
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -74,22 +120,28 @@ found in this codebase — see [§8](#8-known-issues).
 
 ---
 
-### `<x-app-logo>` / `<x-app-logo-icon>`
+### `<x-app.ui.app-logo>` / `<x-app.ui.app-logo-icon>`
 
 | Component | Prop | Type | Default |
 | --- | --- | --- | --- |
-| `<x-app-logo>` | `sidebar` | `bool` | `false` |
+| `<x-app.ui.app-logo>` | `sidebar` | `bool` | `false` |
+| `<x-app.ui.app-logo-icon>` | — | — | no props |
 
 `sidebar` switches between `flux:brand` and `flux:sidebar.brand`. The icon is a
 bare inline SVG (`viewBox="0 0 40 42"`, 5 `currentColor` paths) so it inherits
 text colour and needs no asset request.
 
+The wrapper `<x-app.ui.app-logo>` is currently **unused** — the auth layout
+composes `<flux:brand>` itself and renders the icon directly. See
+[§11](#11-known-issues).
+
 ---
 
-### `<x-placeholder-pattern>`
+### `<x-app.ui.placeholder-pattern>`
 
 An 8px diagonal lattice as an SVG `<pattern>`. Used as a texture wash behind the
-portfolio hero and the auth layout's editorial panel.
+auth layout's editorial panel; the public pages get their grid from the
+`grid-field` utility in `app.css` instead.
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -97,16 +149,17 @@ portfolio hero and the auth layout's editorial panel.
 
 That default is a genuine footgun: SVG `<pattern id>` is document-global, so two
 default instances collide and the second renders blank. Pass an explicit `id`
-when using more than one.
+when using more than one. Today there is exactly one call site, so the footgun
+is theoretical rather than live.
 
 ---
 
-### `<x-modal>` / `<x-modal.actions>` / `<x-modal.trigger>`
+### `<x-app.ui.modal>` / `<x-app.ui.modal.actions>` / `<x-app.ui.modal.trigger>`
 
 The shared modal system. Full rationale in
 [`ARCHITECTURE.md`](ARCHITECTURE.md#the-modal-system).
 
-**`<x-modal>`**
+**`<x-app.ui.modal>`**
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -122,7 +175,7 @@ The shared modal system. Full rationale in
 handlers pass through:
 
 ```blade
-<x-modal
+<x-app.ui.modal
     name="two-factor-setup-modal"
     :title="$this->modalConfig['title']"
     :description="$this->modalConfig['description']"
@@ -136,7 +189,7 @@ handlers pass through:
 declares `variant="danger"` itself, because the destructive control is often
 outside the shell.
 
-**`<x-modal.actions>`**
+**`<x-app.ui.modal.actions>`**
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -150,13 +203,13 @@ With no slot content it renders a `flux:modal.close` cancel button — the commo
 case. Supply slot content to replace it:
 
 ```blade
-<x-modal.actions>
+<x-app.ui.modal.actions>
     <flux:modal.close><flux:button variant="filled">Cancel</flux:button></flux:modal.close>
     <flux:button variant="danger" type="submit">Delete</flux:button>
-</x-modal.actions>
+</x-app.ui.modal.actions>
 ```
 
-**`<x-modal.trigger>`** — `name` only. A pass-through to
+**`<x-app.ui.modal.trigger>`** — `name` only. A pass-through to
 `<flux:modal.trigger>` that exists so a modal's name is written in exactly one
 place. A renamed modal opened by a stale trigger still renders, still looks
 right, and does nothing when clicked.
@@ -165,7 +218,7 @@ right, and does nothing when clicked.
 
 ## 2. Authentication components
 
-### `<x-auth-header>`
+### `<x-app.ui.auth.header>`
 
 The heading block inside the auth form column — *not* the editorial panel, which
 has its own headline.
@@ -181,7 +234,7 @@ marketing pages into authenticated screens reads as one design.
 
 ---
 
-### `<x-auth-session-status>`
+### `<x-app.ui.auth.session-status>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
@@ -194,7 +247,7 @@ carried no semantic weight.
 
 ---
 
-### `<x-passkey-verify>`
+### `<x-app.ui.auth.passkey-verify>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
@@ -209,35 +262,129 @@ outside the login screen without editing it.
 
 ---
 
-### `<x-passkey-registration>`
+### `<x-app.ui.auth.passkey-registration>`
 
 No props. Registration counterpart, used in the security settings page.
 
 ---
 
-## 3. Dashboard components
+## 3. Dashboard primitives
 
-### `<x-dashboard.header>`
+Everything in this section lives in `components/app/ui/` and is shared by all
+three role layouts. None of them branches on role — role enters only through the
+chrome in [§4](#4-the-dashboard-shell-and-role-chrome).
+
+### `<x-app.ui.header>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
 | `title` | `string` | — |
 | `description` | `?string` | `null` |
 | `eyebrow` | `?string` | `null` |
+| `breadcrumbs` | `array<int, array{label: string, href?: string}>` | `[]` |
 
 Page header for dashboard screens. `eyebrow` takes the permission-group label so
 a page states which area of the product it belongs to.
 
+When `breadcrumbs` is present it renders a `<nav aria-label="Breadcrumb">` with an
+`<ol>`: a leading **Home** link to `route(auth()->user()->dashboardRoute())` so
+the trail starts at the role's own home rather than a fixed path, then each crumb,
+then the page title as plain text carrying `aria-current="page"`. The final crumb
+is never a link — a breadcrumb that links to where you already are is noise.
+
+The header body is wrapped in `mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-10` so
+it lines up with `<x-app.ui.body>` underneath it. Change one and you must
+change the other.
+
+```blade
+<x-app.ui.header
+    :title="__('Posts')"
+    :description="__('Drafts, published and archived.')"
+    :breadcrumbs="[['label' => __('Content')], ['label' => __('Posts')]]"
+/>
+```
+
 ---
 
-### `<x-dashboard.nav>`
+### `<x-app.ui.body>`
 
-No props. Renders the sidebar by delegating to
+The page-body container. Every dashboard page wraps its content in exactly one.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `max` | `'full'\|'wide'\|'prose'` | `'wide'` | `wide` → `max-w-7xl`, `prose` → `max-w-3xl`, `full` → `max-w-none` |
+
+Renders `mx-auto w-full {width} space-y-8 px-5 py-8 sm:px-6 lg:px-10`. Because the
+spacing lives here, sibling `<x-app.ui.section>` blocks are spaced without any
+`space-y-*` on each call site — which is what made the old pages drift.
+
+---
+
+### `<x-app.ui.section>`
+
+A titled region within a page — the unit of visual grouping below the page header.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `title` | `?string` | `null` | Header row is omitted entirely when null |
+| `description` | `?string` | `null` | |
+| `icon` | `?string` | `null` | Must be a real Flux icon |
+| `tone` | `'default'\|'attention'` | `'default'` | `attention` is a soft amber wash |
+| `padded` | `bool` | `true` | `false` when the body is a table that owns its own padding |
+
+Depth comes from the `sui-card` utility (soft shadow plus a hairline border).
+`tone="attention"` is reserved for a region that genuinely needs action — a
+surface that shouts everywhere shouts nowhere.
+
+```blade
+<x-app.ui.section :title="__('Recent posts')" icon="document-text">
+    {{-- … --}}
+</x-app.ui.section>
+
+<x-app.ui.section :padded="false">
+    {{-- a table with its own cell padding --}}
+</x-app.ui.section>
+```
+
+---
+
+### `<x-app.ui.nav>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `label` | `?string` | `__('Dashboard')` |
+
+Renders the sidebar by delegating to
 `App\Support\DashboardNavigation::for(auth()->user())`.
 
 This component contains **no permission logic of its own**, and that is its
 entire value. The nav items and the route guards read the same definitions, so
 a menu entry cannot be visible to an account whose route would refuse it.
+
+The navigation is three levels deep — **section → group → item**:
+
+* a **section** is a labelled band (`Home`, `Writing`, `Workspaces`, `Manage`).
+  It is a non-interactive heading and is dropped entirely, heading included, if
+  nothing under it survives permission filtering;
+* a **group** is a collapsible cluster with an icon. A group holding exactly one
+  visible item is marked `static` and renders as a plain link with **no**
+  chevron, because a disclosure that expands to reveal a single child is worse
+  than no disclosure at all;
+* an **item** is a leaf link.
+
+`$label` is the nav's accessible name. Each role's sidebar passes its own, so an
+account moving between the author workspace, the storefront and platform
+administration hears a landmark that says where it is rather than the same
+generic "Dashboard" three times over.
+
+Group collapse state is a presentation concern and lives in the view, keyed by
+the group's stable `key` and persisted to `df.nav.groups.{userId}` in
+`localStorage`. The one rule the support class does own is `active`: a group
+reports whether it contains the current route, so the view can force the group
+open. A collapsed group holding the page you are looking at would hide the very
+link the sidebar exists to highlight. `active` resolves against each item's
+`pattern` via `request()->routeIs()`, so the highlight cannot drift from the
+route table.
 
 The `$badge` resolved per item is always an `int` — never a sentinel string.
 An earlier version used `'pending-comments'` as a placeholder and leaked it into
@@ -246,7 +393,38 @@ satisfied PHPStan's return-type check.
 
 ---
 
-### `<x-dashboard.role-badge>`
+### `<x-app.ui.nav-icons>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `label` | `?string` | `__('Dashboard (compact)')` |
+
+No props of its own beyond the accessible name. The icon-only variant of the
+sidebar, rendered when the desktop rail is collapsed.
+
+It is built from **the same `DashboardNavigation::for()` data**, flattened — not
+from a second hand-maintained list. A parallel menu is exactly the drift the
+navigation layer exists to prevent. Sections and group headers are dropped
+because neither survives being reduced to an icon. Because the label text is
+absent, every link carries both a `title` and an `aria-label`.
+
+---
+
+### `<x-app.ui.utility-link>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `href` | `string` | — |
+| `icon` | `string` | — |
+| `label` | `string` | — |
+
+A link in the sidebar's pinned footer ("View site", "Settings"). The label is
+hidden with `x-show="! rail"` when the rail collapses; an `sr-only` copy of the
+label remains so the link is never nameless to a screen reader.
+
+---
+
+### `<x-app.ui.role-badge>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
@@ -258,7 +436,7 @@ with the sidebar. Used in the dashboard plan card and the mobile header.
 
 ---
 
-### `<x-dashboard.stat>`
+### `<x-app.ui.stat>`
 
 A single metric tile.
 
@@ -273,18 +451,19 @@ A single metric tile.
 
 ---
 
-### `<x-module-placeholder>`
+### `<x-app.ui.module-placeholder>`
 
 The shared shell for a product module that has a route, a permission and a
 sidebar entry but no feature yet. Every unbuilt module renders through this
 component, so the four placeholder pages cannot drift into four different
-designs. It wraps `<x-dashboard.header>` with `eyebrow="Module"` and states
+designs. It wraps `<x-app.ui.header>` — with breadcrumbs
+`Workspaces / {title}` — inside a `<x-app.ui.body max="prose">`, and states
 three things honestly: what the module is, what is already built underneath it,
 and that the module itself is not available yet.
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `title` | `string` | — | Also rendered as the card heading |
+| `title` | `string` | — | Also rendered as the section heading |
 | `description` | `string` | — | One-line summary of the module |
 | `icon` | `string` | `'sparkles'` | Must be a real Flux icon |
 | `status` | `string` | `'planned'` | Declared for future use; the badge is currently a fixed "Not yet available" |
@@ -292,7 +471,7 @@ and that the module itself is not available yet.
 | `spec` | `?string` | `null` | Path to the module's specification document |
 
 ```blade
-<x-module-placeholder
+<x-app.ui.module-placeholder
     :title="__('Developer Lab')"
     :description="__('A browser-based environment to write, run, inspect and debug code.')"
     icon="beaker"
@@ -306,9 +485,219 @@ Used by `pages::dev-lab.index`, `pages::ai-hub.index`,
 
 ---
 
-## 4. Post components
+### The settings shell
 
-### `<x-post.card>`
+`resources/views/pages/settings/layout.blade.php` is the settings sibling of the
+main navigation: a labelled list of destinations beside the active screen.
+Above `md` the list is a `md:w-56` column; below it, it becomes a horizontally
+scrollable tab strip, because a two-column layout with one item per row spends
+the whole first screen on navigation.
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `heading` | `?string` | `null` |
+| `subheading` | `?string` | `null` |
+
+The shell renders `heading` as the page `<h1>` and `subheading` as its
+supporting line, then constrains the slot to `max-w-2xl`. **Pages must not
+render their own page-level heading** — that duplication is why
+`partials/settings-heading.blade.php` was deleted. They may (and should) render
+*section* headings below it, e.g. Security's "Update password" block above the
+form.
+
+Destinations come from `App\Support\SettingsNavigation::items()` — the same
+declaration shape as `DashboardNavigation`, minus permission filtering, because
+every account manages its own profile, security and appearance. There is no
+`for(User)` parameter; a test asserts the method takes none, since adding one
+would imply role-dependent settings.
+
+| Key | Route | Pattern |
+| --- | --- | --- |
+| Profile | `profile.edit` | `profile.*` |
+| Security | `security.edit` | `security.*` |
+| Appearance | `appearance.edit` | `appearance.*` |
+
+The settings pages carry **no** `#[Layout]` attribute, so they render in the
+guest shell — see [§9](#9-layouts).
+
+---
+
+## 4. The dashboard shell and role chrome
+
+This is the part of the tree the role directories exist for. The rule:
+
+> **`ui/` implements the workspace; the role directories name it.**
+
+Every authenticated surface is the same workspace — a collapsible rail, a mobile
+drawer, a sticky bar, a `<main>`. Three roles' worth of that machinery is one
+implementation in `components/app/ui/dashboard-shell.blade.php`, and each role's
+directory holds three one-line components that fill the shell's regions and
+supply the accessible names that tell an account where it is.
+
+### `<x-app.ui.dashboard-shell>`
+
+No props. Every region is a slot.
+
+| Slot | Region | Filled by |
+| --- | --- | --- |
+| `brand` | the wordmark, in the rail and again in the drawer | *(default: role-aware home link)* |
+| `sidebar` | the rail's scrolling navigation | `<x-app.{role}.sidebar />` |
+| `sidebarIcons` | the rail's collapsed, icon-only navigation | `<x-app.{role}.sidebar variant="icons" />` |
+| `footer` | the rail's pinned account block | `<x-app.{role}.footer />` |
+| `header` | the sticky bar shown below `lg` | `<x-app.{role}.header />` |
+| default slot | `<main id="dashboard-main">` — the page itself | the Livewire page |
+
+The shell owns the skip link, the `data-sui` scope's host markup, two pieces of
+Alpine layout state, the `x-teleport` that keeps the drawer out of a clipped
+ancestor, the focus trap that makes it modal in fact as well as in
+`aria-modal`, and the escape handler that closes it.
+
+**Why a component and not a layout.** There are three role layouts
+(`layouts::app.dashboard`, `layouts::seller.dashboard`,
+`layouts::admin.dashboard`) and they share this shell rather than each carrying
+a copy. The rail and the drawer are ~270 lines of interdependent machinery;
+duplicating that three times would mean three places to fix the same bug, and
+the three would drift. The layouts *compose*; only this file *implements*.
+
+**Two regions reuse the same slot content on purpose.** The brand appears in
+both the rail and the drawer, and the navigation appears in the rail, the
+rail's collapsed form, and the drawer: rendering `{{ $brand }}` twice costs
+nothing because a slot is already a rendered string
+(`ComponentSlot::toHtml()` returns it), and it guarantees the drawer cannot
+disagree with the rail about where "home" is.
+
+**State.** Two independent pieces, both namespaced by user id so a shared
+machine does not leak one account's layout into another's:
+
+| State | Persisted to | Behaviour |
+| --- | --- | --- |
+| `rail` | `df.rail.{userId}` in `localStorage` | Desktop sidebar collapses to a 68 px icon-only strip and back to 264 px |
+| `drawer` | not persisted (transient) | Below `lg` the sidebar becomes an off-canvas drawer |
+
+The rail toggle carries `data-test="rail-toggle"` and the mobile header trigger
+`data-test="drawer-open"`, so the responsive behaviour is testable without
+asserting on CSS.
+
+The mobile drawer is `x-teleport`ed to `<body>` and declared
+`role="dialog" aria-modal="true"`. It implements, by hand, the three things a
+modal must do:
+
+1. **scroll lock** — `document.documentElement.classList.add('overflow-hidden')`;
+2. **focus trap** — an `@keydown.tab` handler cycling between the first and last
+   *visible* focusable descendants (`el.offsetParent !== null` filters out the
+   links hidden inside collapsed groups);
+3. **focus restore** — the element that had focus before opening is refocused on
+   close.
+
+> **Why hand-rolled.** `x-collapse` ships with Flux, but `x-trap` **does not** —
+> grep `flux.min.js` for `trap` and you get zero hits. Writing `x-trap` would
+> fail *silently*: the dialog would look modal while Tab walked straight out into
+> the page behind it. `tests/Feature/Dashboard/ShellTest.php` asserts that this
+> is the only view file in the application containing a focus trap.
+
+---
+
+### `<x-app.ui.rail-footer>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `label` | `?string` | `__('Account')` |
+| `links` | *(slot)* | — |
+
+The rail's pinned footer: who you are, what you are on, and how to leave.
+
+Four blocks, top to bottom, each one the smallest thing that answers its
+question: the rail toggle; the account identity (name, email, role); the plan
+card as a link home; and the utility links — view site, settings, the optional
+`links` slot, log out.
+
+It is **pinned rather than scrolling** with the nav so the log-out control can
+never be scrolled out of reach, which matters most on exactly the small screens
+where the rail is at its narrowest.
+
+`$label` names the account block for assistive technology. Each role's footer
+passes its own so the region is not announced as a bare "Account" three
+different ways in three different parts of the product.
+
+The `links` slot is each role's seam: a role's own utility links, rendered
+between the shared ones and the logout control. Empty today for every role,
+which is the point — the shape exists before the need does, and adding the
+seller's payouts link later is one line in
+`components/app/seller/footer.blade.php` rather than a fork of this file.
+
+---
+
+### `<x-app.ui.topbar>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `label` | `?string` | `__('Dashboard home')` |
+
+The bar that replaces the rail below `lg`. Three things, in the order a thumb
+reaches them: the button that opens the drawer, the wordmark that goes home,
+and the role badge that says which workspace you are standing in. Nothing else
+— at this width the bar is 56px tall and every additional control is a control
+you miss.
+
+The brand link carries `aria-label` because its visible text is the author's
+short name, which says who owns the site and not where the link goes. `$label`
+supplies the destination — "Selling dashboard", "Admin dashboard" — drawn from
+the role's own route by the role's header component.
+
+---
+
+### The role chrome: `user`, `seller`, `admin`
+
+Each role directory holds exactly three components, and they are deliberately
+thin.
+
+| Component | Props | Body |
+| --- | --- | --- |
+| `<x-app.user.sidebar>` | `variant: 'default'\|'icons'` | `<x-app.ui.nav :label="__('Author workspace')" />`, or `<x-app.ui.nav-icons>` when `variant="icons"` |
+| `<x-app.user.footer>` | `label: ?string` | `<x-app.ui.rail-footer :label="__('Author account')" />` |
+| `<x-app.user.header>` | `label: ?string` | `<x-app.ui.topbar :label="__('Author dashboard')" />` |
+| `<x-app.seller.sidebar>` | `variant` | same, labelled `__('Selling workspace')` |
+| `<x-app.seller.footer>` | `label` | `__('Seller account')` |
+| `<x-app.seller.header>` | `label` | `__('Selling dashboard')` |
+| `<x-app.admin.sidebar>` | `variant` | same, labelled `__('Administration')` |
+| `<x-app.admin.footer>` | `label` | `__('Administrator account')` |
+| `<x-app.admin.header>` | `label` | `__('Admin dashboard')` |
+
+**The one genuine per-role difference is the nav's accessible name.** The items
+are not any role component's business: `DashboardNavigation` already filters
+them by permission, and an admin holds every one of them, so the Administration
+group appears in the admin sidebar and nowhere else *without the admin sidebar
+knowing any other role exists*. That is the whole value of the split — role
+differentiation comes from composing permission-filtered data under a
+role-specific name, never from duplicated navigation logic.
+
+Each role file carries a docblock naming what that role is most likely to need
+that is not a navigation item: the seller's payouts and listings, the admin's
+health indicator, failed-job count and deploy stamp, the author's drafts queue.
+Those belong in the role's directory when they arrive — which is why the
+directories exist before their contents do.
+
+---
+
+### `<x-app.ui.desktop-user-menu>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `showRole` | `bool` | `true` |
+
+**Currently unused.** The account block it used to render is now
+`<x-app.ui.rail-footer>`, which replaces it outright: same dropdown-style
+identity, plus the rail toggle and the utility links the old shell rendered
+separately. Its `data-test="sidebar-menu-button"` hook died with it — nothing
+ever asserted on it. The file is retained only as the historical record of the
+pre-rail chrome, and it is the first file to delete — see
+[§11](#11-known-issues).
+
+---
+
+## 5. Post components
+
+### `<x-app.ui.post.card>`
 
 The post summary used on the index and in related-post lists.
 
@@ -326,7 +715,7 @@ preference.
 
 ---
 
-### `<x-post.toc>`
+### `<x-app.ui.post.toc>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
@@ -339,7 +728,7 @@ empty — an "On this page" heading above nothing is worse than no heading.
 
 ---
 
-### `<x-post.reading-progress>`
+### `<x-app.ui.post.reading-progress>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
@@ -350,28 +739,18 @@ a specific element rather than always the document.
 
 ---
 
-### `<x-post.share-bar>`
+### `<x-app.ui.post.share-bar>`
 
 | Prop | Type | Notes |
 | --- | --- | --- |
 | `post` | `Post` | Needs an absolute canonical URL |
 
-Renders share targets from `config/portfolio.php`. See `<x-share-icon>`.
+Renders share targets from `config/portfolio.php`. See
+[`<x-app.icon.share>`](#x-appiconshare).
 
 ---
 
-### `<x-share-icon>`
-
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `name` | `string` | A key from the share-target config |
-
-Brand marks are inlined as SVG paths because the free Flux tier has no brand
-icons.
-
----
-
-### `<x-comment>`
+### `<x-app.ui.comment>`
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -380,50 +759,213 @@ icons.
 
 ---
 
-## 5. Site chrome
+## 6. Editor components
 
-### `<x-site.header>` / `<x-site.footer>`
+### `<x-app.ui.editor.rich-text>`
 
-No props. Used by `layouts/public.blade.php` only. Dashboard screens use
-`layouts/dashboard.blade.php` and never render these.
+The Markdown editor with inline AI assistance.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `model` | `string` | `'body'` | The Livewire property the editor syncs to |
+| `value` | `string` | `''` | Initial Markdown |
+| `label` | `?string` | `null` | |
+| `placeholder` | `?string` | `null` | |
+| `minHeight` | `string` | `'28rem'` | |
+| `imagesEnabled` | `?bool` | `null` | `null` falls back to `ai.editor.images_enabled` |
+
+**Why Markdown and not a contenteditable surface.** The post body is stored as
+Markdown and rendered through `App\Support\MarkdownRenderer`. A WYSIWYG surface
+would have to emit HTML, which means a sanitiser, a new column, and a rewrite of
+the public render path — for a feature the data model does not ask for. Editing
+Markdown directly also keeps the preview honest: the author sees exactly what the
+renderer will produce, not an approximation that drifts from it.
+
+**Why Alpine rather than Livewire state.** Every AI action must leave the cursor
+where it was. A Livewire round trip re-renders the DOM, which loses the
+textarea's selection and scroll position. The component owns its state
+client-side and talks to the server over plain JSON (`resources/js/editor-ai.js`),
+syncing the finished value back up with `$wire.set()` only when an action
+completes. `apply({ text, start, end })` is the single mutation point, so
+selection restoration and syncing exist once rather than at every call site.
+
+**Batching corrections.** `acceptAllMechanical()` applies corrections in
+**descending offset order**. Applying from the start would shift every later
+offset and invalidate the rest of the batch.
+
+**One gotcha.** Do not pass a dynamic name to `<flux:icon>` — a
+`<flux:icon ::name="…">` binding makes Blaze re-enter the compiled icon template
+forever and exhausts memory. The category grid is rendered server-side from
+`ContentCategory` with a static icon per case for exactly this reason.
+
+The three enums behind it — `ContentCategory`, `ContentTone`, `CorrectionType` —
+each carry `label()`, `icon()`, `toArray()` and their own prompt fragments, so
+adding a category is a one-file change with no view edit.
 
 ---
 
-### `<x-desktop-user-menu>`
+## 7. Icon components
+
+Components whose entire body is a glyph. They exist so a mark is drawn from one
+definition: before `<x-app.icon.logo-mark>` was extracted, the `>_` wordmark
+appeared in four files under three different corner radii.
+
+### `<x-app.icon.logo-mark>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
-| `showRole` | `bool` | `true` |
+| `size` | `'sm'\|'md'\|'lg'` | `'md'` |
 
-The dropdown in the dashboard sidebar footer. Carries
-`data-test="sidebar-menu-button"`. `showRole` controls whether the account's
-role label renders beneath its name in the collapsed-header area.
+The `>_` terminal glyph in a rounded box. The component owns the glyph and the
+box only — **the palette arrives through `$attributes`**, because the same mark
+is a white-on-dark chip in the rail, a dark chip in the topbar, and a bordered
+monogram on the public About page:
 
-> **Legacy.** This component still uses `zinc-*` classes where the project token
-> is `ink-*`. It predates the design token migration and is a candidate for
-> conversion; it is listed here rather than silently fixed because it is outside
-> the current redesign's scope.
+```blade
+<x-app.icon.logo-mark size="md" class="bg-white text-sui-rail" />          {{-- rail + drawer --}}
+<x-app.icon.logo-mark size="sm" class="bg-sui-rail text-sui-rail-ink" />  {{-- mobile topbar --}}
+<x-app.icon.logo-mark size="lg" class="border … bg-ink-900 font-mono text-signal-400 …" />
+```
 
----
+`tests/Feature/Dashboard/ShellTest.php` asserts the glyph is defined in exactly
+one file and rendered exactly three times in a dashboard page — once per
+surface, never duplicated as markup.
 
-## 6. Layouts
+### `<x-app.icon.share>`
 
-| Layout | Tag | Used by |
+| Prop | Type | Notes |
 | --- | --- | --- |
-| `layouts/public.blade.php` | `<x-layouts::public>` | Home, blog, about |
-| `layouts/dashboard.blade.php` | `<x-layouts::dashboard>` | All dashboard and settings pages |
-| `layouts/auth.blade.php` | `<x-layouts::auth>` | All seven Fortify screens |
-| `layouts/auth/split.blade.php` | `<x-layouts::auth.split>` | The implementation behind the above |
+| `name` | `string` | A key from the share-target config |
 
-The starter-kit `layouts/app*` layouts and `views/dashboard.blade.php` were
-deleted along with the team feature. The public site (landing page, blog index,
-post detail, about) renders inside `layouts::public`, which is the default;
-dashboard and settings screens opt into `layouts::dashboard` explicitly — see
-[How a page gets its layout](#how-a-page-gets-its-layout).
+Brand marks are inlined as SVG paths because the free Flux tier has no brand
+icons. Sized to a 3.5 `size-*` utility (14px) and drawn with `currentColor` so
+they inherit the button's hover state.
 
 ---
 
-## 7. Livewire single-file components
+## 8. Site chrome
+
+### `<x-app.home.header>` / `<x-app.home.footer>`
+
+No props. Used by `layouts::guest.home` only. Dashboard screens use the shell in
+[§4](#4-the-dashboard-shell-and-role-chrome) and never render these.
+
+Both were brought onto the shared focus treatment: every interactive element
+carries `focus-ring`, which draws a 2 px signal-coloured ring with a 2 px offset
+via `box-shadow` rather than `outline`, so it can follow a non-square
+`border-radius` cleanly. The offset colour flips to `ink-950` in dark mode so the
+ring reads as a ring and not a smear.
+
+The header nav marks the current section with both `aria-current="page"` and a
+signal-coloured underline, so the state is not carried by colour alone. Below
+`md` the nav collapses into a disclosure panel; its `x-transition` classes are
+neutralised by the `prefers-reduced-motion` block in `app.css`, because a blanket
+`transition-duration` clamp does not stop Alpine from applying its classes.
+
+The footer's external links (GitHub, LinkedIn, X) carry
+`rel="noopener noreferrer me"` — the `me` value is what makes IndieWeb-style
+identity consumers treat them as belonging to the same person — plus an
+`sr-only` " (opens in a new tab)" announcement, since `target="_blank"` is
+invisible to a screen reader.
+
+---
+
+## 9. Layouts
+
+Five layouts, one per audience. The audience is always the first path segment,
+so a layout's name states who it is for before what it contains.
+
+| Layout | Audience | Used by |
+| --- | --- | --- |
+| `layouts::guest.home` | unauthenticated visitors | Home, blog index, post detail, about — **and the default** |
+| `layouts::auth` / `layouts::auth.split` | every authenticated account, mid-flow | All seven Fortify screens |
+| `layouts::app.dashboard` | authenticated accounts generally | `/dashboard` and the four platform modules |
+| `layouts::seller.dashboard` | the seller role | `/seller/dashboard` |
+| `layouts::admin.dashboard` | the admin role | `/admin/dashboard`, `/admin/users` |
+
+`layouts::auth` is the entry point and `layouts::auth.split` is the
+implementation behind it; the pair exists so the seven Fortify screens all
+reference one name and switching the authentication design is a one-line change
+to `auth.blade.php` — a second design would be added beside `split` and selected
+there, and no caller would change. `layouts::auth.split` is a public surface
+with no `data-sui` scope — it is written in the editorial `ink-*`/`signal-*`
+palette so the login screen looks like the site it guards.
+
+### The three workspace layouts are one composition
+
+`layouts::app.dashboard`, `layouts::seller.dashboard` and
+`layouts::admin.dashboard` are **byte-identical in shape**. Each one owns the
+document, the `data-sui` scope, the persisted toast group and `@fluxScripts` —
+the parts that are about being a page — and fills the shell's regions from its
+own role chrome:
+
+```blade
+<body class="min-h-screen antialiased" data-sui>
+    <x-app.ui.dashboard-shell>
+        <x-slot:sidebar><x-app.user.sidebar /></x-slot:sidebar>
+        <x-slot:sidebarIcons><x-app.user.sidebar variant="icons" /></x-slot:sidebarIcons>
+        <x-slot:header><x-app.user.header /></x-slot:header>
+        <x-slot:footer><x-app.user.footer /></x-slot:footer>
+
+        {{ $slot }}
+    </x-app.ui.dashboard-shell>
+
+    @persist('toast')
+        <flux:toast.group><flux:toast /></flux:toast.group>
+    @endpersist
+
+    @fluxScripts
+</body>
+```
+
+`brand` is deliberately not passed by any of the three: the shell's default
+wordmark points at `auth()->user()->dashboardRoute()`, which is already
+role-aware, so every role gets the correct home link without restating it.
+
+`data-sui` sits on `<body>` rather than an inner wrapper because the mobile
+drawer and the toast group are teleported straight onto the body — anything
+outside the scope would silently fall back to the public palette. That is the
+mechanism documented in [`SOFT-UI.md`](SOFT-UI.md#12-the-mechanism).
+
+### How a page gets its layout
+
+`config/livewire.php` sets `component_layout => 'layouts::guest.home'`. That
+means **every** SFC rendered through `Route::livewire()` is wrapped in the public
+shell by default — including dashboard pages, unless they say otherwise.
+
+Workspace pages therefore opt in explicitly:
+
+```blade
+new #[Layout('layouts::app.dashboard')] class extends Component { … }
+```
+
+| Page | Layout |
+| --- | --- |
+| `pages::dashboard.index`, `dashboard.comments`, `dashboard.taxonomy`, `dashboard.posts.*` | `layouts::app.dashboard` |
+| `pages::dev-lab.index`, `ai-hub.index`, `marketplace.index`, `ideas.index` | `layouts::app.dashboard` |
+| `pages::seller.dashboard` | `layouts::seller.dashboard` |
+| `pages::admin.dashboard`, `pages::admin.users` | `layouts::admin.dashboard` |
+| `pages::settings.*` | *(none — the guest shell, deliberately)* |
+
+That last row is a wrinkle worth knowing about. The settings pages carry no
+`#[Layout]` attribute and therefore render in the guest shell: settings is the
+one authenticated surface that does not want the workspace chrome around it, so
+it keeps the quiet public frame. It does mean those pages are written in
+`ink-*`/`signal-*` utilities rather than `sui-*` — a `tests/Feature/Dashboard/ShellTest.php`
+assertion pins the behaviour so it cannot regress silently.
+
+`component_namespaces` (which gives `pages::` and `layouts::`) and
+`component_locations` (which lists `resources/views/components` and
+`resource_path('views/livewire')`) are both declared there too.
+`component_locations` is what lets a plain component resolve by short name, and
+an SFC placed under `views/livewire` is `<livewire:name />`, neither needing a
+namespace prefix. Only the `pages::` and `layouts::` namespaces need one. So
+`config/livewire.php` is the file to read first when a component cannot be
+found.
+
+---
+
+## 10. Livewire single-file components
 
 SFCs live under `resources/views/pages/**` and carry the `⚡` prefix. They are
 anonymous classes addressed by **name string**, never `::class`.
@@ -472,42 +1014,18 @@ the loop and every row's modal operates on the same record.
 
 ---
 
-### How a page gets its layout
-
-`config/livewire.php` sets `component_layout => 'layouts::public'`. That means
-**every** SFC rendered through `Route::livewire()` is wrapped in the public
-marketing shell by default — including dashboard pages, unless they say
-otherwise.
-
-Dashboard and settings screens therefore opt in explicitly:
-
-```blade
-new #[Layout('layouts::dashboard')] class extends Component { … }
-```
-
-`component_namespaces` (which gives `pages::` and `layouts::`) and
-`component_locations` (which lists `resources/views/components` and
-`resource_path('views/livewire')`) are both declared there too.
-`component_locations` is what lets a plain component resolve by short name —
-`components/module-placeholder.blade.php` is `<x-module-placeholder />`, and an
-SFC placed under `views/livewire` is `<livewire:name />`, neither needing a
-namespace prefix. Only the `pages::` and `layouts::` namespaces need one. So
-`config/livewire.php` is the file to read first when a component cannot be
-found.
-
----
-
-## 8. Known issues
+## 11. Known issues
 
 Concrete defects and hazards found while writing this reference. Recorded so they
 are tracked rather than rediscovered.
 
 | # | Issue | Impact |
 | --- | --- | --- |
-| 1 | `<x-placeholder-pattern>` defaults `id` to `uniqid()` | Two instances on a page collide; the second renders blank. Pass an explicit `id`. |
-| 2 | `<x-desktop-user-menu>` uses `zinc-*` tokens | Off-palette against the `ink-*` system. Predates the token migration. |
-| 3 | `<x-desktop-user-menu>` and other pre-migration components use `zinc-*` tokens | Off-palette against the `ink-*` system, but they still render. |
+| 1 | `<x-app.ui.placeholder-pattern>` defaults `id` to `uniqid()` | Two instances on a page collide; the second renders blank. Pass an explicit `id`. Currently one call site, so the footgun is theoretical. |
+| 2 | `<x-app.ui.desktop-user-menu>` and `<x-app.ui.app-logo>` are unused | Dead components left by the reorganisation. `rail-footer` superseded the first; the auth layout composes `flux:brand` itself and only needs the icon. Delete both when convenient — nothing references them, including tests. |
+| 3 | `<x-app.ui.desktop-user-menu>` uses `zinc-*` tokens | Off-palette against the `ink-*` system. It predates the token migration and, being unused, renders nowhere — so the fix and the deletion are the same change. |
 | 4 | Invalid Flux icon names recurred four times | `storefront`, `book-open-text`, `folder-git-2`, `layout-grid` all threw. All fixed; a repo-wide audit is now part of the verification gate. |
+| 5 | A dynamic `<flux:icon ::name="…">` recurses forever under Blaze | Memory exhaustion, not a blank icon. Never bind the icon name to an Alpine expression — see §6. |
 
 On issue 4: the audit that found them is
 

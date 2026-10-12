@@ -45,7 +45,7 @@
             }"
         >
             <div x-show="!showRecoveryInput">
-                <x-auth-header
+                <x-app.ui.auth.header
                     :eyebrow="__('Security')"
                     :title="__('Authentication code')"
                     :description="__('Enter the 6-digit code from your authenticator app.')"
@@ -53,7 +53,7 @@
             </div>
 
             <div x-show="showRecoveryInput">
-                <x-auth-header
+                <x-app.ui.auth.header
                     :eyebrow="__('Security')"
                     :title="__('Recovery code')"
                     :description="__('Enter one of the recovery codes you saved when enabling two-factor authentication.')"

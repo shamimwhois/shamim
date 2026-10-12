@@ -147,7 +147,7 @@ new #[Title('Senior Software Engineer')] class extends Component
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
 
         <div class="shell relative pb-20 pt-16 sm:pt-24 lg:pb-28 lg:pt-32">
-            <x-section-marker :number="1" :label="$this->profile()->availability ?? 'Available'" accent />
+            <x-app.ui.section-marker :number="1" :label="$this->profile()->availability ?? 'Available'" accent />
 
             <h1
                 id="hero-heading"
@@ -209,7 +209,7 @@ new #[Title('Senior Software Engineer')] class extends Component
     <section class="shell py-20 lg:py-24" aria-labelledby="writing-heading">
         <div class="flex flex-wrap items-end justify-between gap-6">
             <div>
-                <x-section-marker :number="2" label="Writing" />
+                <x-app.ui.section-marker :number="2" label="Writing" />
                 <h2 id="writing-heading" class="mt-5 max-w-xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                     Notes on building systems that last
                 </h2>
@@ -226,7 +226,7 @@ new #[Title('Senior Software Engineer')] class extends Component
         </div>
 
         @if ($this->posts->isEmpty())
-            <x-empty-state
+            <x-app.ui.empty-state
                 class="mt-10"
                 title="No writing published yet"
                 description="Posts will appear here once the first one goes out."
@@ -236,7 +236,7 @@ new #[Title('Senior Software Engineer')] class extends Component
             {{-- Lead item: full-width featured post --}}
             @foreach ($this->featured as $post)
                 <div class="mt-10">
-                    <x-post.card :post="$post" featured :heading-level="'h3'" />
+                    <x-app.ui.post.card :post="$post" featured :heading-level="'h3'" />
                 </div>
             @endforeach
 
@@ -244,7 +244,7 @@ new #[Title('Senior Software Engineer')] class extends Component
             @if ($this->latest->isNotEmpty())
                 <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($this->latest as $post)
-                        <x-post.card :post="$post" :heading-level="'h3'" />
+                        <x-app.ui.post.card :post="$post" :heading-level="'h3'" />
                     @endforeach
                 </div>
             @endif
@@ -283,7 +283,7 @@ new #[Title('Senior Software Engineer')] class extends Component
                         <ul class="mt-4 flex flex-wrap gap-1.5">
                             @foreach ($this->tags as $tag)
                                 <li>
-                                    <x-tag-pill :tag="$tag" :count="$tag->posts_count" />
+                                    <x-app.ui.tag-pill :tag="$tag" :count="$tag->posts_count" />
                                 </li>
                             @endforeach
                         </ul>
@@ -298,7 +298,7 @@ new #[Title('Senior Software Engineer')] class extends Component
      --}}
     <section class="border-y border-ink-200 bg-ink-50/60 py-20 lg:py-24 dark:border-ink-800 dark:bg-ink-900/30" aria-labelledby="expertise-heading">
         <div class="shell">
-            <x-section-marker :number="3" label="Expertise" />
+            <x-app.ui.section-marker :number="3" label="Expertise" />
             <h2 id="expertise-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 What I am actually good at
             </h2>
@@ -335,7 +335,7 @@ new #[Title('Senior Software Engineer')] class extends Component
      | 04 — Selected work
      --}}
     <section class="shell py-20 lg:py-24" aria-labelledby="work-heading">
-        <x-section-marker :number="4" label="Selected work" />
+        <x-app.ui.section-marker :number="4" label="Selected work" />
         <h2 id="work-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
             Systems I have built and shipped
         </h2>
@@ -386,7 +386,7 @@ new #[Title('Senior Software Engineer')] class extends Component
         <div class="shell">
             <div class="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-center">
                 <div>
-                    <x-section-marker :number="5" label="Contact" />
+                    <x-app.ui.section-marker :number="5" label="Contact" />
                     <h2 id="contact-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                         Let us talk about the hard part
                     </h2>

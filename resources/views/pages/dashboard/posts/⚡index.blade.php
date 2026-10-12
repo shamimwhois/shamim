@@ -24,7 +24,7 @@ use Livewire\WithPagination;
  * All mutations route through the existing Action classes so the dashboard
  * cannot bypass the publish/unpublish invariants enforced for the editor.
  */
-new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Posts')] class extends Component
 {
     use WithPagination;
 
@@ -201,19 +201,20 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
 }; ?>
 
 <div>
-    <x-dashboard.header
+    <x-app.ui.header
         eyebrow="Content"
         title="Posts"
         description="Every post you have written, with its current state. Drafts and archived posts are invisible to readers."
+        :breadcrumbs="[['label' => __('Content')], ['label' => __('Posts')]]"
     >
         <x-slot:actions>
             <flux:button variant="primary" :href="route('dashboard.posts.create')" icon="plus" wire:navigate>
-                New post
+                {{ __('New post') }}
             </flux:button>
         </x-slot:actions>
-    </x-dashboard.header>
+    </x-app.ui.header>
 
-    <div class="px-6 py-8 lg:px-10">
+    <x-app.ui.body max="full">
         {{-- ============================================================= --
          | Filters
          --}}
@@ -221,7 +222,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
             <div class="w-full lg:max-w-xs">
                 <label for="post-search" class="sr-only">Search posts</label>
                 <div class="relative">
-                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400 dark:text-ink-500">
+                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400">
                         <flux:icon name="magnifying-glass" class="size-4" />
                     </span>
 
@@ -231,7 +232,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                         wire:model.live.debounce.300ms="search"
                         placeholder="Search your posts…"
                         autocomplete="off"
-                        class="w-full rounded-md border border-ink-200 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 dark:placeholder:text-ink-600"
+                        class="sui-control w-full pl-9"
                     />
                 </div>
             </div>
@@ -242,13 +243,12 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                     type="button"
                     wire:click="$set('status', '')"
                     @class([
-                        'rounded-xs px-3 py-1.5 font-mono text-2xs font-medium transition-colors',
-                        'bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-950' => $status === '',
-                        'text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100' => $status !== '',
+                        'sui-focus sui-tab',
+                        'sui-tab-active' => $status === '',
                     ])
                 >
                     All
-                    <span class="ml-1 opacity-60 tabular-nums">{{ array_sum(array_column($this->statusCounts, 'count')) }}</span>
+                    <span class="opacity-60 tabular-nums">{{ array_sum(array_column($this->statusCounts, 'count')) }}</span>
                 </button>
 
                 @foreach ($this->statusCounts as $value => $meta)
@@ -256,24 +256,23 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                         type="button"
                         wire:click="$set('status', '{{ $value }}')"
                         @class([
-                            'rounded-xs px-3 py-1.5 font-mono text-2xs font-medium transition-colors',
-                            'bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-950' => $status === $value,
-                            'text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100' => $status !== $value,
+                            'sui-focus sui-tab',
+                            'sui-tab-active' => $status === $value,
                         ])
                     >
                         {{ $meta['label'] }}
-                        <span class="ml-1 opacity-60 tabular-nums">{{ $meta['count'] }}</span>
+                        <span class="opacity-60 tabular-nums">{{ $meta['count'] }}</span>
                     </button>
                 @endforeach
 
                 @if ($this->categories->isNotEmpty())
-                    <span aria-hidden="true" class="mx-1 h-4 w-px bg-ink-200 dark:bg-ink-800"></span>
+                    <span aria-hidden="true" class="mx-1 h-4 w-px bg-sui-hairline"></span>
 
                     <label for="category-filter" class="sr-only">Filter by category</label>
                     <select
                         id="category-filter"
                         wire:model.live="category"
-                        class="rounded-xs border border-ink-200 bg-white px-2 py-1.5 font-mono text-2xs text-ink-600 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-400"
+                        class="sui-control w-auto !py-1.5 text-xs"
                     >
                         <option value="">All categories</option>
                         @foreach ($this->categories as $cat)
@@ -286,7 +285,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                     <button
                         type="button"
                         wire:click="clearFilters"
-                        class="rounded-xs px-2 py-1.5 font-mono text-2xs text-ink-400 transition-colors hover:text-ink-700 dark:text-ink-500 dark:hover:text-ink-200"
+                        class="sui-focus sui-chip-neutral"
                     >
                         Clear
                     </button>
@@ -297,18 +296,18 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
         {{-- ============================================================= --
          | Table
          --}}
-        <div class="mt-6 overflow-hidden rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
+        <div class="sui-card mt-6 overflow-hidden">
             @if ($this->posts->isEmpty())
-                <div class="px-6 py-16 text-center">
-                    <div class="mx-auto grid size-11 place-items-center rounded-md border border-ink-200 bg-ink-50 text-ink-400 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-500">
+                <div class="sui-empty">
+                    <div class="mx-auto grid size-11 place-items-center rounded-md border border-sui-hairline bg-sui-well text-ink-400">
                         <flux:icon name="document-text" class="size-5" />
                     </div>
 
-                    <p class="mt-4 text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+                    <p class="mt-4 text-base font-semibold tracking-tight text-ink-900">
                         {{ $this->hasFilters ? 'No posts match those filters' : 'No posts yet' }}
                     </p>
 
-                    <p class="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
+                    <p class="mt-1.5 text-sm text-ink-500">
                         {{ $this->hasFilters ? 'Try clearing the filters.' : 'Your writing will show up here once you start.' }}
                     </p>
 
@@ -326,19 +325,19 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                 </div>
             @else
                 {{-- Table header (desktop) --}}
-                <div class="hidden border-b border-ink-200 px-5 py-3 lg:grid lg:grid-cols-[1fr_120px_100px_100px_140px] lg:gap-4 dark:border-ink-800">
-                    <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">Title</span>
-                    <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">Status</span>
-                    <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">Views</span>
-                    <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">Comments</span>
-                    <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">Updated</span>
+                <div class="hidden border-b border-sui-hairline px-5 py-3 lg:grid lg:grid-cols-[1fr_120px_100px_100px_140px] lg:gap-4">
+                    <span class="sui-table-head">Title</span>
+                    <span class="sui-table-head">Status</span>
+                    <span class="sui-table-head">Views</span>
+                    <span class="sui-table-head">Comments</span>
+                    <span class="sui-table-head">Updated</span>
                 </div>
 
-                <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                <ul class="divide-y divide-sui-hairline">
                     @foreach ($this->posts as $post)
                         <li
                             wire:key="dashboard-post-{{ $post->id }}"
-                            class="group px-5 py-4 transition-colors hover:bg-ink-50 dark:hover:bg-ink-950/60"
+                            class="sui-row group transition duration-150 ease-soft hover:bg-sui-hover"
                             x-data="{ confirmingDelete: false }"
                         >
                             <div class="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_120px_100px_100px_140px] lg:items-center">
@@ -347,25 +346,25 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                                     <a
                                         href="{{ route('dashboard.posts.edit', $post) }}"
                                         wire:navigate
-                                        class="block truncate text-sm font-medium text-ink-900 transition-colors hover:text-signal-700 dark:text-ink-50 dark:hover:text-signal-400"
+                                        class="block truncate text-sm font-medium text-ink-900 transition duration-150 ease-soft hover:text-sui-accent-ink"
                                     >
                                         {{ $post->title }}
                                     </a>
 
-                                    <p class="mt-0.5 truncate font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                    <p class="mt-0.5 truncate text-2xs text-ink-500">
                                         {{ $post->category?->name ?? 'Uncategorised' }}
                                         @if ($post->is_featured)
-                                            · <span class="text-amber-600 dark:text-amber-400">featured</span>
+                                            · <span class="text-sui-attention-ink">featured</span>
                                         @endif
                                         @if ($post->trashed())
-                                            · <span class="text-red-500">deleted</span>
+                                            · <span class="text-sui-danger">deleted</span>
                                         @endif
                                     </p>
                                 </div>
 
                                 {{-- Status --}}
                                 <div class="flex items-center gap-2 lg:block">
-                                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 lg:hidden dark:text-ink-500">Status</span>
+                                    <span class="sui-table-head lg:hidden">Status</span>
                                     <flux:badge :color="$post->status->badgeColor()" size="sm">
                                         {{ $post->status->label() }}
                                     </flux:badge>
@@ -373,30 +372,30 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
 
                                 {{-- Views --}}
                                 <div class="flex items-center justify-between gap-2 lg:block">
-                                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 lg:hidden dark:text-ink-500">Views</span>
-                                    <span class="font-mono text-xs tabular-nums text-ink-600 dark:text-ink-400">
+                                    <span class="sui-table-head lg:hidden">Views</span>
+                                    <span class="sui-table-cell">
                                         {{ number_format($post->view_count) }}
                                     </span>
                                 </div>
 
                                 {{-- Comments --}}
                                 <div class="flex items-center justify-between gap-2 lg:block">
-                                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 lg:hidden dark:text-ink-500">Comments</span>
-                                    <span class="font-mono text-xs tabular-nums text-ink-600 dark:text-ink-400">
+                                    <span class="sui-table-head lg:hidden">Comments</span>
+                                    <span class="sui-table-cell">
                                         {{ $post->approved_comments_count }}
                                     </span>
                                 </div>
 
                                 {{-- Updated + actions --}}
                                 <div class="flex items-center justify-between gap-2 lg:justify-end">
-                                    <time class="font-mono text-2xs text-ink-400 dark:text-ink-500" datetime="{{ $post->updated_at->toIso8601String() }}">
+                                    <time class="text-2xs text-ink-500" datetime="{{ $post->updated_at->toIso8601String() }}">
                                         {{ $post->updated_at->diffForHumans(short: true) }}
                                     </time>
                                 </div>
                             </div>
 
                             {{-- Row actions --}}
-                            <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3 lg:mt-3 dark:border-ink-800">
+                            <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-sui-hairline pt-3">
                                 <flux:button variant="ghost" size="xs" :href="route('dashboard.posts.edit', $post)" icon="pencil-square" wire:navigate>
                                     Edit
                                 </flux:button>
@@ -406,7 +405,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
                                         href="{{ route('blog.show', $post) }}"
                                         target="_blank"
                                         rel="noopener"
-                                        class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+                                        class="sui-action !px-2.5 !py-1.5 !text-xs"
                                     >
                                         <flux:icon name="arrow-top-right-on-square" class="size-3.5" />
                                         View
@@ -429,14 +428,14 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
 
                                 <div class="ml-auto flex items-center gap-2">
                                     <template x-if="! confirmingDelete">
-                                        <flux:button variant="ghost" size="xs" x-on:click="confirmingDelete = true" icon="trash" class="!text-red-600 dark:!text-red-400">
+                                        <flux:button variant="ghost" size="xs" x-on:click="confirmingDelete = true" icon="trash" class="!text-sui-danger">
                                             Delete
                                         </flux:button>
                                     </template>
 
                                     <template x-if="confirmingDelete">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-mono text-2xs text-red-600 dark:text-red-400">Delete permanently?</span>
+                                            <span class="text-2xs text-sui-danger">Delete permanently?</span>
                                             <flux:button variant="danger" size="xs" wire:click="delete({{ $post->id }})" wire:loading.attr="disabled">
                                                 Confirm
                                             </flux:button>
@@ -453,6 +452,6 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
             @endif
         </div>
 
-        <x-pagination :paginator="$this->posts" label="Posts pagination" class="mt-6" />
-    </div>
+        <x-app.ui.pagination :paginator="$this->posts" label="Posts pagination" />
+    </x-app.ui.body>
 </div>

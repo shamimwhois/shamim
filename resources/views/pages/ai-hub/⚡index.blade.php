@@ -15,14 +15,14 @@ use Livewire\Component;
  * enrolled readers will need its own permission additions rather than reusing
  * the publishing set.
  */
-new #[Layout('layouts::dashboard')] #[Title('AI Knowledge Hub')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('AI Knowledge Hub')] class extends Component
 {
     //
 };
 ?>
 
 <div>
-    <x-module-placeholder
+    <x-app.ui.module-placeholder
         :title="__('AI Knowledge Hub')"
         :description="__('A structured knowledge base for AI concepts and practice, with published packages alongside it.')"
         icon="sparkles"

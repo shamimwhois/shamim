@@ -25,6 +25,7 @@ Versions below are the versions actually installed in this repository, verified 
 | UI components | Flux UI | 2.13+ | Free edition. Provides accessible primitives (modal, dropdown, field, toast, navbar) that would otherwise be reimplemented badly. |
 | Auth | Laravel Fortify | 1.37+ | Headless auth: registration, login, password reset, email verification, two-factor, passkey. Views are supplied by this application, not the package. |
 | Passkeys | `laravel/fortify` passkey support | — | WebAuthn login and registration, already wired through `PasskeyAuthenticatable`. |
+| AI | `laravel/ai` | 1.2+ | Official first-party AI SDK. Agents, structured output, provider abstraction, and a `fake()` harness for tests. See §1.5. |
 | Admin scaffolding | `laravel/chisel` | 0.1+ | Project scaffolding helper; not used at runtime by product features. |
 | Dev tooling | Pint, Larastan/PHPStan, Pest 5, Pail, Boost | see `composer.json` | Formatting, static analysis, testing, log tailing, framework-aware tooling. |
 
@@ -60,6 +61,34 @@ Versions below are the versions actually installed in this repository, verified 
 | Vue/React | Frontend | Livewire + Alpine already covers every interaction in the PRD. A second rendering model would double the surface for no user-visible gain. |
 
 **Rule:** the dependency set is frozen. Any addition requires approval, as stated in `AGENTS.md`.
+
+### 1.5 AI provider
+
+The editor's AI features are built on **`laravel/ai`**, the official Laravel SDK,
+rather than a hand-rolled wrapper over a vendor HTTP client. The SDK supplies
+three things that would otherwise be reimplemented: a provider abstraction with
+17 drivers, structured output enforced by a JSON schema, and a first-class test
+harness (`Ai::fakeAgent()`, `Ai::fakeImages()`).
+
+**Configuration lives in `config/ai.php` plus one `editor` block.** The block
+adds `text_provider`, `text_model`, `image_provider`, `image_model`,
+`images_enabled`, `max_tokens` and `timeout`, each read from an `AI_EDITOR_*`
+environment variable. A model name of `null` means "the provider's own default",
+which is deliberate: hardcoding `gpt-4o-mini` would make a DeepSeek or Ollama
+deployment fail at request time with a confusing upstream error.
+
+**No key is a supported state.** A fresh checkout has no provider key. That must
+not be a 500, so `EditorAiService::isConfigured()` gates every operation,
+`GET /editor/ai/capabilities` reports `configured: false`, and the editor hides
+its AI rows rather than rendering buttons that fail. Ollama and
+`openai-compatible` are treated as valid with only a `url` set — neither takes a
+key — which makes a zero-cost local setup a two-line `.env` change.
+
+**Prompt text is treated as code.** The instructions an agent receives are
+asserted in tests, because a prompt is the only part of this feature that cannot
+be type-checked. Two defects were caught that way: a `{MAX_SUGGESTIONS}`
+placeholder that a heredoc rendered as literal text, and a category filter that
+the instruction body then contradicted by listing every category anyway.
 
 ---
 
@@ -111,7 +140,7 @@ The application follows the layering already present in this codebase. New code 
 
 **Existing conventions this project already established and that new code must follow:**
 
-1. **Livewire component format is single-file (SFC)** in `resources/views/pages/` (full-page, registered with `Route::livewire()`) and `resources/views/components/` (reusable), with the ⚡ filename prefix. Class-based components are **not** used. An SFC opens with `<?php ... new class extends Component { ... }; ?>` followed by the Blade template. `config/livewire.php` declares the `pages::` and `layouts::` namespaces and adds `views/components` to `component_locations`, so a component in that directory is referenced as `<livewire:module-placeholder />` with **no** namespace prefix.
+1. **Livewire component format is single-file (SFC)** in `resources/views/pages/`, with the ⚡ filename prefix. Class-based components are **not** used. An SFC opens with `<?php ... new class extends Component { ... }; ?>` followed by the Blade template. Reusable Blade components live in `resources/views/components/app/**` as anonymous components addressed with `<x-app.*>` tags. `config/livewire.php` declares the `pages::` and `layouts::` namespaces and adds `views/components` to `component_locations`, so a component placed at the top level of that directory resolves with no namespace prefix at all.
 2. **Multi-step domain operations live in Action classes** under `app/Actions/**`, invoked through a public `handle()` method, with dependencies constructor-injected and resolved by the container. See `app/Actions/Posts/UpdatePost.php`.
 3. **Authorization uses Gates/Policies**, checked with `Gate::authorize()` at the top of the action that mutates state. Two policies exist: `PostPolicy` and `UserPolicy`.
 4. **Models declare configuration with PHP attributes**: `#[Fillable([...])]` and `#[Hidden([...])]`, with casts in a `casts()` method. Do not add `protected $fillable` properties.
@@ -216,7 +245,7 @@ The rendered HTML is produced from a sanitised pipeline and treated as trusted *
 
 > **Revised.** The original draft had a single dashboard reached at `⚡dashboard.blade.php`. There are now three dashboards, one shell, and one navigation map, each role owning a top-level URL space.
 
-**One shell, three homes.** `layouts/dashboard.blade.php` renders the chrome — sidebar, top bar, user menu, flash region — and each dashboard page opts in with `#[Layout('layouts::dashboard')]`. That attribute is not optional: `config/livewire.php` sets `component_layout => 'layouts::public'`, so **every SFC defaults to the public shell** and a dashboard page that forgets the attribute renders inside the blog chrome, with a public header and footer around it. This is the single most common mistake in this area of the codebase.
+**One shell, three homes.** `components/app/ui/dashboard-shell.blade.php` renders the chrome — rail, mobile drawer, top bar, flash region — and the three workspace layouts (`layouts::app.dashboard`, `layouts::seller.dashboard`, `layouts::admin.dashboard`) each compose it with their role's own chrome components. Each dashboard page opts in with `#[Layout('layouts::<audience>.dashboard')]`. That attribute is not optional: `config/livewire.php` sets `component_layout => 'layouts::guest.home'`, so **every SFC defaults to the public shell** and a dashboard page that forgets the attribute renders inside the blog chrome, with a public header and footer around it. This is the single most common mistake in this area of the codebase.
 
 **Roles decide the home, permissions decide the menu.** Each role home is a top-level path whose first segment names the surface — no role dashboard is nested inside another's:
 
@@ -444,34 +473,36 @@ resources/
 ├── js/
 │   └── app.js                         (existing)
 └── views/
-    ├── components/                    modal shell + modal/{actions,trigger},
-    │                                  auth-header, auth-session-status, comment,
-    │                                  empty-state, module-placeholder, pagination,
-    │                                  placeholder-pattern, post-card, section-marker,
-    │                                  share-icon, tag-pill, app-logo,
-    │                                  dashboard/*, post/*, site/*, …
-    ├── layouts/                       Three top-level shells — public.blade.php,
-    │                                  dashboard.blade.php, and auth.blade.php
-    │                                  delegating to auth/split.blade.php
+    ├── components/
+    │   └── app/                       every component, namespaced under app/
+    │       ├── home/                  guest chrome — header, footer
+    │       ├── ui/                    shared primitives: header, body, section,
+    │       │                          stat, nav, modal/{actions,trigger},
+    │       │                          auth/*, post/*, editor/rich-text,
+    │       │                          dashboard-shell, rail-footer, topbar, …
+    │       ├── icon/                  logo-mark, share
+    │       └── user|seller|admin/     each role's header, footer, sidebar
+    ├── layouts/                       guest/home (the default), auth + auth/split,
+    │                                  app/dashboard, seller/dashboard,
+    │                                  admin/dashboard
     ├── pages/
     │   ├── auth/                      login, register, forgot-password,
     │   │                              reset-password, confirm-password,
     │   │                              two-factor-challenge, verify-email
     │   ├── blog/                      ⚡index, ⚡show
-    │   ├── dashboard/                 ⚡index, ⚡comments, ⚡taxonomy, posts/(⚡index, ⚡edit)
-    │   ├── admin/                     ⚡dashboard, ⚡users
+    │   ├── dashboard/                 ⚡index, ⚡comments, ⚡taxonomy, posts/(⚡index, ⚡edit)    │   ├── admin/                     ⚡dashboard, ⚡users
     │   ├── seller/                    ⚡dashboard
     │   ├── dev-lab/                   ⚡index (placeholder)
     │   ├── ai-hub/                    ⚡index (placeholder)
     │   ├── marketplace/               ⚡index (placeholder)
     │   ├── ideas/                     ⚡index (placeholder)
-    │   ├── settings/                  (existing) layout.blade.php, two-factor/,
+    │   ├── settings/                  layout.blade.php, two-factor/,
     │   │                              ⚡profile, ⚡security, ⚡appearance,
     │   │                              ⚡delete-user-form, ⚡delete-user-modal,
     │   │                              ⚡two-factor-setup-modal
     │   ├── ⚡about.blade.php
     │   └── ⚡home.blade.php
-    └── partials/                      head, settings-heading
+    └── partials/                      head
 
 routes/
 ├── console.php                        (existing)
@@ -483,6 +514,7 @@ tests/
 │   ├── Auth/                          AuthLayoutTest
 │   ├── Blog/                          index, detail, filter, comment, sharing
 │   ├── Dashboard/                     post management, moderation, taxonomy
+│   ├── Editor/                        AI endpoints, correction placement
 │   ├── Enums/                         PermissionModelTest
 │   └── Routing/                       RoutingStructureTest
 └── Unit/                              Support/*
@@ -495,9 +527,9 @@ tests/
 | Artifact | Convention | Example |
 | --- | --- | --- |
 | Livewire page component | `resources/views/pages/<area>/⚡<name>.blade.php`, registered via `Route::livewire('uri', 'pages::<area>.<name>')` | `pages/blog/⚡index.blade.php` → `'pages::blog.index'` |
-| Livewire UI component | `resources/views/components/⚡<name>.blade.php`, referenced **without** a namespace prefix | `components/module-placeholder.blade.php` → `<x-module-placeholder />` |
-| Blade partial / component | kebab-case, referenced with `<x-...>` | `<x-post-card :post="$post" />` |
-| Layout | `layouts/<name>.blade.php`, or `layouts/<family>/<variant>.blade.php` | `layouts/dashboard.blade.php`, `layouts/auth/split.blade.php` |
+| Livewire UI component | `resources/views/components/app/**/⚡<name>.blade.php` | none in this project — reusable UI is anonymous Blade, addressed `<x-app.ui.*>` |
+| Blade component | kebab-case under `components/app/<audience>/`, referenced with `<x-app.<audience>.<name>>` | `components/app/ui/post/card.blade.php` → `<x-app.ui.post.card :post="$post" />` |
+| Layout | `layouts/<audience>/<variant>.blade.php` | `layouts/app/dashboard.blade.php`, `layouts/auth/split.blade.php` |
 | Action | verb + noun, `handle()` entry point | `App\Actions\Posts\PublishPost` |
 | Enum | singular noun, TitleCase cases, behaviour on the enum | `App\Enums\PostStatus::Published` |
 | Support class | noun describing the computation | `App\Support\MarkdownRenderer` |
@@ -692,11 +724,11 @@ Every PRD requirement mapped to the code that realises it and the test that pins
 | FR-3.1–3.10 | `MarkdownRenderer`, `pages/blog/⚡show.blade.php`, related-post query | `tests/Feature/Blog/PostDetailTest.php` |
 | FR-4.x | Fortify + `pages/dashboard/*`, `Actions/Posts/*`, `PostPolicy` | `tests/Feature/Dashboard/*` |
 | FR-4.1a / 4.1b | `AccountRole`, `AccountPermission`, `HasAccountRole`, `UserPolicy` | `tests/Feature/Enums/PermissionModelTest.php` |
-| FR-4.2a–4.2c | `layout('layouts::dashboard')`, `DashboardNavigation`, role-scoped sidebars | `PermissionModelTest`, dashboard feature tests |
+| FR-4.2a–4.2c | `layout('layouts::{app,seller,admin}.dashboard')`, `DashboardNavigation`, `components/app/ui/dashboard-shell.blade.php`, role-scoped sidebars | `PermissionModelTest`, `ShellTest`, dashboard feature tests |
 | FR-4.4a | `AccountRole::dashboardRoute()` consumed by every Fortify response | `tests/Feature/Auth/*` |
 | FR-4.11a | `EnsureAccountPermission` route middleware + declared nav permissions | `PermissionModelTest` (composition, not size) |
-| FR-5.x | `components/post/share-bar.blade.php`, `Support\Seo` | `tests/Feature/Blog/SharingTest.php` |
-| FR-6.x | `resources/css/app.css` tokens, `layouts/public.blade.php` | Manual audit + Lighthouse |
+| FR-5.x | `components/app/ui/post/share-bar.blade.php`, `Support\Seo` | `tests/Feature/Blog/SharingTest.php` |
+| FR-6.x | `resources/css/app.css` tokens, `layouts/guest/home.blade.php` | Manual audit + Lighthouse |
 | NFR-4 | Semantic landmarks, focus management, contrast tokens | axe-core manual run |
 | NFR-7 | Portable Eloquent; no raw SQL | Code review |
 | NFR-11 | Auth layout token-driven, no forced scheme | `tests/Feature/Auth/AuthLayoutTest.php` |
@@ -717,7 +749,7 @@ A traceability matrix that only lists successes is a marketing document. These a
 
 ### 7.2 Deferred by decision, not by omission
 
-The following four product modules are specified in their own documents and are **not** part of the delivered system. Each has a real route rendering a permission-guarded placeholder page (via `resources/views/components/module-placeholder.blade.php`, which states the module is not yet available and lists what is planned), its own `AccountPermission`, and its own `DashboardNavigation` entry. They are deferred rather than omitted because their routes, permissions, and navigation were designed once, coherently, instead of being grown one feature at a time.
+The following four product modules are specified in their own documents and are **not** part of the delivered system. Each has a real route rendering a permission-guarded placeholder page (via `resources/views/components/app/ui/module-placeholder.blade.php`, which states the module is not yet available and lists what is planned), its own `AccountPermission`, and its own `DashboardNavigation` entry. They are deferred rather than omitted because their routes, permissions, and navigation were designed once, coherently, instead of being grown one feature at a time.
 
 | Module | Path | Route name | Permission | Spec | Deferred because |
 | --- | --- | --- | --- | --- | --- |

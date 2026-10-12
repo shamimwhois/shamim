@@ -16,14 +16,14 @@ use Livewire\Component;
  * does not currently provide, so the runner is an open question rather than a
  * settled requirement.
  */
-new #[Layout('layouts::dashboard')] #[Title('Developer Lab')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Developer Lab')] class extends Component
 {
     //
 };
 ?>
 
 <div>
-    <x-module-placeholder
+    <x-app.ui.module-placeholder
         :title="__('Developer Lab')"
         :description="__('A browser-based environment to write, run, inspect and debug code, with practice challenges and saved work.')"
         icon="beaker"

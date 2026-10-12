@@ -12,6 +12,10 @@
      * it, and a visitor who moves through four of them in ninety seconds
      * should never see the frame shift.
      *
+     * It is reached through `layouts::auth`, a one-line entry point that
+     * resolves here. The indirection means switching the authentication design
+     * is a change to that file alone, and no page has to know the split exists.
+     *
      * Two things were wrong with the layout this replaces, and both are worth
      * naming because they were not cosmetic:
      *
@@ -29,6 +33,10 @@
      * The panel is `lg:` only. On a phone there is no room for a second
      * column and no reason to make someone scroll past a manifesto to reach a
      * password field, so the split collapses to a centred card.
+     *
+     * This is a *public* surface, so it uses the public `ink-*`/`signal-*`
+     * palette and carries no `data-sui` scope, exactly like
+     * `layouts::guest.home`.
      */
 @endphp
 
@@ -51,7 +59,7 @@
              --}}
             <aside class="relative hidden overflow-hidden border-e border-ink-200 bg-ink-50 lg:flex lg:flex-col dark:border-ink-800 dark:bg-ink-900">
                 {{-- Grid texture: the same 8px lattice used behind the portfolio hero. --}}
-                <x-placeholder-pattern
+                <x-app.ui.placeholder-pattern
                     class="pointer-events-none absolute inset-0 size-full stroke-ink-300/40 dark:stroke-ink-700/40"
                     aria-hidden="true"
                 />
@@ -64,12 +72,12 @@
 
                 <div class="relative z-10 flex h-full flex-col justify-between p-10 xl:p-14">
                     <a href="{{ route('home') }}" class="group inline-flex items-center gap-3" wire:navigate>
-                        <x-app-logo-icon class="size-7 fill-current text-ink-900 transition-colors group-hover:text-signal-600 dark:text-ink-50 dark:group-hover:text-signal-400" />
+                        <x-app.ui.app-logo-icon class="size-7 fill-current text-ink-900 transition-colors group-hover:text-signal-600 dark:text-ink-50 dark:group-hover:text-signal-400" />
                         <span class="font-medium tracking-tight">{{ config('app.name') }}</span>
                     </a>
 
                     <div class="max-w-md space-y-6">
-                        <x-section-marker number="01" :label="__('Account')" accent />
+                        <x-app.ui.section-marker number="01" :label="__('Account')" accent />
 
                         <flux:heading size="3xl" class="text-balance tracking-tighter">
                             {{ __('Sign in to your workspace.') }}
@@ -83,7 +91,7 @@
                             @foreach ([
                                 __('Role-scoped dashboard — reader, seller or administrator'),
                                 __('Two-factor authentication and passkey sign-in'),
-                                __('Team workspaces with per-member permissions'),
+                                __('Granular permissions — moderation, taxonomy and platform settings'),
                             ] as $capability)
                                 <li class="flex items-start gap-3">
                                     <flux:icon.check-circle class="mt-0.5 size-4 shrink-0 text-signal-600 dark:text-signal-400" />
@@ -110,7 +118,7 @@
                         class="flex items-center justify-center gap-3 lg:hidden"
                         wire:navigate
                     >
-                        <x-app-logo-icon class="size-7 fill-current text-ink-900 dark:text-ink-50" />
+                        <x-app.ui.app-logo-icon class="size-7 fill-current text-ink-900 dark:text-ink-50" />
                         <span class="font-medium tracking-tight">{{ config('app.name') }}</span>
                     </a>
 

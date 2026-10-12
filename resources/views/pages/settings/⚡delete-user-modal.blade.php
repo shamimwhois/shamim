@@ -25,7 +25,7 @@ new class extends Component {
     }
 }; ?>
 
-<x-modal
+<x-app.ui.modal
     name="confirm-user-deletion"
     title="{{ __('Delete your account?') }}"
     :description="__('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm.')"
@@ -35,7 +35,7 @@ new class extends Component {
     <form method="POST" wire:submit="deleteUser" class="space-y-6">
         <flux:input wire:model="password" :label="__('Password')" type="password" viewable />
 
-        <x-modal.actions danger :submit="__('Delete account')">
+        <x-app.ui.modal.actions danger :submit="__('Delete account')">
             <flux:modal.close>
                 <flux:button variant="filled" class="w-full sm:w-auto">{{ __('Cancel') }}</flux:button>
             </flux:modal.close>
@@ -48,6 +48,6 @@ new class extends Component {
             >
                 {{ __('Delete account') }}
             </flux:button>
-        </x-modal.actions>
+        </x-app.ui.modal.actions>
     </form>
-</x-modal>
+</x-app.ui.modal>

@@ -1,12 +1,12 @@
 <x-layouts::auth :title="__('Email verification')">
     <div class="flex flex-col gap-6">
-        <x-auth-header
+        <x-app.ui.auth.header
             :eyebrow="__('Verification')"
             :title="__('Verify your email')"
             :description="__('We sent a verification link to :email.', ['email' => auth()->user()?->email ?? __('your inbox')])"
         />
 
-        <x-auth-session-status class="text-center" :status="session('status')" />
+        <x-app.ui.auth.session-status class="text-center" :status="session('status')" />
 
         <flux:text class="text-center text-pretty">
             {{ __('Click the link in that email to activate your account. If it has not arrived within a few minutes, check your spam folder or send another.') }}

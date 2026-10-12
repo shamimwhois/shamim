@@ -23,7 +23,7 @@ use Livewire\Component;
  *   - A category in use cannot be deleted; its posts are reassigned first.
  *   - A tag in use can be deleted; the pivot rows cascade and posts survive.
  */
-new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Taxonomy')] class extends Component
 {
     use HasSlug;
 
@@ -286,111 +286,110 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
 }; ?>
 
 <div>
-    <x-dashboard.header
+    <x-app.ui.header
         eyebrow="Content"
         title="Taxonomy"
         description="Categories are broad topics a reader browses; tags are specifics they search. A post has one category and any number of tags."
+        :breadcrumbs="[['label' => __('Content')], ['label' => __('Taxonomy')]]"
     />
 
-    <div class="grid gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:px-10">
+    <div class="grid gap-6 px-5 py-8 sm:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:px-10">
         {{-- ============================================================= --
          | Categories
          --}}
-        <section aria-labelledby="categories-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-            <div class="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                <h2 id="categories-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+        <section aria-labelledby="categories-heading" class="sui-card overflow-hidden">
+            <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
+                <h2 id="categories-heading" class="text-sm font-semibold tracking-tight text-ink-900">
                     Categories
                 </h2>
-                <span class="font-mono text-2xs text-ink-400 dark:text-ink-500">
+                <span class="text-2xs text-ink-500">
                     {{ $this->categories->count() }} total
                 </span>
             </div>
 
             {{-- Form --}}
-            <div class="border-b border-ink-200 bg-ink-50/50 p-5 dark:border-ink-800 dark:bg-ink-950/40">
-                <div class="space-y-3">
-                    <div>
-                        <label for="category-name" class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                            {{ $this->isEditingCategory ? 'Rename category' : 'New category' }}
-                        </label>
-                        <input
-                            id="category-name"
-                            type="text"
-                            wire:model="categoryName"
-                            wire:keydown.enter.prevent="saveCategory"
-                            placeholder="Architecture"
-                            autocomplete="off"
-                            class="mt-2 w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 dark:placeholder:text-ink-600"
-                        />
-                        @error('categoryName')
-                            <p class="mt-1.5 font-mono text-2xs text-red-600 dark:text-red-400">{{ $message }}</p>
-                        @enderror
-                    </div>
+            <div class="space-y-3 border-b border-sui-hairline bg-sui-accent-softer p-5">
+                <div>
+                    <label for="category-name" class="sui-control-label">
+                        {{ $this->isEditingCategory ? 'Rename category' : 'New category' }}
+                    </label>
+                    <input
+                        id="category-name"
+                        type="text"
+                        wire:model="categoryName"
+                        wire:keydown.enter.prevent="saveCategory"
+                        placeholder="Architecture"
+                        autocomplete="off"
+                        class="sui-control mt-2 w-full"
+                    />
+                    @error('categoryName')
+                        <p class="mt-1.5 text-xs leading-normal text-sui-danger">{{ $message }}</p>
+                    @enderror
+                </div>
 
-                    <div>
-                        <label for="category-description" class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                            Description
-                        </label>
-                        <textarea
-                            id="category-description"
-                            wire:model="categoryDescription"
-                            rows="2"
-                            placeholder="Shown on the blog index when this category is filtered."
-                            class="mt-2 w-full resize-y rounded-md border border-ink-200 bg-white px-3 py-2 text-xs leading-relaxed text-ink-800 placeholder:text-ink-400 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-200 dark:placeholder:text-ink-600"
-                        ></textarea>
-                        @error('categoryDescription')
-                            <p class="mt-1.5 font-mono text-2xs text-red-600 dark:text-red-400">{{ $message }}</p>
-                        @enderror
-                    </div>
+                <div>
+                    <label for="category-description" class="sui-control-label">
+                        Description
+                    </label>
+                    <textarea
+                        id="category-description"
+                        wire:model="categoryDescription"
+                        rows="2"
+                        placeholder="Shown on the blog index when this category is filtered."
+                        class="sui-control mt-2 w-full resize-y text-xs leading-normal"
+                    ></textarea>
+                    @error('categoryDescription')
+                        <p class="mt-1.5 text-xs leading-normal text-sui-danger">{{ $message }}</p>
+                    @enderror
+                </div>
 
-                    <div>
-                        <span class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                            Accent
-                        </span>
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            @foreach ($this->palette() as $colour)
-                                <button
-                                    type="button"
-                                    wire:click="$set('categoryColor', '{{ $colour['value'] }}')"
-                                    @class([
-                                        'rounded-xs border px-2.5 py-1 font-mono text-2xs transition-colors',
-                                        'border-signal-400 bg-signal-50 text-signal-700 dark:border-signal-600 dark:bg-signal-950 dark:text-signal-300' => $categoryColor === $colour['value'],
-                                        'border-ink-200 text-ink-500 hover:border-ink-300 dark:border-ink-700 dark:text-ink-400' => $categoryColor !== $colour['value'],
-                                    ])
-                                >
-                                    {{ $colour['label'] }}
-                                </button>
-                            @endforeach
-                        </div>
+                <div>
+                    <span class="sui-control-label">
+                        Accent
+                    </span>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        @foreach ($this->palette() as $colour)
+                            <button
+                                type="button"
+                                wire:click="$set('categoryColor', '{{ $colour['value'] }}')"
+                                @class([
+                                    'sui-focus rounded-full border px-2.5 py-1 text-xs font-medium transition duration-150 ease-soft',
+                                    'border-sui-accent/30 bg-sui-accent-soft text-sui-accent-ink' => $categoryColor === $colour['value'],
+                                    'border-sui-hairline text-ink-500 hover:bg-sui-hover hover:text-sui-ink' => $categoryColor !== $colour['value'],
+                                ])
+                            >
+                                {{ $colour['label'] }}
+                            </button>
+                        @endforeach
                     </div>
+                </div>
 
-                    <div class="flex items-center gap-2 pt-1">
-                        <flux:button variant="primary" size="sm" wire:click="saveCategory" wire:loading.attr="disabled" icon="check">
-                            {{ $this->isEditingCategory ? 'Save changes' : 'Create category' }}
+                <div class="flex items-center gap-2 pt-1">
+                    <flux:button variant="primary" size="sm" wire:click="saveCategory" wire:loading.attr="disabled" icon="check">
+                        {{ $this->isEditingCategory ? 'Save changes' : 'Create category' }}
+                    </flux:button>
+
+                    @if ($this->isEditingCategory)
+                        <flux:button variant="ghost" size="sm" wire:click="resetCategoryForm">
+                            Cancel
                         </flux:button>
-
-                        @if ($this->isEditingCategory)
-                            <flux:button variant="ghost" size="sm" wire:click="resetCategoryForm">
-                                Cancel
-                            </flux:button>
-                        @endif
-                    </div>
+                    @endif
                 </div>
             </div>
 
             {{-- List --}}
             @if ($this->categories->isEmpty())
-                <div class="px-5 py-12 text-center">
-                    <p class="text-sm text-ink-500 dark:text-ink-400">No categories yet.</p>
+                <div class="sui-empty">
+                    <p class="text-sm text-ink-500">No categories yet.</p>
                 </div>
             @else
-                <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                <ul class="divide-y divide-sui-hairline">
                     @foreach ($this->categories as $category)
                         <li
                             wire:key="category-{{ $category->id }}"
                             @class([
-                                'group flex items-start gap-4 px-5 py-4 transition-colors',
-                                'bg-signal-50/40 dark:bg-signal-950/20' => $editingCategoryId === $category->id,
+                                'group flex items-start gap-4 px-5 py-4 transition duration-150 ease-soft',
+                                'bg-sui-accent-softer' => $editingCategoryId === $category->id,
                             ])
                         >
                             {{-- Colour swatch --}}
@@ -403,21 +402,23 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
                                     'bg-rose-500' => $category->color === 'rose',
                                     'bg-amber-500' => $category->color === 'amber',
                                     'bg-lime-500' => $category->color === 'lime',
-                                    'bg-ink-300 dark:bg-ink-600' => blank($category->color),
+                                    /* No colour chosen — the swatch reads as an
+                                       empty slot, so it takes the neutral border. */
+                                    'bg-sui-border' => blank($category->color),
                                 ])
                                 aria-hidden="true"
                             ></span>
 
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-ink-900 dark:text-ink-50">
+                                <p class="text-sm font-medium text-ink-900">
                                     {{ $category->name }}
                                 </p>
-                                <p class="mt-0.5 font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                <p class="mt-0.5 text-2xs text-ink-500">
                                     /{{ $category->slug }} · {{ $category->posts_count }} {{ Str::plural('post', $category->posts_count) }}
                                 </p>
 
                                 @if ($category->description)
-                                    <p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-ink-500 dark:text-ink-400">
+                                    <p class="mt-1.5 line-clamp-2 text-xs leading-normal text-ink-500">
                                         {{ $category->description }}
                                     </p>
                                 @endif
@@ -439,7 +440,7 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
                                         size="xs"
                                         x-on:click="confirming = true"
                                         icon="trash"
-                                        class="!text-red-600 dark:!text-red-400"
+                                        class="!text-sui-danger"
                                     >
                                         <span class="sr-only">Delete {{ $category->name }}</span>
                                     </flux:button>
@@ -470,19 +471,19 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
         {{-- ============================================================= --
          | Tags
          --}}
-        <section aria-labelledby="tags-heading" class="rounded-lg border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-            <div class="flex items-center justify-between gap-4 border-b border-ink-200 px-5 py-4 dark:border-ink-800">
-                <h2 id="tags-heading" class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+        <section aria-labelledby="tags-heading" class="sui-card overflow-hidden">
+            <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
+                <h2 id="tags-heading" class="text-sm font-semibold tracking-tight text-ink-900">
                     Tags
                 </h2>
-                <span class="font-mono text-2xs text-ink-400 dark:text-ink-500">
+                <span class="text-2xs text-ink-500">
                     {{ $this->tags->count() }} total
                 </span>
             </div>
 
             {{-- Bulk create --}}
-            <div class="border-b border-ink-200 bg-ink-50/50 p-5 dark:border-ink-800 dark:bg-ink-950/40">
-                <label for="tag-names" class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+            <div class="border-b border-sui-hairline bg-sui-accent-softer p-5">
+                <label for="tag-names" class="sui-control-label">
                     Add tags
                 </label>
 
@@ -491,18 +492,18 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
                     wire:model="tagNames"
                     rows="2"
                     placeholder="One per line, or comma separated: caching, queues, redis"
-                    class="mt-2 w-full resize-y rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 dark:placeholder:text-ink-600"
+                    class="sui-control mt-2 w-full resize-y"
                 ></textarea>
 
                 @error('tagNames')
-                    <p class="mt-1.5 font-mono text-2xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    <p class="mt-1.5 text-xs leading-normal text-sui-danger">{{ $message }}</p>
                 @enderror
 
-                <div class="mt-3 flex items-center gap-3">
+                <div class="mt-3 flex flex-wrap items-center gap-3">
                     <flux:button variant="primary" size="sm" wire:click="createTags" wire:loading.attr="disabled" icon="plus">
                         Add tags
                     </flux:button>
-                    <span class="font-mono text-2xs text-ink-400 dark:text-ink-500">
+                    <span class="text-2xs text-ink-500">
                         Existing tags are skipped, not duplicated.
                     </span>
                 </div>
@@ -510,13 +511,13 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
 
             {{-- List --}}
             @if ($this->tags->isEmpty())
-                <div class="px-5 py-12 text-center">
-                    <p class="text-sm text-ink-500 dark:text-ink-400">No tags yet.</p>
+                <div class="sui-empty">
+                    <p class="text-sm text-ink-500">No tags yet.</p>
                 </div>
             @else
-                <ul class="divide-y divide-ink-200 dark:divide-ink-800">
+                <ul class="divide-y divide-sui-hairline">
                     @foreach ($this->tags as $tag)
-                        <li wire:key="tag-{{ $tag->id }}" class="flex items-center gap-4 px-5 py-3">
+                        <li wire:key="tag-{{ $tag->id }}" class="sui-row flex items-center gap-4">
                             <a
                                 href="{{ route('blog.index', ['tag' => $tag->slug]) }}"
                                 target="_blank"
@@ -528,15 +529,15 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
 
                             {{-- Usage bar: visual weight proportional to use --}}
                             <div class="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
-                                <div class="h-1 flex-1 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
+                                <div class="h-1 flex-1 overflow-hidden rounded-full bg-sui-hover">
                                     <div
-                                        class="h-full rounded-full bg-signal-400 dark:bg-signal-600"
+                                        class="h-full rounded-full bg-sui-accent"
                                         style="width: {{ $this->tags->max('posts_count') > 0 ? max(4, ($tag->posts_count / $this->tags->max('posts_count')) * 100) : 4 }}%"
                                     ></div>
                                 </div>
                             </div>
 
-                            <span class="shrink-0 font-mono text-2xs tabular-nums text-ink-400 dark:text-ink-500">
+                            <span class="shrink-0 text-2xs tabular-nums text-ink-500">
                                 {{ $tag->posts_count }}
                             </span>
 
@@ -547,7 +548,7 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
                                         size="xs"
                                         x-on:click="confirming = true"
                                         icon="trash"
-                                        class="!text-ink-400 hover:!text-red-600 dark:hover:!text-red-400"
+                                        class="!text-ink-400 hover:!text-sui-danger"
                                     >
                                         <span class="sr-only">Delete {{ $tag->name }}</span>
                                     </flux:button>
@@ -555,7 +556,7 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
 
                                 <template x-if="confirming">
                                     <div class="flex items-center gap-1">
-                                        <span class="font-mono text-2xs text-red-600 dark:text-red-400">Sure?</span>
+                                        <span class="text-2xs text-sui-danger">Sure?</span>
                                         <flux:button
                                             variant="danger"
                                             size="xs"

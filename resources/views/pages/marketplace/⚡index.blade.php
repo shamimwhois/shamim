@@ -16,14 +16,14 @@ use Livewire\Component;
  * Platform unlimited) and `commissionPercent()`. Payments are not integrated,
  * which is the main blocker.
  */
-new #[Layout('layouts::dashboard')] #[Title('Marketplace')] class extends Component
+new #[Layout('layouts::app.dashboard')] #[Title('Marketplace')] class extends Component
 {
     //
 };
 ?>
 
 <div>
-    <x-module-placeholder
+    <x-app.ui.module-placeholder
         :title="__('Developer Marketplace')"
         :description="__('Publish, sell and distribute digital products — free and premium — with licensing and protected downloads.')"
         icon="shopping-bag"

@@ -152,7 +152,7 @@ new class extends Component {
     }
 }; ?>
 
-<x-modal
+<x-app.ui.modal
     name="two-factor-setup-modal"
     :title="$this->modalConfig['title']"
     :description="$this->modalConfig['description']"
@@ -303,4 +303,4 @@ new class extends Component {
             </div>
         </div>
     @endif
-</x-modal>
+</x-app.ui.modal>

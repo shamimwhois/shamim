@@ -1,11 +1,11 @@
 <x-layouts::auth :title="__('Log in')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :eyebrow="__('Sign in')" :title="__('Welcome back')" :description="__('Enter your email and password to continue')" />
+        <x-app.ui.auth.header :eyebrow="__('Sign in')" :title="__('Welcome back')" :description="__('Enter your email and password to continue')" />
 
         <!-- Session Status -->
-        <x-auth-session-status class="text-center" :status="session('status')" />
+        <x-app.ui.auth.session-status class="text-center" :status="session('status')" />
 
-        <x-passkey-verify />
+        <x-app.ui.auth.passkey-verify />
 
         <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
             @csrf

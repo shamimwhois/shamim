@@ -344,7 +344,7 @@ Added with M5. These did not previously have a requirement, which is how the sys
 **US-18 — Have the dashboard shell adapt to my role** *(Must)*
 > As an **account holder of any role**, I want the dashboard chrome to match what I can do, so that I am not shown doors I cannot open.
 
-- One shell (`layouts/dashboard.blade.php`) serves all three roles; each page opts in with `#[Layout('layouts::dashboard')]`.
+- One shell (`components/app/ui/dashboard-shell.blade.php`) serves all three roles, composed by three layouts — `layouts::app.dashboard`, `layouts::seller.dashboard`, `layouts::admin.dashboard` — each page opting in with `#[Layout(...)]`.
 - `DashboardNavigation::for($user)` filters items by permission and drops any section left empty, heading included.
 - The pending-comment badge is scoped to the viewer: comments on their own posts, or all comments if they hold `comment:moderate`. It means "work waiting for *you*".
 - The shell never branches on role directly; it branches on permission. Adding a fourth role is a change to `AccountRole` and its navigation items, and nothing in the shell.
