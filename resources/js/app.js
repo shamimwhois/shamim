@@ -12,6 +12,16 @@
  */
 
 /**
+ * Editor AI client and the rich text editor's Alpine component.
+ *
+ * Imported for their side effects: both attach themselves to `window` so the
+ * Blade component can reference them by name from an `x-data` attribute without
+ * the template having to know how the bundle is split.
+ */
+import './editor-ai.js';
+import './rich-text-editor.js';
+
+/**
  * Reading progress.
  *
  * Writes a 0–1 value into a CSS custom property on the element rather than

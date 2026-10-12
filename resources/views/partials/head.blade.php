@@ -12,6 +12,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+{{--
+    CSRF token for fetch-based requests.
+
+    Livewire injects its own token into its script tag, but the editor's AI
+    calls are plain `fetch()` POSTs, which do not go through Livewire and so
+    need a token they can read. Without this they are rejected with a 419.
+--}}
+<meta name="csrf-token" content="{{ csrf_token() }}" />
+
+
 {{-- ------------------------------------------------------------------ --
  | Title / description
  --}}

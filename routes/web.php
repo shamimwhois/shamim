@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AccountPermission;
+use App\Http\Controllers\Editor\EditorAiController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
@@ -124,6 +125,52 @@ Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseMarke
 Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseIdeas->value])
     ->group(function () {
         Route::livewire('ideas', 'pages::ideas.index')->name('ideas.index');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Editor AI
+|--------------------------------------------------------------------------
+|
+| JSON endpoints behind the rich text editor's AI features. They live under
+| `/editor/ai` rather than inside `/dashboard` because the editor is mounted
+| from the dashboard but is a self-contained widget, and because these are the
+| only JSON endpoints in the app — one namespace makes that obvious at a glance.
+|
+| Every route requires `post:create`: reviewing text, generating drafts and
+| generating images are all authoring operations. The throttle limits are
+| deliberately tight because these endpoints spend real money on every call —
+| the per-minute limit is what stops someone leaning on a keyboard shortcut
+| from emptying an account. Image generation is throttled hardest.
+|
+*/
+
+Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::CreatePost->value])
+    ->prefix('editor/ai')
+    ->name('editor.ai.')
+    ->group(function () {
+        Route::get('capabilities', [EditorAiController::class, 'capabilities'])
+            ->name('capabilities');
+
+        Route::post('preview', [EditorAiController::class, 'preview'])
+            ->middleware('throttle:120,1')
+            ->name('preview');
+
+        Route::post('correct', [EditorAiController::class, 'correct'])
+            ->middleware('throttle:20,1')
+            ->name('correct');
+
+        Route::post('generate', [EditorAiController::class, 'generate'])
+            ->middleware('throttle:10,1')
+            ->name('generate');
+
+        Route::post('image-prompt', [EditorAiController::class, 'imagePrompt'])
+            ->middleware('throttle:15,1')
+            ->name('image-prompt');
+
+        Route::post('image', [EditorAiController::class, 'generateImage'])
+            ->middleware('throttle:5,1')
+            ->name('image');
     });
 
 /*
