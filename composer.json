@@ -21,7 +21,7 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
-        "symfony/maker": "^1.67 | ^2.0.0",
+        "symfony/maker": "^1.67 || ^2.0",
         "larastan/larastan": "^3.9",
         "laravel/boost": "^2.2",
         "laravel/pail": "^1.2.5",
