@@ -153,6 +153,32 @@ function initTableOfContents() {
     );
 
     headings.forEach((heading) => observer.observe(heading));
+
+    // Optional slide-in: a nav element carrying data-toc-reveal stays
+    // off-canvas until the first section has scrolled up past the reading
+    // band, so the hero opens clean and the TOC arrives as reading starts.
+    if (toc.hasAttribute('data-toc-reveal')) {
+        let revealTicking = false;
+
+        const updateReveal = () => {
+            const first = headings[0];
+            const past = ! first || first.getBoundingClientRect().bottom < 96;
+
+            toc.dataset.visible = past ? 'true' : 'false';
+            revealTicking = false;
+        };
+
+        window.addEventListener('scroll', () => {
+            if (revealTicking) {
+                return;
+            }
+
+            revealTicking = true;
+            window.requestAnimationFrame(updateReveal);
+        }, { passive: true });
+
+        updateReveal();
+    }
 }
 
 /**

@@ -709,3 +709,106 @@
 @media (prefers-reduced-motion: reduce) {
     .cta-marquee__track { animation: none; }
 }
+
+/* ------------------------------------------------------------------------ */
+/* Section scrollspy rail — pinned to the viewport's right edge, vertically  */
+/* centred (the reference nav's idiom: icon + label rows, tinted pill on the */
+/* active link, hidden below xl). app.js's [data-toc] observer writes        */
+/* data-active="true" onto the link whose section owns the reading band; the */
+/* rail itself slides in (data-visible) once the hero is scrolled past.      */
+/* Styled here rather than via Tailwind utilities so the reveal state never  */
+/* depends on the JIT picking up an arbitrary variant.                      */
+/* ------------------------------------------------------------------------ */
+
+.about-toc {
+    display: none;
+    position: fixed;
+    top: 50%;
+    right: 1rem;
+    z-index: 30;
+    transform: translate(115%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+@media (min-width: 1280px) {
+    .about-toc {
+        display: block;
+    }
+}
+
+.about-toc[data-visible='true'] {
+    transform: translate(0, -50%);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.about-toc-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.375rem;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.about-toc-link__icon {
+    color: var(--color-ink-400);
+    transition: color 0.2s ease;
+}
+
+.dark .about-toc-link__icon {
+    color: var(--color-ink-500);
+}
+
+.about-toc-link__label {
+    color: var(--color-ink-500);
+    transition: color 0.2s ease;
+}
+
+.dark .about-toc-link__label {
+    color: var(--color-ink-400);
+}
+
+.about-toc-link:hover,
+.about-toc-link:focus-visible {
+    background-color: color-mix(in srgb, var(--color-ink-900) 4%, transparent);
+    outline: none;
+}
+
+.dark .about-toc-link:hover,
+.dark .about-toc-link:focus-visible {
+    background-color: color-mix(in srgb, var(--color-ink-50) 6%, transparent);
+}
+
+.about-toc-link:hover .about-toc-link__icon,
+.about-toc-link:hover .about-toc-link__label,
+.about-toc-link[data-active='true'] .about-toc-link__icon {
+    color: var(--color-signal-600);
+}
+
+.dark .about-toc-link:hover .about-toc-link__icon,
+.dark .about-toc-link:hover .about-toc-link__label,
+.dark .about-toc-link[data-active='true'] .about-toc-link__icon {
+    color: var(--color-signal-400);
+}
+
+.about-toc-link[data-active='true'] {
+    background-color: color-mix(in srgb, var(--color-signal-500) 12%, transparent);
+}
+
+.about-toc-link[data-active='true'] .about-toc-link__label {
+    color: var(--color-ink-900);
+}
+
+.dark .about-toc-link[data-active='true'] .about-toc-link__label {
+    color: var(--color-ink-50);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .about-toc,
+    .about-toc-link,
+    .about-toc-link__icon,
+    .about-toc-link__label { transition: none; }
+}

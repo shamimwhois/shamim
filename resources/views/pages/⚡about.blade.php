@@ -263,13 +263,70 @@ new #[Title('About')] class extends Component
 
 <div>
     {{-- ================================================================== --
+     | 00 — Section nav: the scrollspy rail pinned to the viewport's right
+     |      edge and vertically centred (the reference implementation's
+     |      idiom: icon + label rows, tinted pill on the active link,
+     |      hidden below xl). Each link carries a data-toc-target; app.js's
+     |      existing [data-toc] observer flips data-active / aria-current
+     |      as its section crosses the reading band, and the data-toc-reveal
+     |      hook slides the rail in only once the hero is scrolled past.
+     |      Plain anchors and no rail under JS-less rendering.
+     --}}
+    <nav
+        aria-label="On this page"
+        data-toc
+        data-toc-reveal
+        data-visible="false"
+        class="about-toc"
+    >
+        <ul class="space-y-1">
+            @foreach ([
+                ['id' => 'about-intro', 'label' => 'Intro', 'icon' => 'M3 11.5l9-8 9 8M5.5 10v9.5h13V10'],
+                ['id' => 'about-why', 'label' => 'Why me', 'icon' => 'M12 15a4.5 4.5 0 100-9 4.5 4.5 0 000 9zM8.5 13.5L7 21l5-2.5L17 21l-1.5-7.5'],
+                ['id' => 'about-principles', 'label' => 'How I work', 'icon' => 'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.3 1 2.1h5c0-.8.4-1.6 1-2.1A6 6 0 0012 3z'],
+                ['id' => 'about-capabilities', 'label' => 'Capabilities', 'icon' => 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z'],
+                ['id' => 'about-experience', 'label' => 'Experience', 'icon' => 'M3.5 8.5h17v11h-17zM9 8.5V6a2 2 0 012-2h2a2 2 0 012 2v2.5M3.5 13h17'],
+                ['id' => 'about-work', 'label' => 'Work', 'icon' => 'M3.75 17.5v-11a1.5 1.5 0 011.5-1.5h4l2 2.5h7a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5z'],
+                ['id' => 'about-writing', 'label' => 'Writing', 'icon' => 'M4.5 19.5l.8-3.3 10-10a2 2 0 012.9 2.9l-10 10-3.7.4zM13.5 6.5l2.9 2.9'],
+                ['id' => 'about-contact', 'label' => 'Contact', 'icon' => 'M3.5 6.5h17v11h-17zM3.5 7.5l8.5 6 8.5-6'],
+            ] as $item)
+                <li>
+                    <a
+                        href="#{{ $item['id'] }}"
+                        data-toc-target="{{ $item['id'] }}"
+                        data-active="false"
+                        class="about-toc-link"
+                    >
+                        <svg
+                            aria-hidden="true"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            viewBox="0 0 24 24"
+                            class="about-toc-link__icon size-4 shrink-0"
+                        >
+                            <path d="{{ $item['icon'] }}" />
+                        </svg>
+
+                        <span class="about-toc-link__label text-xs font-medium">
+                            {{ $item['label'] }}
+                        </span>
+                    </a>
+                </li>
+            @endforeach
+        </ul>
+    </nav>
+
+    {{-- ================================================================== --
      | 01 — The short version (hero), modelled on mhabir.dev's opening
      |      panel: status pill, stacked display name, terminal line, bio,
      |      inline anchors, pill CTAs and a full-bleed low-poly portrait.
      |      Renders no section marker — the first numbered marker below
      |      opens the ribcage.
      --}}
-    <section class="relative overflow-hidden border-b border-ink-200 dark:border-ink-800">
+    <section id="about-intro" class="relative scroll-mt-28 overflow-hidden border-b border-ink-200 dark:border-ink-800">
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
 
         {{-- The portraits are shot on a white studio field (≈45-47% of each
@@ -464,7 +521,7 @@ new #[Title('About')] class extends Component
      |      The wrapper owns the band's closing hairline (the component's root
      |      is a `shell` container; every seam on this page is full-bleed).
      --}}
-    <div class="border-b border-ink-200 dark:border-ink-800">
+    <div id="about-why" class="scroll-mt-28 border-b border-ink-200 dark:border-ink-800">
         <x-app.ui.why-hire-me
             :number="2"
             :reasons="$this->reasons()"
@@ -479,7 +536,7 @@ new #[Title('About')] class extends Component
      |      knockout mechanism — but framed as a bordered card instead of
      |      bleeding off the page.
      --}}
-    <section class="relative overflow-hidden py-20 sm:py-24" aria-labelledby="principles-heading">
+    <section id="about-principles" class="relative scroll-mt-28 overflow-hidden py-20 sm:py-24" aria-labelledby="principles-heading">
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
 
         <div class="shell relative">
@@ -607,7 +664,7 @@ new #[Title('About')] class extends Component
      |      (px-5/sm:px-8/lg:px-10). The map panel caps and centres itself
      |      so the `w-full` SVG cannot balloon on wide monitors.
      --}}
-    <section class="border-b border-ink-200 py-20 dark:border-ink-800 md:py-28" aria-labelledby="expertise-heading">
+    <section id="about-capabilities" class="scroll-mt-28 border-b border-ink-200 py-20 dark:border-ink-800 md:py-28" aria-labelledby="expertise-heading">
         <div class="w-full px-5 sm:px-8 lg:px-10">
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
@@ -751,7 +808,7 @@ new #[Title('About')] class extends Component
      |      Data comes from config('portfolio.author.experience') so the
      |      history is edited in one place.
      --}}
-    <section class="border-b border-ink-200 py-20 dark:border-ink-800" aria-labelledby="experience-heading">
+    <section id="about-experience" class="scroll-mt-28 border-b border-ink-200 py-20 dark:border-ink-800" aria-labelledby="experience-heading">
         <div class="shell">
             {{-- Reference header: outlined+filled giant ordinal, wavy rule
                 under the display heading, and a muted lead paragraph. --}}
@@ -868,7 +925,7 @@ new #[Title('About')] class extends Component
      |      chips, ghost product watermark. Each outline draws itself in
      |      on reveal (staggered --frame-delay).
      --}}
-    <section class="border-b border-ink-200 py-20 dark:border-ink-800 md:py-28" aria-labelledby="work-heading">
+    <section id="about-work" class="scroll-mt-28 border-b border-ink-200 py-20 dark:border-ink-800 md:py-28" aria-labelledby="work-heading">
         <div class="shell">
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
@@ -878,7 +935,7 @@ new #[Title('About')] class extends Component
                     </span>
 
                     <div class="inline-block">
-                        <h2 id="work-heading" class="sec-heading text-4xl font-bold leading-none tracking-[-0.025em] text-ink-900 md:text-5xl dark:text-ink-50">
+                        <h2 id="work-heading" class="sec-heading scroll-mt-28 text-4xl font-bold leading-none tracking-[-0.025em] text-ink-900 md:text-5xl dark:text-ink-50">
                             Selected work
                         </h2>
 
@@ -962,7 +1019,7 @@ new #[Title('About')] class extends Component
      |      when there is nothing published.
      --}}
     @if ($this->recentPosts->isNotEmpty())
-        <section class="py-20 md:py-28" aria-labelledby="recent-heading">
+        <section id="about-writing" class="scroll-mt-28 py-20 md:py-28" aria-labelledby="recent-heading">
             <div class="shell">
                 <div class="mb-12 flex flex-wrap items-start justify-between gap-8 md:mb-16" data-reveal>
                     <div>
@@ -1074,7 +1131,7 @@ new #[Title('About')] class extends Component
     {{-- ================================================================== --
      | 08 — Contact
      --}}
-    <section class="border-t border-ink-200 py-20 dark:border-ink-800" aria-labelledby="contact-heading">
+    <section id="about-contact" class="scroll-mt-28 border-t border-ink-200 py-20 dark:border-ink-800" aria-labelledby="contact-heading">
         <div class="shell max-w-3xl">
             <x-app.ui.section-marker :number="8" label="Get in touch" />
             <h2 id="contact-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
