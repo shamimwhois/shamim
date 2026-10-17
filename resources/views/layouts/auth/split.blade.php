@@ -46,6 +46,13 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-white text-ink-800 antialiased dark:bg-ink-950 dark:text-ink-200">
+        {{-- The theme toggle floats clear of both columns: top-right of the
+             viewport is over the form column on every breakpoint, and the
+             form column is the one the visitor is looking at. --}}
+        <div class="fixed right-5 top-5 z-20">
+            <x-app.ui.theme-toggle />
+        </div>
+
         <a
             href="#auth-form"
             class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-ink-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white dark:focus:bg-ink-50 dark:focus:text-ink-900"

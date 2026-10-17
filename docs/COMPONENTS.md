@@ -85,6 +85,85 @@ nothing is.
 
 ---
 
+### `<x-app.ui.why-hire-me>`
+
+A self-contained value-proposition section — "why hire me" — in the site's
+hairline-grid visual language: a marker, a heading, a numbered grid of
+claims and an optional closing CTA. No icons on purpose, so the grid reads as
+a rank ordering rather than a feature wall (that look belongs to the
+Expertise grid further down the About page).
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `number` | `int\|string` | — | Passed to the section marker |
+| `accent` | `bool` | `false` | Accent the marker — the site's convention for a page-opening section |
+| `label` | `string` | `'Why hire me'` | Marker label |
+| `reasons` | `array<int, array{title: string, body: string}>` | `[]` | The value claims |
+| `ctaHref` | `?string` | `null` | Present → mono CTA line renders a link |
+| `ctaLabel` | `string` | `'Get in touch'` | |
+| `headingId` | `string` | `'why-hire-me-heading'` | For `aria-labelledby`; override if two instances share a page |
+
+The copy is a prop, not config: prose belongs next to the page that renders
+it, same stance as the About page's principles. One call site today —
+`pages::about` (section 02, right after the bio).
+
+```blade
+<x-app.ui.why-hire-me :number="2" :reasons="$this->reasons()" :ctaHref="$email['url']" />
+```
+
+---
+
+### `<x-app.ui.expertise-marquee>`
+
+A full-bleed, horizontally scrolling band of the author's expertise domains —one pill per item (icon + mono uppercase label), separated by signal dots,*seamlessly looping via a duplicated track and a CSS translate to -50%*. The
+design copies mhabir.dev's capability strip that opens its page under the*hero; the content and tokens are this site's. Loop mechanics live in`resources/css/about-effects.css`; the component is pure markup.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `items` | `array<int, array{title: string, icon: string, ...}>` | — | Fed from `config('portfolio.author.expertise')` |
+| `anchor` | `string` | `'expertise-heading'` | Every pill links# to this heading id |
+
+Accessibility contract: the second copy of the sequence is `aria-hidden` andits pills carry `tabindex="-1"`, so keyboard users traverse the list exactlyonce; the animation pauses on hover and never runs under reduced motion.
+
+```blade
+<x-app.ui.expertise-marquee :items="$this->profile()->topExpertise()" />
+```
+
+---
+
+### `<x-app.ui.cta-marquee>`
+
+The floor band that closes the about page: an endless leftward drift of theoutlined display phrase *“Let's build something useful ·”*, stroked in the*accent at 35% opacity over a transparent fill — copied 1:1 from mhabir.dev's*footer marquee, including its 20s loop and 72px display size. Like the*expertise marquee, the loop is CSS-only: the track holds the phrase six*times, so a -50% translate lands exactly one phrase-set later and never*shows a seam. Loop and stroke live in `resources/css/about-effects.css`.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `text` | `string` | `"Let's build something useful"` | The repeated phrase |
+| `repeat` | `int` | `6` | Copies in the track; keeps −50% loops seamless on ultrawide screens |
+
+Accessibility contract: the whole band is `aria-hidden` and `select-none` —*pure decoration, no announcement, no tab stops — and the animation never*runs under reduced motion.
+
+```blade
+<x-app.ui.cta-marquee />
+```
+
+---
+
+### `<x-app.ui.stat-band>`
+
+Four centered figures over hairline separators — two columns on phones, fourfrom md up, with the reference band's exact rule topology (third cell swapsits left rule for a top rule when the grid folds). Values render final from*the server; when JS is on, `app.js` counts each numeric figure up once onfirst sight (`data-countup` family of attributes). Single-digit values displayzero-padded (`9` → `09`).
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `stats` | `array<int, array{label: string, value: string}>` | — | Fed from `config('portfolio.author.stats')` |
+
+The component expects exactly the four configured figures — the grid isfixed at four columns, matching `md:grid-cols-4`, not derived from data.
+
+```blade
+<x-app.ui.stat-band :stats="$this->profile()->stats" />
+```
+
+---
+
 ### `<x-app.ui.empty-state>`
 
 The one sanctioned way to render "there is nothing here". Central to the
@@ -361,30 +440,33 @@ This component contains **no permission logic of its own**, and that is its
 entire value. The nav items and the route guards read the same definitions, so
 a menu entry cannot be visible to an account whose route would refuse it.
 
-The navigation is three levels deep — **section → group → item**:
+The navigation data is three levels deep — **section → group → item** — and the
+view renders two:
 
 * a **section** is a labelled band (`Home`, `Writing`, `Workspaces`, `Manage`).
   It is a non-interactive heading and is dropped entirely, heading included, if
   nothing under it survives permission filtering;
-* a **group** is a collapsible cluster with an icon. A group holding exactly one
-  visible item is marked `static` and renders as a plain link with **no**
-  chevron, because a disclosure that expands to reveal a single child is worse
-  than no disclosure at all;
+* a **group** is a labelled cluster with an icon in the *definition*. It draws
+  no heading and no disclosure control of its own: every item renders as a
+  direct neighbour under its section's heading, because a chevron that hides a
+  link behind a click costs a navigation step to reach the thing the sidebar
+  exists to surface;
 * an **item** is a leaf link.
+
+A group that filtered down to a single destination is marked `static`, and
+`active` records whether a group contains the current route — both are metadata
+on the tree that `tests/Feature/Dashboard/NavigationTest.php` pins down, not
+behaviour the view branches on.
 
 `$label` is the nav's accessible name. Each role's sidebar passes its own, so an
 account moving between the author workspace, the storefront and platform
 administration hears a landmark that says where it is rather than the same
 generic "Dashboard" three times over.
 
-Group collapse state is a presentation concern and lives in the view, keyed by
-the group's stable `key` and persisted to `df.nav.groups.{userId}` in
-`localStorage`. The one rule the support class does own is `active`: a group
-reports whether it contains the current route, so the view can force the group
-open. A collapsed group holding the page you are looking at would hide the very
-link the sidebar exists to highlight. `active` resolves against each item's
-`pattern` via `request()->routeIs()`, so the highlight cannot drift from the
-route table.
+Active *item* state resolves against each item's `pattern` via
+`request()->routeIs()`, so the highlight cannot drift from the route table, and
+there is no per-group collapse state left to persist — `df.sidenav-collapsed`
+(the rail width) is the sidebar's only stored preference.
 
 The `$badge` resolved per item is always an `int` — never a sentinel string.
 An earlier version used `'pending-comments'` as a placeholder and leaked it into
@@ -400,7 +482,7 @@ satisfied PHPStan's return-type check.
 | `label` | `?string` | `__('Dashboard (compact)')` |
 
 No props of its own beyond the accessible name. The icon-only variant of the
-sidebar, rendered when the desktop rail is collapsed.
+sidebar, rendered when the desktop sidenav is collapsed.
 
 It is built from **the same `DashboardNavigation::for()` data**, flattened — not
 from a second hand-maintained list. A parallel menu is exactly the drift the
@@ -419,7 +501,7 @@ absent, every link carries both a `title` and an `aria-label`.
 | `label` | `string` | — |
 
 A link in the sidebar's pinned footer ("View site", "Settings"). The label is
-hidden with `x-show="! rail"` when the rail collapses; an `sr-only` copy of the
+hidden with `x-show="! collapsed"` when the sidenav collapses; an `sr-only` copy of the
 label remains so the link is never nameless to a screen reader.
 
 ---
@@ -432,7 +514,8 @@ label remains so the link is never nameless to a screen reader.
 | `size` | `'sm'\|'md'` | `'sm'` |
 
 Reads `accountRole()` and `plan()` off the account, so the badge cannot disagree
-with the sidebar. Used in the dashboard plan card and the mobile header.
+with the permission set the page was rendered under. Used in the top bar's
+profile menu and in the seller dashboard's plan panel.
 
 ---
 
@@ -528,7 +611,7 @@ This is the part of the tree the role directories exist for. The rule:
 
 > **`ui/` implements the workspace; the role directories name it.**
 
-Every authenticated surface is the same workspace — a collapsible rail, a mobile
+Every authenticated surface is the same workspace — a collapsible sidenav, a mobile
 drawer, a sticky bar, a `<main>`. Three roles' worth of that machinery is one
 implementation in `components/app/ui/dashboard-shell.blade.php`, and each role's
 directory holds three one-line components that fill the shell's regions and
@@ -540,10 +623,10 @@ No props. Every region is a slot.
 
 | Slot | Region | Filled by |
 | --- | --- | --- |
-| `brand` | the wordmark, in the rail and again in the drawer | *(default: role-aware home link)* |
-| `sidebar` | the rail's scrolling navigation | `<x-app.{role}.sidebar />` |
-| `sidebarIcons` | the rail's collapsed, icon-only navigation | `<x-app.{role}.sidebar variant="icons" />` |
-| `footer` | the rail's pinned account block | `<x-app.{role}.footer />` |
+| `brand` | the wordmark, in the sidenav and again in the drawer | *(default: role-aware home link)* |
+| `sidebar` | the sidenav's scrolling navigation | `<x-app.{role}.sidebar />` |
+| `sidebarIcons` | the sidenav's collapsed, icon-only navigation | `<x-app.{role}.sidebar variant="icons" />` |
+| `footer` | the sidenav's pinned account block | `<x-app.{role}.footer />` |
 | `header` | the sticky bar shown below `lg` | `<x-app.{role}.header />` |
 | default slot | `<main id="dashboard-main">` — the page itself | the Livewire page |
 
@@ -555,26 +638,29 @@ ancestor, the focus trap that makes it modal in fact as well as in
 **Why a component and not a layout.** There are three role layouts
 (`layouts::app.dashboard`, `layouts::seller.dashboard`,
 `layouts::admin.dashboard`) and they share this shell rather than each carrying
-a copy. The rail and the drawer are ~270 lines of interdependent machinery;
+a copy. The sidenav and the drawer are ~270 lines of interdependent machinery;
 duplicating that three times would mean three places to fix the same bug, and
 the three would drift. The layouts *compose*; only this file *implements*.
 
 **Two regions reuse the same slot content on purpose.** The brand appears in
-both the rail and the drawer, and the navigation appears in the rail, the
-rail's collapsed form, and the drawer: rendering `{{ $brand }}` twice costs
+both the sidenav and the drawer, and the navigation appears in the sidenav, the
+sidenav's collapsed form, and the drawer: rendering `{{ $brand }}` twice costs
 nothing because a slot is already a rendered string
 (`ComponentSlot::toHtml()` returns it), and it guarantees the drawer cannot
-disagree with the rail about where "home" is.
+disagree with the sidenav about where "home" is.
 
 **State.** Two independent pieces, both namespaced by user id so a shared
 machine does not leak one account's layout into another's:
 
 | State | Persisted to | Behaviour |
 | --- | --- | --- |
-| `rail` | `df.rail.{userId}` in `localStorage` | Desktop sidebar collapses to a 68 px icon-only strip and back to 264 px |
+| `sidenav` | `df.sidenav-collapsed.{userId}` in `localStorage` | Desktop sidebar collapses to a 68 px icon-only strip and back to 264 px |
 | `drawer` | not persisted (transient) | Below `lg` the sidebar becomes an off-canvas drawer |
 
-The rail toggle carries `data-test="rail-toggle"` and the mobile header trigger
+The collapse toggle is the icon button in the sidenav's **brand row** —
+top-right of the wordmark when the rail is expanded, centred alone when it is
+narrow (the brand link yields the row at 76 px). It carries
+`data-test="sidenav-toggle"`; the mobile header trigger carries
 `data-test="drawer-open"`, so the responsive behaviour is testable without
 asserting on CSS.
 
@@ -584,8 +670,8 @@ modal must do:
 
 1. **scroll lock** — `document.documentElement.classList.add('overflow-hidden')`;
 2. **focus trap** — an `@keydown.tab` handler cycling between the first and last
-   *visible* focusable descendants (`el.offsetParent !== null` filters out the
-   links hidden inside collapsed groups);
+   *visible* focusable descendants (`el.offsetParent !== null` filters out
+   anything hidden from layout);
 3. **focus restore** — the element that had focus before opening is refocused on
    close.
 
@@ -597,23 +683,34 @@ modal must do:
 
 ---
 
-### `<x-app.ui.rail-footer>`
+### `<x-app.ui.sidenav-footer>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
 | `label` | `?string` | `__('Account')` |
 | `links` | *(slot)* | — |
 
-The rail's pinned footer: who you are, what you are on, and how to leave.
+The sidenav's pinned footer: who you are, and how to leave.
 
-Four blocks, top to bottom, each one the smallest thing that answers its
-question: the rail toggle; the account identity (name, email, role); the plan
-card as a link home; and the utility links — view site, settings, the optional
-`links` slot, log out.
+Two blocks, top to bottom, each one the smallest thing that answers its
+question: the account identity (name, email); and the utility links — view site,
+settings, the optional `links` slot, log out.
+
+> **Moved:** the collapse toggle used to be a third block here. It now lives in
+> the shell's brand row (`<x-app.ui.dashboard-shell>`), because it is shell
+> machinery rather than account chrome and must stay reachable at every rail
+> width — including the icon-only one this footer sits under.
+
+> **Removed:** a fourth block, the plan card (role + plan badge and tagline, as
+> a link home), used to sit between the identity and the utility links. It is
+> gone from every workspace rail: the wordmark already links home, the profile
+> menu in the top bar already shows the role and plan, and the seller's own
+> dashboard is where the plan belongs. `tests/Feature/Dashboard/ShellTest.php`
+> asserts the tagline no longer appears inside the `<aside>`.
 
 It is **pinned rather than scrolling** with the nav so the log-out control can
 never be scrolled out of reach, which matters most on exactly the small screens
-where the rail is at its narrowest.
+where the sidenav is at its narrowest.
 
 `$label` names the account block for assistive technology. Each role's footer
 passes its own so the region is not announced as a bare "Account" three
@@ -633,7 +730,7 @@ seller's payouts link later is one line in
 | --- | --- | --- |
 | `label` | `?string` | `__('Dashboard home')` |
 
-The bar that replaces the rail below `lg`. Three things, in the order a thumb
+The bar that replaces the sidenav below `lg`. Three things, in the order a thumb
 reaches them: the button that opens the drawer, the wordmark that goes home,
 and the role badge that says which workspace you are standing in. Nothing else
 — at this width the bar is 56px tall and every additional control is a control
@@ -654,7 +751,7 @@ thin.
 | Component | Props | Body |
 | --- | --- | --- |
 | `<x-app.user.sidebar>` | `variant: 'default'\|'icons'` | `<x-app.ui.nav :label="__('Author workspace')" />`, or `<x-app.ui.nav-icons>` when `variant="icons"` |
-| `<x-app.user.footer>` | `label: ?string` | `<x-app.ui.rail-footer :label="__('Author account')" />` |
+| `<x-app.user.footer>` | `label: ?string` | `<x-app.ui.sidenav-footer :label="__('Author account')" />` |
 | `<x-app.user.header>` | `label: ?string` | `<x-app.ui.topbar :label="__('Author dashboard')" />` |
 | `<x-app.seller.sidebar>` | `variant` | same, labelled `__('Selling workspace')` |
 | `<x-app.seller.footer>` | `label` | `__('Seller account')` |
@@ -686,11 +783,11 @@ directories exist before their contents do.
 | `showRole` | `bool` | `true` |
 
 **Currently unused.** The account block it used to render is now
-`<x-app.ui.rail-footer>`, which replaces it outright: same dropdown-style
-identity, plus the rail toggle and the utility links the old shell rendered
+`<x-app.ui.sidenav-footer>`, which replaces it outright: same dropdown-style
+identity, plus the sidenav toggle and the utility links the old shell rendered
 separately. Its `data-test="sidebar-menu-button"` hook died with it — nothing
 ever asserted on it. The file is retained only as the historical record of the
-pre-rail chrome, and it is the first file to delete — see
+pre-sidenav chrome, and it is the first file to delete — see
 [§11](#11-known-issues).
 
 ---
@@ -818,12 +915,12 @@ appeared in four files under three different corner radii.
 
 The `>_` terminal glyph in a rounded box. The component owns the glyph and the
 box only — **the palette arrives through `$attributes`**, because the same mark
-is a white-on-dark chip in the rail, a dark chip in the topbar, and a bordered
+is an accent-filled chip on the sidenav and in the topbar, and a bordered
 monogram on the public About page:
 
 ```blade
-<x-app.icon.logo-mark size="md" class="bg-white text-sui-rail" />          {{-- rail + drawer --}}
-<x-app.icon.logo-mark size="sm" class="bg-sui-rail text-sui-rail-ink" />  {{-- mobile topbar --}}
+<x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />          {{-- sidenav + drawer --}}
+<x-app.icon.logo-mark size="sm" class="bg-sui-accent text-sui-ink-on-accent" />  {{-- mobile topbar --}}
 <x-app.icon.logo-mark size="lg" class="border … bg-ink-900 font-mono text-signal-400 …" />
 ```
 
@@ -1022,7 +1119,7 @@ are tracked rather than rediscovered.
 | # | Issue | Impact |
 | --- | --- | --- |
 | 1 | `<x-app.ui.placeholder-pattern>` defaults `id` to `uniqid()` | Two instances on a page collide; the second renders blank. Pass an explicit `id`. Currently one call site, so the footgun is theoretical. |
-| 2 | `<x-app.ui.desktop-user-menu>` and `<x-app.ui.app-logo>` are unused | Dead components left by the reorganisation. `rail-footer` superseded the first; the auth layout composes `flux:brand` itself and only needs the icon. Delete both when convenient — nothing references them, including tests. |
+| 2 | `<x-app.ui.desktop-user-menu>` and `<x-app.ui.app-logo>` are unused | Dead components left by the reorganisation. `sidenav-footer` superseded the first; the auth layout composes `flux:brand` itself and only needs the icon. Delete both when convenient — nothing references them, including tests. |
 | 3 | `<x-app.ui.desktop-user-menu>` uses `zinc-*` tokens | Off-palette against the `ink-*` system. It predates the token migration and, being unused, renders nowhere — so the fix and the deletion are the same change. |
 | 4 | Invalid Flux icon names recurred four times | `storefront`, `book-open-text`, `folder-git-2`, `layout-grid` all threw. All fixed; a repo-wide audit is now part of the verification gate. |
 | 5 | A dynamic `<flux:icon ::name="…">` recurses forever under Blaze | Memory exhaustion, not a blank icon. Never bind the icon name to an Alpine expression — see §6. |

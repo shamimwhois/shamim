@@ -4,7 +4,7 @@
     'icon' => 'squares-2x2',
     'hint' => null,
     'href' => null,
-    'tone' => 'default',
+    'tone' => 'primary',
 ])
 
 @php
@@ -16,14 +16,24 @@
      * just the label. When `href` is null it is a plain surface and does not
      * advertise a click it cannot deliver.
      *
-     * `tone="attention"` is used for the moderation queue, where a non-zero
-     * value means there is work waiting. Everything else stays neutral so the
-     * one number that needs action is the one that catches the eye. The
-     * attention ink is the `sui-attention-ink` family: the plain
-     * `sui-attention` (amber-700) measures 3.19:1 on white and would not
-     * clear AA at this size.
+     * ## The pastel square
+     *
+     * The glyph sits in a tinted square from the six-tone pastel family —
+     * the Creative Tim signature, re-expressed so the wash/ink pair clears
+     * 4.5:1 rather than leaning on a saturated fill that fails on white.
+     * The tone is assigned per metric by the caller, not by index, because
+     * a metric's identity should survive its position in the grid.
+     *
+     * `tone="attention"` is the one override: the moderation queue, where a
+     * non-zero value means there is work waiting. It uses the amber
+     * attention family and only engages when the value is actually above
+     * zero, so a clear queue is a quiet tile rather than an amber one.
      */
+    $pastels = ['primary', 'secondary', 'info', 'success', 'warning', 'danger'];
+
     $attention = $tone === 'attention' && (int) $value > 0;
+    $pastel = in_array($tone, $pastels, true) ? $tone : 'primary';
+
     $Tag = $href ? 'a' : 'div';
 @endphp
 
@@ -46,7 +56,7 @@
             <p @class([
                 'mt-3 text-3xl font-semibold tabular-nums tracking-tightest',
                 'text-sui-attention-ink dark:text-sui-attention-ink' => $attention,
-                'text-ink-900' => ! $attention,
+                'sui-text-gradient' => ! $attention,
             ])>
                 {{ is_numeric($value) ? number_format($value) : $value }}
             </p>
@@ -57,11 +67,11 @@
         </div>
 
         <div @class([
-            'grid size-9 shrink-0 place-items-center rounded-md border transition duration-150 ease-soft',
-            'border-sui-attention-border bg-sui-attention-wash text-sui-attention dark:border-sui-attention-border/40 dark:bg-sui-attention-wash/40 dark:text-sui-attention' => $attention,
-            'border-sui-hairline bg-sui-well text-ink-400 group-hover:text-sui-accent-ink' => ! $attention,
+            'grid size-10 shrink-0 place-items-center rounded-md shadow-soft-1 transition duration-150 ease-soft',
+            'border border-sui-attention-border bg-sui-attention-wash text-sui-attention dark:border-sui-attention-border/40 dark:bg-sui-attention-wash/40 dark:text-sui-attention' => $attention,
+            "bg-sui-pastel-{$pastel}-wash text-sui-pastel-{$pastel}-ink" => ! $attention,
         ])>
-            <flux:icon :name="$icon" class="size-4.5" />
+            <flux:icon :name="$icon" class="size-5" />
         </div>
     </div>
 </{{ $Tag }}>

@@ -29,7 +29,7 @@ return [
 
         'availability' => env('PORTFOLIO_AUTHOR_AVAILABILITY', 'Open to senior platform and backend roles'),
 
-        'years_of_experience' => (int) env('PORTFOLIO_AUTHOR_YEARS', 9),
+        'years_of_experience' => (int) env('PORTFOLIO_AUTHOR_YEARS', 15),
 
         'bio' => 'Senior engineer specialising in Laravel, distributed systems, and developer tooling. I care about the boring parts: migrations that are reversible, queries that scale, and interfaces a new teammate can understand on their first day.',
 
@@ -91,7 +91,10 @@ I write here because writing is how I find out whether I actually understand som
         |----------------------------------------------------------------------
         |
         | Outcome first, mechanism second. Stack chips are supporting detail.
-        |
+        | Four entries render as the Selected Work bento: 7+5 columns, then
+        | 6+6 — matching the reference's asymmetric two-row grid. `url` is
+        | rendered as the card's pill link; follow the links config's rule
+        | and keep it a real placeholder host, never a dead relative path.
         */
 
         'projects' => [
@@ -101,7 +104,7 @@ I write here because writing is how I find out whether I actually understand som
                 'summary' => 'Double-entry accounting engine handling multi-currency settlement for a payments platform.',
                 'outcome' => 'Cut month-end reconciliation from 6 hours to 11 minutes by replacing a cron-driven batch with an event-sourced projection built on database-backed queues.',
                 'stack' => ['Laravel', 'PostgreSQL', 'Redis', 'Horizon'],
-                'url' => null,
+                'url' => 'https://github.com/example/atlas-ledger',
             ],
             [
                 'name' => 'Meridian API',
@@ -109,7 +112,7 @@ I write here because writing is how I find out whether I actually understand som
                 'summary' => 'Public REST API serving 40M requests a month across three product teams.',
                 'outcome' => 'Reduced p95 latency from 840ms to 190ms and eliminated a recurring incident class by introducing a query-budget layer that fails builds, not requests.',
                 'stack' => ['Laravel', 'MySQL', 'OpenTelemetry', 'Kubernetes'],
-                'url' => null,
+                'url' => 'https://github.com/example/meridian-api',
             ],
             [
                 'name' => 'Forge CLI',
@@ -117,7 +120,112 @@ I write here because writing is how I find out whether I actually understand som
                 'summary' => 'Internal developer CLI that scaffolds services with migrations, CI, and observability pre-wired.',
                 'outcome' => 'Brought new-service bootstrap time from two weeks of copy-paste to under an hour, and made the platform team\'s conventions the path of least resistance.',
                 'stack' => ['PHP', 'Symfony Console', 'Docker', 'GitHub Actions'],
-                'url' => null,
+                'url' => 'https://github.com/example/forge-cli',
+            ],
+            [
+                'name' => 'QueueLens',
+                'role' => 'Maintainer',
+                'summary' => 'Open-source metrics exporter that turns Horizon queue telemetry into Prometheus dashboards.',
+                'outcome' => 'Gave platform teams a queue-depth SLO out of the box; adopted by four internal teams in its first quarter and now shipped with the default platform image.',
+                'stack' => ['PHP', 'Prometheus', 'Redis Streams', 'Grafana'],
+                'url' => 'https://github.com/example/queuelens',
+            ],
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Experience
+        |----------------------------------------------------------------------
+        |
+        | The career timeline rendered by the about page's Experience section:
+        | newest employer first, one or more roles per employer, and each
+        | role's highlights with the supporting stack. Periods are plain
+        | strings so the copy owns its own formatting.
+        |
+        */
+
+        'experience' => [
+            [
+                'company' => 'Lattice Systems',
+                'period' => 'Jun 2025 – Present',
+                'roles' => [
+                    [
+                        'title' => 'Senior Software Engineer',
+                        'period' => 'Jun 2025 – Present',
+                        'highlights' => [
+                            [
+                                'text' => 'Settlement platform — own the event-sourced accounting core behind multi-currency settlement, having replaced a nightly reconciliation batch with a database-backed projection.',
+                                'stack' => ['Laravel', 'PostgreSQL', 'Redis', 'Horizon'],
+                            ],
+                            [
+                                'text' => 'Public API platform — designed the query-budget layer that retired a recurring timeout incident class by failing builds, not customer requests.',
+                                'stack' => ['MySQL', 'OpenTelemetry', 'Kubernetes'],
+                            ],
+                            [
+                                'text' => 'Developer tooling — author the internal service-scaffolding CLI that makes the platform conventions the path of least resistance for every new service.',
+                                'stack' => ['PHP', 'Symfony Console', 'GitHub Actions'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'company' => 'Northbrim Digital',
+                'period' => 'Jun 2021 – Jun 2025',
+                'roles' => [
+                    [
+                        'title' => 'Senior Backend Engineer',
+                        'period' => 'Jun 2023 – Jun 2025',
+                        'highlights' => [
+                            [
+                                'text' => 'Multi-tenant platform — owned queue design and backpressure for ingestion workloads, moving slow-path jobs behind explicit budgets instead of retries all the way down.',
+                                'stack' => ['Laravel', 'Redis', 'Horizon', 'Redis Streams'],
+                            ],
+                            [
+                                'text' => 'Led the observability rollout: structured logs, traces, and the dashboards that answer what is slow without a debugging session.',
+                                'stack' => ['OpenTelemetry', 'Sentry', 'Grafana'],
+                            ],
+                            [
+                                'text' => 'Mentored engineers across three product teams — design reviews, decision records, and the query-plan sessions that settled most performance debates.',
+                                'stack' => ['PostgreSQL', 'EXPLAIN'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'title' => 'Backend Engineer',
+                        'period' => 'Jun 2021 – Jun 2023',
+                        'highlights' => [
+                            [
+                                'text' => 'Rebuilt the reporting layer around indexed read models, cutting the heaviest monthly report from minutes to seconds without touching the transactional schema.',
+                                'stack' => ['PostgreSQL', 'MySQL', 'Redis'],
+                            ],
+                            [
+                                'text' => 'Extracted the first service boundaries out of a growing monolith — REST contracts with versioning discipline the frontend teams could build against.',
+                                'stack' => ['Laravel', 'REST', 'PHPUnit'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'company' => 'Ravenport Labs',
+                'period' => 'Jul 2017 – Jun 2021',
+                'roles' => [
+                    [
+                        'title' => 'Software Engineer',
+                        'period' => 'Jul 2017 – Jun 2021',
+                        'highlights' => [
+                            [
+                                'text' => 'Built and ran the catalogue and checkout services of an e-commerce platform through two Black-Friday-scale peaks.',
+                                'stack' => ['PHP', 'MySQL', 'Elasticsearch', 'Varnish'],
+                            ],
+                            [
+                                'text' => 'Introduced automated testing to a codebase that had none — the suite that eventually let deploys happen on a Friday.',
+                                'stack' => ['PHPUnit', 'GitHub Actions'],
+                            ],
+                        ],
+                    ],
+                ],
             ],
         ],
 

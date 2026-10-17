@@ -346,25 +346,22 @@ dashboard.admin.index   → Selling AND Administration sections visible
 
 A `user` account sees neither section, and the navigation drops the heading along with its items — so a plain user never meets an "Administration" heading with nothing under it. This is why the sidebar is generated from `DashboardNavigation` rather than written into the Blade template: the menu and the route guards read from the same source and cannot disagree.
 
-The sidebar has three levels — **section → group → item**. A *group* is a
-collapsible cluster inside a section (`Content`, `Modules`, `Administration`).
-Filtering is applied per *item*, then a group that emptied out is dropped, then a
-section that emptied out is dropped. A group left holding exactly one visible
-item renders as a plain link with no disclosure control.
+The sidebar data has three levels — **section → group → item** — and renders
+two. A *group* is a labelled cluster inside a section (`Content`, `Modules`,
+`Administration`); the view draws no group heading and no disclosure control, so
+every item sits as a direct neighbour under its section's heading. Filtering is
+applied per *item*, then a group that emptied out is dropped, then a section that
+emptied out is dropped.
 
-Two rules keep the highlight honest:
+**Active state resolves against each item's `pattern`** via
+`request()->routeIs()`, so a nested route (`ideas.index` under `ideas.*`) lights
+its link without anyone maintaining a second list.
 
-* **A group containing the current route is forced open**, whatever the stored
-  collapse state says. A collapsed group holding the page you are on would hide
-  the very link the sidebar exists to highlight.
-* **Active state resolves against each item's `pattern`** via
-  `request()->routeIs()`, so a nested route (`ideas.index` under `ideas.*`) lights
-  its group without anyone maintaining a second list.
-
-Collapse state and the desktop rail preference are per-account presentation
-state, persisted to `localStorage` under `df.nav.groups.{userId}` and
-`df.rail.{userId}` — never in the database, because the server has no opinion
-about which menu a person left open.
+The desktop sidenav width preference is per-account presentation state,
+persisted to `localStorage` under `df.sidenav-collapsed.{userId}` — never in the
+database, because the server has no opinion about which menu a person left open.
+There is no per-group collapse state to keep: with no disclosure there is
+nothing to open or close.
 
 ### 4.2 Journey H — Authoring a post
 

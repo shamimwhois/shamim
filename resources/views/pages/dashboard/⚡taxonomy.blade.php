@@ -1,6 +1,7 @@
 <?php
 
 use App\Concerns\HasSlug;
+use App\Enums\AccountPermission;
 use App\Models\Category;
 use App\Models\Tag;
 use App\Support\Seo;
@@ -46,6 +47,11 @@ new #[Layout('layouts::app.dashboard')] #[Title('Taxonomy')] class extends Compo
      */
     #[Validate('required|string|max:500')]
     public string $tagNames = '';
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->hasPermission(AccountPermission::ManageTaxonomy), 403);
+    }
 
     public function mount(): void
     {

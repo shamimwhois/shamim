@@ -234,7 +234,7 @@ new #[Title('Writing')] class extends Component
     {{-- ================================================================== --
      | Page header
      --}}
-    <section class="border-b border-ink-200 dark:border-ink-800">
+    <section data-reveal class="border-b border-ink-200 dark:border-ink-800">
         <div class="shell py-14 lg:py-16">
             <x-app.ui.section-marker :number="1" label="Writing" accent />
 
@@ -393,7 +393,7 @@ new #[Title('Writing')] class extends Component
     {{-- ================================================================== --
      | Results
      --}}
-    <section class="shell py-14" aria-live="polite" aria-busy="{{ $this->posts->isEmpty() ? 'false' : 'false' }}">
+    <section data-reveal class="shell py-14" aria-live="polite" aria-busy="{{ $this->posts->isEmpty() ? 'false' : 'false' }}">
         {{-- Loading skeleton, shown only while a filter request is in flight --}}
         <div wire:loading.delay.shorter.flex wire:target="search, category, tag" class="hidden grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach (range(1, 6) as $i)

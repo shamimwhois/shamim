@@ -151,7 +151,7 @@ new #[Title('Senior Software Engineer')] class extends Component
 
             <h1
                 id="hero-heading"
-                class="mt-8 max-w-4xl text-4xl font-semibold leading-[1.08] tracking-tightest text-ink-900 sm:text-5xl dark:text-ink-50"
+                class="sui-text-gradient mt-8 max-w-4xl text-4xl font-semibold leading-[1.08] tracking-tightest [--text-gradient-from:var(--color-ink-900)] [--text-gradient-to:var(--color-signal-700)] sm:text-5xl dark:[--text-gradient-from:var(--color-ink-50)] dark:[--text-gradient-to:var(--color-signal-400)]"
             >
                 {{ $this->profile()->name }}
                 <span class="block mt-3 text-2xl font-normal leading-snug tracking-tight text-ink-400 sm:text-3xl dark:text-ink-500">
@@ -206,7 +206,7 @@ new #[Title('Senior Software Engineer')] class extends Component
     {{-- ================================================================== --
      | 02 — Writing
      --}}
-    <section class="shell py-20 lg:py-24" aria-labelledby="writing-heading">
+    <section data-reveal class="shell py-20 lg:py-24" aria-labelledby="writing-heading">
         <div class="flex flex-wrap items-end justify-between gap-6">
             <div>
                 <x-app.ui.section-marker :number="2" label="Writing" />
@@ -296,7 +296,7 @@ new #[Title('Senior Software Engineer')] class extends Component
     {{-- ================================================================== --
      | 03 — Expertise
      --}}
-    <section class="border-y border-ink-200 bg-ink-50/60 py-20 lg:py-24 dark:border-ink-800 dark:bg-ink-900/30" aria-labelledby="expertise-heading">
+    <section data-reveal class="border-y border-ink-200 bg-ink-50/60 py-20 lg:py-24 dark:border-ink-800 dark:bg-ink-900/30" aria-labelledby="expertise-heading">
         <div class="shell">
             <x-app.ui.section-marker :number="3" label="Expertise" />
             <h2 id="expertise-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
@@ -334,7 +334,7 @@ new #[Title('Senior Software Engineer')] class extends Component
     {{-- ================================================================== --
      | 04 — Selected work
      --}}
-    <section class="shell py-20 lg:py-24" aria-labelledby="work-heading">
+    <section data-reveal class="shell py-20 lg:py-24" aria-labelledby="work-heading">
         <x-app.ui.section-marker :number="4" label="Selected work" />
         <h2 id="work-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
             Systems I have built and shipped
@@ -382,7 +382,7 @@ new #[Title('Senior Software Engineer')] class extends Component
     {{-- ================================================================== --
      | 05 — Contact
      --}}
-    <section class="border-t border-ink-200 py-20 lg:py-24 dark:border-ink-800" aria-labelledby="contact-heading">
+    <section data-reveal class="border-t border-ink-200 py-20 lg:py-24 dark:border-ink-800" aria-labelledby="contact-heading">
         <div class="shell">
             <div class="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-center">
                 <div>

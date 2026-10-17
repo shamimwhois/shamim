@@ -25,6 +25,13 @@ export default defineConfig({
                 bunny('Open Sans', {
                     weights: [400, 500, 600, 700],
                 }),
+                /* Vintage calligraphy + serif accents for the About header. */
+                bunny('Dancing Script', {
+                    weights: [400, 700],
+                }),
+                bunny('Cormorant Garamond', {
+                    weights: [400, 500, 600, 700],
+                }),
             ],
         }),
         tailwindcss(),

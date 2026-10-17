@@ -10,38 +10,39 @@ use App\Models\User;
  * The dashboard navigation map.
  *
  * A single declarative definition, filtered by permission at render time. This
- * replaces the previous hardcoded array in `components/dashboard/nav.blade.php`
- * for one reason: the navigation and the access rules must not be able to
- * disagree. When each item declares the permission it requires, an item can
- * never be visible to an account that would be refused by the route.
+ * replaces the previous hardcoded array in `components/dashboard/nav.blade.php`.
+ * Each item declares the permission required to show it. Route middleware
+ * independently enforces access; route/navigation tests keep those declarations
+ * aligned so a visible item is not refused by its destination.
  *
  * ## Structure
  *
- * Navigation is two levels deep, and no deeper:
+ * Navigation is two levels deep at render time, three in the data:
  *
  *     section  ── a labelled band, always a non-interactive heading
- *       └─ group ── a collapsible cluster with an icon and its own items
+ *       └─ group ── a labelled cluster of related items
  *            └─ item ── a link
  *
- * A section is the only thing that is guaranteed visible; a group may be
- * collapsed, and an item is a leaf. Sections exist to answer "which part of the
- * product am I in" — they are never clickable, and an empty one is dropped
- * entirely, heading included.
+ * A section is the only thing that is guaranteed visible; an item is a leaf.
+ * Sections exist to answer "which part of the product am I in" — they are
+ * never clickable, and an empty one is dropped entirely, heading included.
  *
- * Groups exist because a flat list of ten links with no hierarchy is hard to
- * scan. Where a section holds exactly one destination there is nothing to nest,
- * so the group is marked `static` and renders as a plain link with no
- * disclosure control — a chevron that expands to reveal a single child is a
- * worse experience than no chevron at all.
+ * Groups exist to cluster related destinations in the definition and to carry
+ * their icon, description and stable key. They render **flat**: the view draws
+ * no group heading and no disclosure control, so every item is a direct
+ * neighbour under its section's heading. A chevron that hides a link behind a
+ * click costs a navigation step to reach the thing the sidebar exists to
+ * surface, and the section heading already names the band. Where a section
+ * holds exactly one destination the group is marked `static` — there is
+ * nothing to cluster around it.
  *
- * ## Collapse state
+ * ## Group metadata
  *
- * Which groups are open is a *presentation* concern, so this class does not
- * decide it. It emits a stable `key` per group and lets the view own the
- * behaviour. The one rule that does live here is `active`: a group reports
- * whether it contains the current route, so the view can force it open. A
- * collapsed group holding the page you are looking at would hide the very link
- * the sidebar exists to highlight.
+ * `key`, `static` and `active` describe the tree rather than any behaviour:
+ * a stable identity per group, whether it resolved to a single destination,
+ * and whether it contains the current route. The view no longer branches on
+ * them — which groups are *shown* is decided here, by permission, and nothing
+ * else may hide a link the account is allowed to reach.
  */
 final class DashboardNavigation
 {
@@ -57,6 +58,11 @@ final class DashboardNavigation
     /**
      * Build the navigation for the given account.
      *
+     * @param  string|null  $scope  When set, only items whose route name starts
+     *                              with `{$scope}.` survive — used by the admin rail to present just the
+     *                              platform-administration routes rather than the account's whole
+     *                              permission set. The permission filter still runs, so a scoped menu is
+     *                              never wider than the account may reach; scoping only narrows it.
      * @return array<int, array{
      *     label: string,
      *     groups: array<int, array{
@@ -70,7 +76,7 @@ final class DashboardNavigation
      *     }>
      * }>
      */
-    public static function for(User $user): array
+    public static function for(User $user, ?string $scope = null): array
     {
         $pendingComments = self::pendingCommentCount($user);
 
@@ -83,6 +89,16 @@ final class DashboardNavigation
                 $items = [];
 
                 foreach ($group['items'] as $item) {
+                    /*
+                     * Scope the rail to a route prefix (e.g. only `admin.*`).
+                     * Runs before the permission check so the account's reach
+                     * is still the upper bound — scoping can only remove items,
+                     * never grant ones the guard would refuse.
+                     */
+                    if ($scope !== null && ! str_starts_with($item['route'], $scope.'.')) {
+                        continue;
+                    }
+
                     if (! $user->hasAnyPermission(...$item['permissions'])) {
                         continue;
                     }
@@ -114,8 +130,8 @@ final class DashboardNavigation
                     'icon' => $group['icon'],
                     'description' => $group['description'],
                     /*
-                     * A group that filtered down to one item has nothing left to
-                     * disclose, whatever the definition intended.
+                     * A group that filtered down to one destination is recorded
+                     * as single-destination, whatever the definition intended.
                      */
                     'static' => $group['static'] || count($items) === 1,
                     'active' => self::isActive($items),

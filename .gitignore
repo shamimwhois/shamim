@@ -38,3 +38,9 @@ yarn-error.log
 /boost.json
 /opencode.json
 /opencode.jsonc
+
+# AI tooling / diagnostics (not committed)
+/.freebuff/
+/_diag/
+/ext/
+/.kilo/

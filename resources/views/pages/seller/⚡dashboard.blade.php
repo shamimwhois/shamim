@@ -69,18 +69,27 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
 }; ?>
 
 <div>
-    <x-app.ui.header
+    {{-- The hero, not `x-app.ui.header`: same reasoning as the other two
+         dashboards. The action is deliberately inert — the product pipeline
+         does not exist yet, so a live-looking button would be a promise the
+         page cannot keep. It renders as reserved, not as broken. --}}
+    <x-app.ui.welcome-card
+        :level="1"
         eyebrow="Seller"
         :title="'Welcome back, '.Str::of(auth()->user()->name)->explode(' ')->first()"
         description="Your plan, your listings, and the path from draft to published."
-        :breadcrumbs="[['label' => __('Selling')]]"
+        icon="building-storefront"
     >
         <x-slot:actions>
-            <flux:button variant="primary" icon="plus" disabled>
-                New product
-            </flux:button>
+            <span
+                class="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white/60 ring-1 ring-white/15"
+                aria-disabled="true"
+            >
+                <flux:icon name="plus" class="size-4" />
+                {{ __('New product') }}
+            </span>
         </x-slot:actions>
-    </x-app.ui.header>
+    </x-app.ui.welcome-card>
 
     <x-app.ui.body>
         {{-- ============================================================= --

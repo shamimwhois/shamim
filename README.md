@@ -209,7 +209,7 @@ resources/views/
 Every component is namespaced under `app/` so `<x-app.ui.modal>` can never be
 shadowed by a package's `<x-modal>`, and the three workspace layouts compose one
 shell — `components/app/ui/dashboard-shell.blade.php` — rather than each
-carrying a copy of ~270 lines of rail, drawer and focus-trap machinery.
+carrying a copy of ~270 lines of sidenav, drawer and focus-trap machinery.
 
 Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 
@@ -232,6 +232,29 @@ Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 | [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) | Roles, permissions and plans |
 | [`docs/API.md`](docs/API.md) | Intended API surface — **not implemented** |
 | [`docs/audit/PHASE-0-AUDIT.md`](docs/audit/PHASE-0-AUDIT.md) | Verified state before changes |
+
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for a record of notable changes, organised by
+release. The `Unreleased` entry covers the roles/auth dashboard redesign work.
+
+---
+
+## Contributing
+
+All changes must pass the quality gates before being considered finished:
+
+| Gate | Command |
+| --- | --- |
+| Tests | `php artisan test` |
+| Types | `vendor/bin/phpstan analyse` (level 7) |
+| Style | `vendor/bin/pint --dirty --format agent` |
+| Build | `npm run build` |
+
+`composer test` runs all four gates in order: config clear, Pint check mode,
+PHPStan, then the Pest suite. On this machine `php` and `composer` are not on
+`PATH` inside the sandboxed shell — use `bash /tmp/phpx.sh` and pass
+`-d memory_limit=1G` to PHPStan.
 
 ---
 

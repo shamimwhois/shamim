@@ -11,21 +11,3 @@ parameters:
         - routes/
 
     level: 7
-
-    # `env()` belongs in `config/` and nowhere else, so larastan's
-    # `noEnvCallsOutsideOfConfig` rule is correct in spirit. It is also
-    # wrong in practice on this setup: the rule resolves its allowed
-    # directory from `config_path()` (`D:\laravel\shamim\config`) while
-    # PHPStan hands it the analysed path (`d:/laravel/shamim/config`),
-    # and a Windows drive letter that differs only in case still fails
-    # `str_starts_with`. Every one of the resulting errors therefore points
-    # at a config file that is doing exactly the right thing.
-    #
-    # The error is suppressed only for `config/*`, so the rule still fires
-    # for `env()` calls in `app/`, `routes/` and `database/` — which is the
-    # part that is genuinely worth catching. Pinning an explicit
-    # `configDirectories` path would also silence it, but only for the
-    # machine whose drive letter happens to match the entry.
-    ignoreErrors:
-        - identifier: larastan.noEnvCallsOutsideOfConfig
-          path: config/*

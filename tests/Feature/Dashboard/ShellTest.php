@@ -34,11 +34,10 @@ use Illuminate\Support\Facades\File;
  */
 $regions = function (): array {
     return [
-        'desktop rail' => 'sui-rail hidden shrink-0 border-r',
-        'rail brand mark' => 'bg-white text-sui-rail',
-        'mobile brand mark' => 'bg-sui-rail text-sui-rail-ink',
-        'mobile top bar' => 'sticky top-0 z-30',
-        'rail toggle' => 'data-test="rail-toggle"',
+        'desktop sidenav' => 'sui-sidenav sticky top-3',
+        'sidenav brand mark' => 'bg-sui-accent text-sui-ink-on-accent',
+        'floating navbar' => 'sui-nav mx-4',
+        'sidenav collapse toggle' => 'data-test="sidenav-toggle"',
         'mobile drawer' => 'id="dashboard-drawer"',
         'drawer trigger' => 'data-test="drawer-open"',
         'drawer close' => 'data-test="drawer-close"',
@@ -68,6 +67,18 @@ test('every workspace layout fills every region of the shared shell', function (
         foreach ($regions() as $region => $marker) {
             $response->assertSee($marker, false, sprintf('[%s] is missing the [%s] region.', $key, $region));
         }
+
+        // The floating navbar carries the Creative Tim set: a real search,
+        // a notification panel backed by the comment queue, and a profile
+        // menu with the way out. A navbar that renders the pill but none of
+        // its machinery is the failure this guards.
+        $response
+            ->assertSee('data-flux-dropdown', false)
+            ->assertSee('data-flux-menu', false)
+            ->assertSee('name="q"', false)
+            ->assertSee(route('dashboard.posts.index'), false)
+            ->assertSee(__('Notifications'), false)
+            ->assertSee(__('Review the queue'), false);
     }
 })->group('shell');
 
@@ -80,13 +91,22 @@ test('each workspace layout supplies its own role chrome', function () use ($wor
         $response->assertOk()
             // The sidebar names its own landmark, not a generic one.
             ->assertSee('aria-label="'.$label.'"', false)
-            // The rail's wordmark points at the role's own home.
+            // The sidenav's wordmark points at the role's own home.
             ->assertSee('href="'.route($user->dashboardRoute()).'"', false)
-            // The account block renders the role, the plan and the way out.
+            // The account block renders the identity and the way out.
             ->assertSee(__('View site'), false)
             ->assertSee(__('Settings'), false)
-            ->assertSee(__('Log out'), false)
-            ->assertSee($user->plan()->tagline(), false);
+            ->assertSee(__('Log out'), false);
+
+        // The pinned footer is identity and way out — not the plan card it
+        // used to carry. The plan still exists (the seller dashboard shows
+        // it, the profile menu shows the role), it is simply no longer
+        // repeated in the rail, so the sidenav stays a single-purpose
+        // navigation column.
+        preg_match('/<aside\b.*?<\/aside>/s', $response->getContent(), $aside);
+
+        expect($aside)->not->toBeFalse()
+            ->and($aside[0])->not->toContain($user->plan()->tagline());
 
         if ($badge !== null) {
             $response->assertSee($badge, false);
@@ -96,10 +116,47 @@ test('each workspace layout supplies its own role chrome', function () use ($wor
     }
 })->group('shell');
 
+test('the sidebar nav renders every destination with no disclosure control', function () use ($workspaces) {
+    foreach ($workspaces as $key => ['route' => $route, 'role' => $role]) {
+        $response = $this->actingAs(User::factory()->role(AccountRole::from($role))->create())
+            ->get(route($route));
+
+        $response->assertOk();
+
+        // Groups render flat — no disclosure button, no `aria-controls` pair,
+        // nothing behind a click. A group header that looks like a link but
+        // is not one was the failure this replaced.
+        $response
+            ->assertDontSee('data-nav-group', false)
+            ->assertDontSee('aria-controls="nav-group-', false);
+
+        // The leaves themselves are still there.
+        expect(substr_count($response->getContent(), 'data-nav-item='))
+            ->toBeGreaterThan(0, sprintf('[%s] renders no navigation items at all.', $key));
+    }
+})->group('shell');
+
+test('the collapse toggle is one icon in the brand row, not a labelled footer row', function () use ($workspaces) {
+    foreach ($workspaces as $key => ['route' => $route, 'role' => $role]) {
+        $html = $this->actingAs(User::factory()->role(AccountRole::from($role))->create())
+            ->get(route($route))
+            ->assertOk()
+            ->getContent();
+
+        // One control, not one per shell surface: the desktop sidenav carries
+        // it, and the drawer has no rail to collapse.
+        expect(substr_count($html, 'data-test="sidenav-toggle"'))
+            ->toBe(1, sprintf('[%s] does not render exactly one collapse toggle.', $key))
+            // Icon-only — named for assistive technology, labelled for nobody else.
+            ->and($html)->toContain('aria-label="'.__('Collapse or expand the sidebar').'"')
+            ->and($html)->not->toContain('>Collapse</span>');
+    }
+})->group('shell');
+
 test('the shared shell is one implementation, not three copies', function () {
-    // The rail and the drawer are one implementation. A second copy of the
+    // The sidenav and the drawer are one implementation. A second copy of the
     // focus trap is the failure mode this guards against: three layouts that
-    // each carry their own rail is three places to fix the same bug, and they
+    // each carry their own sidenav is three places to fix the same bug, and they
     // drift. So the distinctive markers of the hand-rolled trap — which exist
     // because Flux does not bundle `x-trap` — must appear in exactly one view.
     $shell = realpath(resource_path('views/components/app/ui/dashboard-shell.blade.php'));
@@ -118,12 +175,12 @@ test('the shared shell is one implementation, not three copies', function () {
     expect($copies->map->getFilename()->all())->toBe([]);
 })->group('shell');
 
-test('the wordmark is one component rendered in every rail position', function () {
+test('the wordmark is one component rendered in every sidenav position', function () {
     $html = $this->actingAs(User::factory()->admin()->create())
         ->get(route('admin.dashboard'))
         ->getContent();
 
-    // Rail brand, drawer brand, mobile top bar. Three positions, one glyph.
+    // Sidenav brand, drawer brand, mobile top bar. Three positions, one glyph.
     expect(substr_count($html, '&gt;_</span>'))->toBe(3);
 
     // ...and the glyph is defined in exactly one file, which is the point of
@@ -148,7 +205,7 @@ test('the guest layout renders the public chrome and carries no workspace scope'
         // it up would silently recolour to the dashboard's palette.
         ->assertDontSee('data-sui', false)
         // ...and must not reach for a `sui-*` utility to do the public job.
-        ->assertDontSee('sui-rail', false);
+        ->assertDontSee('sui-sidenav', false);
 })->group('shell');
 
 test('the auth layout is reachable and renders the split panel', function () {

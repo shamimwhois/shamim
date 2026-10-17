@@ -7,7 +7,10 @@
      * terminal motif before the reader has scrolled anywhere.
      */
     $nav = [
+        ['label' => 'Feed', 'route' => 'feed.index', 'pattern' => 'feed.*'],
         ['label' => 'Writing', 'route' => 'blog.index', 'pattern' => 'blog.*'],
+        ['label' => 'AI Knowledge', 'route' => 'ai-hub.index', 'pattern' => 'ai-hub.*'],
+        ['label' => 'Marketplace', 'route' => 'marketplace.index', 'pattern' => 'marketplace.*'],
         ['label' => 'About', 'route' => 'about', 'pattern' => 'about'],
     ];
 @endphp
@@ -53,6 +56,10 @@
             @endforeach
 
             <span aria-hidden="true" class="mx-2 h-4 w-px bg-ink-200 dark:bg-ink-800"></span>
+
+            <x-app.ui.theme-toggle />
+
+            <x-app.ui.accent-picker panel-id="accent-picker-desktop" />
 
             <flux:button
                 variant="ghost"
@@ -124,6 +131,22 @@
             @endforeach
 
             <div class="hairline my-3"></div>
+
+            {{-- Theme — a labelled row rather than a bare icon, because a
+                 phone has no tooltip to explain a sun glyph. --}}
+            <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-base font-medium text-ink-600 dark:text-ink-300">
+                    {{ __('Theme') }}
+                </span>
+                <x-app.ui.theme-toggle />
+            </div>
+
+            <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-base font-medium text-ink-600 dark:text-ink-300">
+                    {{ __('Accent color') }}
+                </span>
+                <x-app.ui.accent-picker panel-id="accent-picker-mobile" />
+            </div>
 
             @auth
                 <a

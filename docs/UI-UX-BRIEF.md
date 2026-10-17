@@ -122,7 +122,7 @@ Semantic naming, not literal. Templates reference intent.
 | --- | --- | --- |
 | **Public** | Home, blog index, blog detail, about | Skip-link → sticky header (logo, nav, theme toggle, auth action) → `main` → footer → back-to-top |
 | **Auth** | Login, register, reset, verify, 2FA | Split panel (editorial left, form right) collapsing to a centred card below `lg`; skip-link → `main#auth-form` |
-| **App** | Dashboard, post editor, settings | Sidebar shell with permission-filtered navigation and a role/plan card |
+| **App** | Dashboard, post editor, settings | Sidebar shell with permission-filtered navigation and a pinned account footer (identity, utility links) |
 
 > **Revised — the original guidance was wrong.** This table previously read
 > "Existing starter-kit auth shells — **reuse, do not rebuild**" and "Existing
@@ -165,38 +165,40 @@ stop being readable:
 | Level | Interactive? | Notes |
 | --- | --- | --- |
 | **Section** | No | A labelled band (`Home`, `Writing`, `Workspaces`, `Manage`). Dropped entirely — heading included — when permission filtering empties it |
-| **Group** | Only if it holds > 1 visible item | Collapsible, with an icon and a one-line description |
+| **Group** | No | A labelled cluster with an icon in the definition; its items render flat under the section heading |
 | **Item** | Yes | A leaf link |
 
-A group holding exactly one visible item renders as a **plain link with no
-chevron**. A disclosure control that expands to reveal a single child costs a
-click and teaches nothing. This is decided from the *filtered* item count, so a
-group declared with three items still becomes static for a role that can only
-reach one of them.
+Nothing is hidden behind a click. An earlier design gave multi-item groups a
+disclosure control that collapsed their links; it is gone, because a chevron
+between a section heading and three links is a navigation step with no
+information in it. A group that filters down to a single destination is still marked `static` in the data, and the navigation tests still pin the shape down.
 
-**Desktop — collapsible rail.** The sidebar animates between a 264 px expanded
+**Desktop — collapsible sidenav.** The sidebar animates between a 264 px expanded
 state and a 68 px icon-only strip. The collapsed strip is built from the same
 navigation data, flattened; labels are replaced by icons but every link keeps a
 `title` and an `aria-label`, because an icon with no accessible name is
 unusable to a screen reader. The preference persists per account
-(`df.rail.{userId}`), so two people sharing a browser do not fight over it.
+(`df.sidenav-collapsed.{userId}`), so two people sharing a browser do not fight over it.
+The toggle is an icon button in the brand row, beside the wordmark; at icon
+width the brand link yields the row to it, because a rail you cannot widen back
+is a trap.
 
 **Below `lg` — off-canvas drawer.** The sidebar leaves the flow entirely and
 becomes a drawer over a backdrop. It is a `role="dialog" aria-modal="true"` and
 implements all three modal obligations: scroll lock on `<html>`, focus trapped
 within the drawer, and focus restored to the trigger on close. Escape closes it.
 
-**Group collapse state** persists per account (`df.nav.groups.{userId}`). A group
-containing the current route is **forced open** regardless of stored state — a
-collapsed group holding the page you are on would hide the very link the sidebar
-exists to highlight.
+**No group collapse state.** With the disclosure gone there is nothing to
+persist per group: `df.sidenav-collapsed.{userId}` (the rail width) is the
+sidebar's only stored preference.
 
 **Active state** is carried by three signals, never by colour alone: a
 signal-coloured left spine on the item, a filled background, and
 `aria-current="page"` in the markup.
 
 **Mobile drawer internals.** The scrolling nav region is separate from the pinned
-footer, so the rail toggle and the utility links never scroll out of reach.
+footer, so the utility links never scroll out of reach. The collapse toggle is
+not in the footer at all — it is the icon button in the sidenav's brand row.
 
 ### 3.2 Public header behaviour
 
@@ -216,7 +218,7 @@ The header never hides on scroll-down. A portfolio reader frequently wants to ju
 | `xs` | 360 px | Single column; reduced section padding; TOC becomes a drawer |
 | `sm` | 640 px | Two-column post grid |
 | `md` | 768 px | Nav collapses to full menu; editorial two-column layouts activate; settings nav becomes a horizontal tab strip |
-| `lg` | 1024 px | Three-column post grid; sticky TOC appears beside articles; **dashboard sidebar leaves the drawer and becomes a persistent rail** |
+| `lg` | 1024 px | Three-column post grid; sticky TOC appears beside articles; **dashboard sidebar leaves the drawer and becomes a persistent sidenav** |
 | `xl` | 1280 px | Editor splits into form + preview panes |
 | `2xl` | 1536 px | Content width stops growing; only whitespace increases |
 

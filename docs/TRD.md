@@ -245,7 +245,7 @@ The rendered HTML is produced from a sanitised pipeline and treated as trusted *
 
 > **Revised.** The original draft had a single dashboard reached at `⚡dashboard.blade.php`. There are now three dashboards, one shell, and one navigation map, each role owning a top-level URL space.
 
-**One shell, three homes.** `components/app/ui/dashboard-shell.blade.php` renders the chrome — rail, mobile drawer, top bar, flash region — and the three workspace layouts (`layouts::app.dashboard`, `layouts::seller.dashboard`, `layouts::admin.dashboard`) each compose it with their role's own chrome components. Each dashboard page opts in with `#[Layout('layouts::<audience>.dashboard')]`. That attribute is not optional: `config/livewire.php` sets `component_layout => 'layouts::guest.home'`, so **every SFC defaults to the public shell** and a dashboard page that forgets the attribute renders inside the blog chrome, with a public header and footer around it. This is the single most common mistake in this area of the codebase.
+**One shell, three homes.** `components/app/ui/dashboard-shell.blade.php` renders the chrome — sidenav, mobile drawer, top bar, flash region — and the three workspace layouts (`layouts::app.dashboard`, `layouts::seller.dashboard`, `layouts::admin.dashboard`) each compose it with their role's own chrome components. Each dashboard page opts in with `#[Layout('layouts::<audience>.dashboard')]`. That attribute is not optional: `config/livewire.php` sets `component_layout => 'layouts::guest.home'`, so **every SFC defaults to the public shell** and a dashboard page that forgets the attribute renders inside the blog chrome, with a public header and footer around it. This is the single most common mistake in this area of the codebase.
 
 **Roles decide the home, permissions decide the menu.** Each role home is a top-level path whose first segment names the surface — no role dashboard is nested inside another's:
 
@@ -479,7 +479,7 @@ resources/
     │       ├── ui/                    shared primitives: header, body, section,
     │       │                          stat, nav, modal/{actions,trigger},
     │       │                          auth/*, post/*, editor/rich-text,
-    │       │                          dashboard-shell, rail-footer, topbar, …
+    │       │                          dashboard-shell, sidenav-footer, topbar, …
     │       ├── icon/                  logo-mark, share
     │       └── user|seller|admin/     each role's header, footer, sidebar
     ├── layouts/                       guest/home (the default), auth + auth/split,

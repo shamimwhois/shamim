@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
 
 /*
 |--------------------------------------------------------------------------
@@ -81,16 +82,63 @@ test('every role can reach the three shared modules', function () {
     }
 });
 
-test('the marketplace is gated to sellers and above', function () {
-    $this->actingAs(User::factory()->create())->get('/marketplace')->assertForbidden();
+test('the marketplace catalogue and package detail are browsable by everyone', function () {
+    // The catalogue is a storefront, not a workspace: anyone may read it, the
+    // way a public package index is readable. Selling remains permission-gated,
+    // which is what the seller dashboard guards.
+    $packageRoute = route('marketplace.show', ['package' => 'media-library-for-laravel']);
+
+    $this->get('/marketplace')->assertOk();
+    $this->get($packageRoute)->assertOk();
+
+    $this->actingAs(User::factory()->create())->get('/marketplace')->assertOk();
     $this->actingAs(User::factory()->seller()->create())->get('/marketplace')->assertOk();
     $this->actingAs(User::factory()->admin()->create())->get('/marketplace')->assertOk();
 });
 
-test('guests cannot reach any module route', function () {
-    foreach (['/dev-lab', '/ai-hub', '/marketplace', '/ideas'] as $path) {
+test('the marketplace catalogue links an attributed example to package documentation', function () {
+    $seller = User::factory()->seller()->create();
+
+    $this->get(route('marketplace.index'))
+        ->assertOk()
+        ->assertSee('Developer Marketplace')
+        ->assertSee('Reference package')
+        ->assertSee('Roundly Consulting')
+        ->assertSee(route('marketplace.show', ['package' => 'media-library-for-laravel']));
+
+    Livewire::actingAs($seller)
+        ->test('pages::marketplace.show', ['package' => 'media-library-for-laravel'])
+        ->assertSee('Media Library for Laravel')
+        ->call('showDocument', 'installation')
+        ->assertSet('activeDocument', 'installation')
+        ->assertSee('media-migrations')
+        ->call('showDocument', 'adding-media')
+        ->assertSee('addFromUrl')
+        ->call('showDocument', 'requirements')
+        ->assertSee('ext-fileinfo')
+        ->assertSee('ext-imagick or ext-gd');
+});
+
+test('the package documentation supports direct links to a section', function () {
+    $this->get(route('marketplace.show', ['package' => 'media-library-for-laravel', 'doc' => 'requirements']))
+        ->assertOk()
+        ->assertSee('ext-fileinfo')
+        ->assertSee('ext-imagick or ext-gd');
+});
+
+test('unknown marketplace package slugs return not found', function () {
+    $this->get(route('marketplace.show', ['package' => 'unknown-package']))
+        ->assertNotFound();
+});
+
+test('guests cannot reach any gated module route', function () {
+    // The marketplace is deliberately absent: it is a public catalogue, so a
+    // guest browsing it is reading, not entering a workspace.
+    foreach (['/dev-lab', '/ai-hub', '/ideas'] as $path) {
         $this->get($path)->assertRedirect(route('login'));
     }
+
+    $this->get('/marketplace')->assertOk();
 });
 
 test('a module page states that it is not yet available', function () {

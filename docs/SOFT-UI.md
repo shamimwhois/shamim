@@ -108,8 +108,7 @@ Rules:
 | `sui-ink-muted` | grey-slate | mid slate | The spec's secondary — **white surfaces only** |
 | `sui-ink-disabled` | light grey-slate | dark slate | Disabled and non-essential text, large sizes only |
 | `sui-ink-on-accent` | white | near-black | Text on a filled accent surface |
-| `rail-ink` | white | near-white | Primary text on the rail |
-| `rail-ink-secondary` | grey | mid slate | Secondary text on the rail |
+| `sui-accent-ink` | indigo | pale indigo | Active sidenav destination, on the soft accent wash |
 
 Two rules govern this table and they are the most-broken rules in the system:
 
@@ -162,11 +161,12 @@ Every status colour that ever carries text is a **700-weight** colour. The
 600-weight family measures below 4.5:1 on white and must not carry text. The
 `-soft` washes are for backgrounds only; never for text.
 
-### 2.5 The rail
+### 2.5 The sidenav
 
-`--color-sui-rail` is the one dark surface in the light theme. Its text follows
-the rail's own tokens rather than the ink scale, because the light-theme
-secondary would measure 4.47:1 on it. Design rules for the rail live in `§5.7`.
+The sidenav is a white raised surface — it shares `sui-surface` with the cards,
+not its own dark token. Its text therefore follows the ordinary ink scale
+(`sui-ink` for primary, `sui-ink-secondary` for the quieter labels) rather than a
+separate palette. Design rules for the sidenav live in `§5.7`.
 
 ### 2.6 Radii
 
@@ -276,11 +276,10 @@ table requires re-measuring.
 | `#5f6b7e` | `#f8f9fa` canvas | 5.12:1 | AA |
 | `#67748e` (ink-400) | white raised surface | 4.70:1 | AA, marginal |
 | `#67748e` | `#f8f9fa` canvas | **4.46:1** | **fails AA** — hence §2.2's restriction |
-| `#8392ab` (rail secondary) | `#000000` rail | 6.66:1 | AA |
+| `#2440b0` (accent-ink) | `#eef1fb` (accent-soft) | ≥ 7:1 | AA, AAA — active sidenav destination |
 | `#2b4acb` (accent) | white raised surface | 7.13:1 | AA, AAA |
 | `#2b4acb` | `#f8f9fa` canvas | 6.76:1 | AA, AAA |
 | white on `#2b4acb` | — | 7.09:1 | AA, AAA — the filled button |
-| `#5b76d6` (rail accent) | `#000000` rail | 5.00:1 | AA as text; ≥3:1 as a non-text bar |
 | `amber-600` | white raised surface | **3.19:1** | **fails AA** — attention text moved to amber-700/800 |
 | white on `amber-500` | — | **~2.1:1** | **fails AA** — badges became `bg-amber-400 text-amber-950` |
 | `amber-950` on `amber-400` | — | 5.44:1 | AA — the replacement badge pair |
@@ -476,7 +475,7 @@ the dashboard, because a link is the most context-sensitive element. They are:
 | 2 | Body link on the canvas | `sui-link` |
 | 3 | Link inside a table cell | `sui-link` at `text-sm` |
 | 4 | Compact meta link ("All users →", "Save now") | `sui-focus sui-link text-xs` |
-| 5 | Nav rail destination | See `§5.7` |
+| 5 | Nav sidenav destination | See `§5.7` |
 | 6 | Nav drawer destination | See `§5.7` |
 | 7 | Inline link inside body copy | `sui-link` with `underline` always on — body prose underlines its links |
 | 8 | Link inside an empty state | `sui-link` at `text-sm`, the sole call to action |
@@ -486,7 +485,7 @@ the dashboard, because a link is the most context-sensitive element. They are:
 | 12 | Skip link to main | The layout's `sr-only … focus:not-sr-only` treatment; see `§8` |
 | 13 | Pagination link | `components/app/ui/pagination.blade.php`'s own treatment |
 | 14 | Breadcrumb / "back to X" | `sui-link text-xs` |
-| 15 | Logo / brand link | Rail's `text-sui-rail-ink`, plain and unadorned |
+| 15 | Logo / brand link | `text-sui-ink-on-accent` on the accent chip, plain and unadorned |
 
 A sixteenth link variant requires either collapsing two of the above or adding a
 token — see `§6`.
@@ -578,36 +577,39 @@ a design error; move the text to a row in `§5.5`.
 
 ### 5.7 Navigation
 
-**Two variants. The rail and the drawer.** Everything else that looks like
+**Two variants. The sidenav and the drawer.** Everything else that looks like
 navigation is a filter pill (§5.8) or a tab within a page.
 
-#### 5.7.1 The rail
+#### 5.7.1 The sidenav
 
-**Primitives:** `sui-rail`, `sui-rail-item`, `sui-rail-item-active`, `sui-rail-group`, `sui-rail-hairline`.
+**Primitives:** `sui-sidenav`, `sui-sidenav-item`, `sui-sidenav-item-active`, `sui-sidenav-group`.
 
-**Anatomy.** The rail is the one dark surface in the light theme — that contrast
-is deliberate, so the workspace reads as "be the tool" rather than as another
-page. Brand block at the top, the scrolling nav region in the middle, a pinned
-account block at the bottom.
+**Anatomy.** The sidenav is a white floating card — `sui-sidenav` is a raised
+`sui-surface` with a 16px outer radius and one soft shadow, inset from the
+viewport edge so the canvas shows around it. Brand block at the top, the
+scrolling nav region in the middle, a pinned account block at the bottom.
 
-A group label (`sui-rail-group`) precedes each set of destinations. The current
-destination is `sui-rail-item-active` plus an accent bar on its left edge.
+A section label (`sui-sidenav-group`) precedes each band of destinations —
+items render flat under it, with no per-group heading or chevron in between. The
+current destination is `sui-sidenav-item-active` — a soft accent wash under the
+whole row and the accent ink on the label, so position reads without a
+contrast-heavy solid fill.
 
 **States.**
 
 | State | Treatment |
 | --- | --- |
-| Default | `sui-rail-item` — translucent white wash on hover, `text-sui-rail-ink-secondary` |
-| Hover | `hover:bg-white/10 hover:text-sui-rail-ink` |
+| Default | `sui-sidenav-item` — quiet `text-ink-500`, `hover:bg-sui-hover hover:text-sui-ink` |
+| Hover | `hover:bg-sui-hover hover:text-sui-ink` |
 | Focus-visible | `sui-focus` ring, accent ring, accent offset |
-| Active / current | `bg-white/10 text-sui-rail-ink` plus the left accent bar, and `aria-current="page"` |
+| Active / current | `bg-sui-accent-soft text-sui-accent-ink` and `aria-current="page"` |
 | Disabled | Not applicable — a destination the user cannot reach is not rendered |
-| Loading | A pending link shows `wire:loading` on the destination, never a spinner rail-wide |
+| Loading | A pending link shows `wire:loading` on the destination, never a spinner sidenav-wide |
 | Error | Not applicable |
 
 #### 5.7.2 The drawer
 
-The drawer is the rail below `lg`, teleported onto `<body>` so no transformed or
+The drawer is the sidenav below `lg`, teleported onto `<body>` so no transformed or
 overflowing ancestor can clip it. It owns four behaviours, and all four are
 mandatory:
 
@@ -623,13 +625,14 @@ mandatory:
 The opener carries `aria-controls="drawer-id"` and `aria-expanded`. The panel
 carries `role="dialog"` and `aria-modal="true"`.
 
-#### 5.7.3 The rail collapse
+#### 5.7.3 The sidenav collapse
 
-At `lg` and above the rail may collapse to a 68px icon strip. The preference is
-persisted in `localStorage` under a key namespaced by user id, so a shared
-machine does not leak one account's layout into another's session. The collapse
-must not be the only way to reach anything — the icon strip is a convenience,
-and the expanded rail is always recoverable with one click.
+At `lg` and above the sidenav may collapse to a 76px icon strip. The preference
+is persisted in `localStorage` under `df.sidenav-collapsed.{userId}`, namespaced
+by user id so a shared machine does not leak one account's layout into another's
+session. The collapse must not be the only way to reach anything — the icon
+strip is a convenience, and the expanded sidenav is always recoverable with one
+click.
 
 ### 5.8 Filter pills
 
@@ -715,9 +718,9 @@ be announced twice: it is static content, so it should not be in an
 
 ### 5.11 Avatars and identity tiles
 
-**Anatomy.** A `size-8 rounded-md border border-sui-hairline bg-sui-well text-xs font-semibold text-ink-500` tile holding one character; `size-7` on the rail and in dense rows. The character is decorative — it is a rendering of the name beside it — so the tile is `aria-hidden="true"` and the name carries the identity.
+**Anatomy.** A `size-8 rounded-md border border-sui-hairline bg-sui-well text-xs font-semibold text-ink-500` tile holding one character; `size-7` on the sidenav and in dense rows. The character is decorative — it is a rendering of the name beside it — so the tile is `aria-hidden="true"` and the name carries the identity.
 
-Rail tiles invert: `bg-white/10` with `text-sui-rail-ink`.
+Sidenav tiles use the soft accent wash: `bg-sui-accent-soft text-sui-accent-ink`.
 
 ### 5.12 Dividers
 
@@ -782,7 +785,7 @@ work; `sm` and `xl` tune grids.
 | Below `sm` | Single column. Stat grids become one column. Horizontal container padding is `px-5` |
 | `sm` | Stat grids reflow to two columns. Container padding steps to `sm:px-8`. Buttons in a toolbar may move onto a second row |
 | `md` | Used sparingly, for isolated cases such as revealing a wide action that does not fit a narrow header |
-| `lg` | **The shell switches.** The rail appears, the mobile header hides, the drawer retires. Container padding steps to `lg:px-10` |
+| `lg` | **The shell switches.** The sidenav appears, the mobile header hides, the drawer retires. Container padding steps to `lg:px-10` |
 | `xl` | Grid column counts expand — two columns become three or four |
 
 ### 7.2 Layout rules
@@ -853,13 +856,13 @@ them.
 
 | # | Level | Requirement | Acceptance criteria |
 | --- | --- | --- | --- |
-| B1 | must | Every function is available from the keyboard | Complete these with no pointer: reach the skip link, open the drawer, change a filter, submit a form, open and close a dialog, navigate every rail destination |
+| B1 | must | Every function is available from the keyboard | Complete these with no pointer: reach the skip link, open the drawer, change a filter, submit a form, open and close a dialog, navigate every sidenav destination |
 | B2 | must | Keyboard focus is never trapped | In the drawer and every dialog, Tab cycles within the panel and Shift+Tab cycles back in; closing restores focus to the opener |
 | B3 | must | Focus order matches visual and reading order | Tab through a card and confirm the sequence reads top-to-bottom and left-to-right |
 | B4 | must | A visible focus indicator is present on every focusable element | Tab through the whole page; every stop shows a ring. `sui-focus` is applied wherever the default outline is suppressed |
 | B5 | must | Focus is never obscured by sticky or absolutely positioned elements | Focus each element in a page with a sticky header; the focused element is not hidden behind it. `scroll-padding-top: 6rem` on `<html>` handles anchor jumps |
-| B6 | must | Pointer targets meet 24×24 CSS px | Measured on icon buttons, pills, checkboxes and rail items in every state |
-| B7 | should | Primary controls meet 44×44 CSS px | Measured on primary buttons, rail destinations and the drawer opener |
+| B6 | must | Pointer targets meet 24×24 CSS px | Measured on icon buttons, pills, checkboxes and sidenav items in every state |
+| B7 | should | Primary controls meet 44×44 CSS px | Measured on primary buttons, sidenav destinations and the drawer opener |
 | B8 | must | Every dragging action has a single-pointer alternative | If any component allows dragging (reordering, selection), the same result is reachable by keyboard |
 | B9 | must | Every landmark region is identified by an accessible name | `<main>` has `id="dashboard-main"`; every `<nav>` has `aria-labelledby`; every `role="dialog"` is named by its own heading or `aria-label` |
 | B10 | must | Help appears in a consistent location | Any contextual help, plan explanation or usage hint appears in the same relative position on every screen that offers one |
@@ -1040,7 +1043,7 @@ first four are blocking.
 
 **Responsive**
 
-- [ ] The shell switches at `lg`; the rail, header and drawer behave per §7.2.
+- [ ] The shell switches at `lg`; the sidenav, header and drawer behave per §7.2.
 - [ ] Long content truncates, wraps or breaks rather than clipping.
 - [ ] Numbers use `tabular-nums`; changing values do not reflow a column.
 - [ ] No component changes its radius, shadow or card style at a breakpoint.

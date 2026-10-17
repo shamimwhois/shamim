@@ -18,7 +18,7 @@
      * the border are the palette's business, not the glyph's, so they arrive
      * through `$attributes` and differ by surface — the public site inverts it
      * on `bg-ink-900`, the dashboard rail sets it on `bg-white`, the mobile bar
-     * sets it on `bg-sui-rail`. That is why this is a prop-taking component and
+     * sets it on `bg-sui-accent`. That is why this is a prop-taking component and
      * not three theme variants: one component with three palettes is the same
      * information, stated once.
      *

@@ -38,7 +38,7 @@
                 <ol class="flex flex-wrap items-center gap-1.5 text-2xs text-ink-500">
                     <li>
                         <a
-                            href="{{ route(auth()->user()->dashboardRoute()) }}"
+                            href="{{ auth()->check() ? route(auth()->user()->dashboardRoute()) : route('home') }}"
                             wire:navigate
                             class="transition duration-150 ease-soft hover:text-sui-accent-ink"
                         >

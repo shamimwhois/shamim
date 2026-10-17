@@ -374,7 +374,7 @@ new #[Title('Post')] class extends Component
      | Related posts
      --}}
     @if ($this->related->isNotEmpty())
-        <section class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="related-heading">
+        <section data-reveal class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="related-heading">
             <div class="shell">
                 <x-app.ui.section-marker :number="2" label="Keep reading" />
                 <h2 id="related-heading" class="mt-5 text-2xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
@@ -393,7 +393,7 @@ new #[Title('Post')] class extends Component
     {{-- ================================================================== --
      | Comments
      --}}
-    <section class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="comments-heading">
+    <section data-reveal class="border-t border-ink-200 py-16 dark:border-ink-800" aria-labelledby="comments-heading">
         <div class="shell max-w-3xl">
             <x-app.ui.section-marker :number="3" label="Discussion" />
             <h2 id="comments-heading" class="mt-5 text-2xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">

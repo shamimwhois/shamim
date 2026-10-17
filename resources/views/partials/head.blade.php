@@ -31,6 +31,14 @@
 <meta name="author" content="{{ $seo->authorName ?? config('portfolio.author.name') }}" />
 <meta name="color-scheme" content="light dark" />
 
+{{--
+    Browser chrome (mobile address bar, task switcher) follows the applied
+    theme. Dark is the product default, so the static value is the dark
+    canvas; `partials/theme-boot` and the theme toggle keep it in sync with
+    the applied theme afterwards.
+--}}
+<meta name="theme-color" content="#0d0d0c" />
+
 {{-- ------------------------------------------------------------------ --
  | Canonical + robots
  --}}
@@ -97,3 +105,4 @@
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+@include('partials.theme-boot')

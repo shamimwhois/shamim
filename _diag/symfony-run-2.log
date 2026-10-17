@@ -1,0 +1,5 @@
+PHP=/c/Users/SHAMIM.IT/.config/herd-lite/bin/php
+symfony_exit=1
+--- stdout tail ---
+--- stderr tail ---
+Could not open input file: vendor/bin/symfony

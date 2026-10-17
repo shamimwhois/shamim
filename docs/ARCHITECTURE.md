@@ -336,7 +336,7 @@ may not branch on role.
 
 The load-bearing consequence is the shell. There are three workspace layouts and
 one implementation: `components/app/ui/dashboard-shell.blade.php` holds the
-rail, the mobile drawer, the focus trap and the `data-sui` scope, and each role
+sidenav, the mobile drawer, the focus trap and the `data-sui` scope, and each role
 layout composes it with its own three one-line chrome components. Triplicating
 ~270 lines of Alpine layout machinery would mean three places to fix the same
 bug. Role differentiation comes from *composing* permission-filtered navigation

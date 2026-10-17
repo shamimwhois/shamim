@@ -5,16 +5,17 @@
      * The dashboard shell.
      *
      * Everything every authenticated surface shares, and nothing any one
-     * surface owns: the skip link, the collapsible desktop rail, the mobile
-     * drawer with its hand-rolled focus trap, the `<main>` that page content
-     * lands in, and the `data-sui` scope that makes all of it Soft UI.
+     * surface owns: the skip link, the floating sidenav, the floating navbar,
+     * the mobile drawer with its hand-rolled focus trap, the `<main>` that
+     * page content lands in, and the `data-sui` scope that makes all of it
+     * Soft UI.
      *
      * ## Why this is a component and not a layout
      *
      * There are three role layouts — `layouts::app.dashboard`,
      * `layouts::seller.dashboard`, `layouts::admin.dashboard` — and they share
-     * this shell rather than each carrying a copy of it. The rail and the
-     * drawer are ~270 lines of interdependent machinery: the Alpine state that
+     * this shell rather than each carrying a copy of it. The sidenav and the
+     * drawer are ~300 lines of interdependent machinery: the Alpine state that
      * drives them, the teleport that keeps the drawer out of a clipped
      * ancestor, the focus trap that makes it modal in fact as well as in
      * `aria-modal`, and the escape handler that closes it. Duplicating that
@@ -29,31 +30,46 @@
      *
      * | Slot           | Region                                            |
      * |----------------|---------------------------------------------------|
-     * | `brand`        | the wordmark, in the rail and again in the drawer |
-     * | `sidebar`      | the rail's scrolling navigation                   |
-     * | `sidebarIcons` | the rail's collapsed, icon-only navigation        |
-     * | `footer`       | the rail's pinned account block                   |
-     * | `header`       | the sticky bar shown below `lg`                   |
+     * | `brand`        | the wordmark, in the sidenav and again in the drawer |
+     * | `sidebar`      | the sidenav's scrolling navigation                |
+     * | `sidebarIcons` | the sidenav's collapsed, icon-only navigation     |
+     * | `footer`       | the sidenav's pinned account block                |
+     * | `header`       | the navbar's breadcrumb (the role's workspace)    |
      * | default slot   | `<main id="dashboard-main">` — the page itself    |
      *
      * Two regions reuse the same slot content on purpose. The brand appears in
-     * both the rail and the drawer, and the navigation appears in the rail, the
-     * rail's collapsed form, and the drawer: rendering `{{ $brand }}` twice
-     * costs nothing because a slot is already a rendered string, and it
-     * guarantees the drawer cannot disagree with the rail about where "home"
-     * is.
+     * both the sidenav and the drawer, and the navigation appears in the
+     * sidenav, the sidenav's collapsed form, and the drawer: rendering
+     * `{{ $brand }}` twice costs nothing because a slot is already a rendered
+     * string, and it guarantees the drawer cannot disagree with the sidenav
+     * about where "home" is.
+     *
+     * ## The Creative Tim shape
+     *
+     * Both surfaces float. The sidenav is a white card inset from the viewport
+     * edge with 16px corners and one soft shadow; the navbar is a white pill
+     * floating inside the content column with the canvas showing around it on
+     * all four sides. Nothing is flush, nothing is a full-width band, and the
+     * only separation between surfaces is shadow — the neumorphic thesis,
+     * applied at the layout level rather than only to the cards.
      *
      * ## State
      *
      * The shell owns two independent pieces of layout state:
      *
-     *   rail   — desktop only. Collapses the sidebar to an icon strip.
+     *   collapsed — desktop only. Collapses the sidenav to an icon strip.
      *            Persisted, because it is a durable workspace preference.
-     *   drawer — below `lg`. The sidebar becomes an off-canvas panel with a
+     *   drawer — below `lg`. The sidenav becomes an off-canvas panel with a
      *            backdrop, scroll lock and Escape-to-close.
      *
      * Both keys are namespaced by user id so a shared machine does not leak
      * one account's layout into another's session.
+     *
+     * The control that flips `collapsed` is the icon button in the sidenav's
+     * brand row — top-right of the wordmark, present in both widths so the
+     * strip can always be widened back. It lives here rather than in the
+     * pinned footer because it belongs to the *shell*: the footer is a role
+     * component, and a rail that cannot be re-widened is a trap.
      */
     $user = auth()->user();
     $home = route($user->dashboardRoute());
@@ -63,7 +79,7 @@
 {{--
     The skip link comes first in the tab order of every dashboard page. It is
     the only element that lives outside the `x-data` root, because it must be
-    reachable even when the rail is collapsed and the drawer is closed.
+    reachable even when the sidenav is collapsed and the drawer is closed.
 --}}
 <a
     href="#dashboard-main"
@@ -75,37 +91,65 @@
 <div
     class="flex min-h-screen"
     x-data="{
-        rail: JSON.parse(localStorage.getItem(@js('df.rail.'.auth()->id())) ?? 'false'),
+        collapsed: JSON.parse(localStorage.getItem(@js('df.sidenav-collapsed.'.auth()->id())) ?? 'false'),
         drawer: false,
-        toggleRail() {
-            this.rail = ! this.rail;
-            localStorage.setItem(@js('df.rail.'.auth()->id()), JSON.stringify(this.rail));
+        toggleCollapsed() {
+            this.collapsed = ! this.collapsed;
+            localStorage.setItem(@js('df.sidenav-collapsed.'.auth()->id()), JSON.stringify(this.collapsed));
         },
     }"
     @keydown.escape.window="drawer = false"
 >
     {{-- ========================================================= --
-     | Sidebar (desktop)
+     | Sidenav (desktop)
      |
-     | The rail is the one dark surface in the light theme. Its text
-     | therefore follows the rail's own tokens rather than the ink
-     | scale — `#8392ab` on `#000000` measures 6.66:1, where the
-     | light-theme secondary would measure 4.47:1.
+     | The floating white card: inset 12px from the viewport edge,
+     | 16px corners, one soft shadow, and a full-height sticky
+     | column that never scrolls with the page. Light surfaces
+     | throughout — the dark surface of the previous shell is gone, and
+     | with it the last surface that needed its own ink scale.
      --}}
     <aside
-        :class="rail ? 'lg:w-[68px]' : 'lg:w-[264px]'"
-        class="sui-rail hidden shrink-0 border-r border-sui-rail-hairline transition-[width] duration-200 ease-soft lg:flex lg:flex-col"
+        :class="collapsed ? 'lg:w-[76px]' : 'lg:w-[250px]'"
+        class="sui-sidenav sticky top-3 hidden h-[calc(100vh-1.5rem)] shrink-0 flex-col ms-3 transition-[width] duration-200 ease-soft lg:flex"
+        aria-label="{{ __('Workspace navigation') }}"
     >
-        <div class="flex h-16 shrink-0 items-center gap-2 border-b border-sui-rail-hairline px-4">
+        <div class="flex h-16 shrink-0 items-center gap-2.5 px-4">
             <a
                 href="{{ $home }}"
                 wire:navigate
-                class="group flex min-w-0 items-center gap-2.5 text-sm font-semibold text-sui-rail-ink"
+                x-show="! collapsed"
+                class="group flex min-w-0 items-center gap-2.5 text-sm font-semibold text-ink-900"
                 title="{{ $authorName }}"
             >
-                <x-app.icon.logo-mark size="md" class="bg-white text-sui-rail" />
-                <span x-show="! rail" class="truncate">{{ $authorName }}</span>
+                <x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />
+                <span class="truncate">{{ $authorName }}</span>
             </a>
+
+            {{--
+                Collapse/expand. Wordmark beside it already spends the row's
+                label budget, so the icon stays label-free and mirrored when
+                the rail is narrow.
+
+                In the icon rail the brand link yields the row to this handle
+                (76 px cannot hold both the chip and the button), so the
+                button only appears next to the wordmark — never twice.
+            --}}
+            <button
+                type="button"
+                @click="toggleCollapsed()"
+                :aria-expanded="collapsed ? 'false' : 'true'"
+                :class="collapsed ? 'mx-auto' : 'ms-auto'"
+                aria-label="{{ __('Collapse or expand the sidebar') }}"
+                class="sui-focus grid size-8 shrink-0 place-items-center rounded-md text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink"
+                data-test="sidenav-toggle"
+            >
+                <flux:icon
+                    name="chevron-double-left"
+                    class="size-4 shrink-0 transition-transform duration-200"
+                    ::class="collapsed ? 'rotate-180' : ''"
+                />
+            </button>
         </div>
 
         {{--
@@ -115,30 +159,36 @@
         --}}
         <div
             class="flex-1 overflow-y-auto overscroll-contain px-3 py-4"
-            x-show="! rail"
+            x-show="! collapsed"
         >
             {{ $sidebar ?? null }}
         </div>
 
         {{--
-            Icon-only rail. The full nav is hidden rather than shrunk:
+            Icon-only sidenav. The full nav is hidden rather than shrunk:
             a tooltip per icon is a worse experience than expanding the
-            rail, and this keeps one source of truth for the item list.
-        --}}
-        <div class="flex-1 overflow-y-auto overscroll-contain px-2 py-4" x-show="rail" x-cloak>
+            sidenav, and this keeps one source of truth for the item list.
+        --}}        <div
+            class="flex-1 overflow-y-auto overscroll-contain px-2 py-4"
+            x-show="collapsed" x-cloak
+        >
             {{ $sidebarIcons ?? null }}
         </div>
 
-        <div class="shrink-0 border-t border-sui-rail-hairline p-3">
+        <div class="shrink-0 p-3">
             {{ $footer ?? null }}
         </div>
     </aside>
 
     {{-- ========================================================= --
-     | Main column
+     | Main column — the floating navbar and the page
      --}}
     <div class="flex min-w-0 flex-1 flex-col">
-        {{ $header ?? null }}
+        <x-app.ui.navbar>
+            <x-slot:crumb>
+                {{ $header ?? null }}
+            </x-slot:crumb>
+        </x-app.ui.navbar>
 
         <main id="dashboard-main" class="flex-1">
             {{ $slot }}
@@ -226,22 +276,22 @@
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="translate-x-0"
                 x-transition:leave-end="-translate-x-full"
-                class="sui-rail absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col shadow-soft-3"
+                class="sui-sidenav absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col rounded-none shadow-soft-3"
             >
-                <div class="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-sui-rail-hairline px-4">
+                <div class="flex h-16 shrink-0 items-center justify-between gap-2 px-4">
                     <a
                         href="{{ $home }}"
                         wire:navigate
-                        class="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-sui-rail-ink"
+                        class="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-ink-900"
                     >
-                        <x-app.icon.logo-mark size="md" class="bg-white text-sui-rail" />
+                        <x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />
                         <span class="truncate">{{ $authorName }}</span>
                     </a>
 
                     <button
                         type="button"
                         @click="drawer = false"
-                        class="sui-focus grid size-9 shrink-0 place-items-center rounded-md text-sui-rail-ink-secondary transition duration-150 ease-soft hover:bg-white/10 hover:text-sui-rail-ink"
+                        class="sui-focus grid size-9 shrink-0 place-items-center rounded-md text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink"
                         aria-label="{{ __('Close navigation') }}"
                         data-test="drawer-close"
                     >
@@ -253,7 +303,7 @@
                     {{ $sidebar ?? null }}
                 </div>
 
-                <div class="shrink-0 border-t border-sui-rail-hairline p-3">
+                <div class="shrink-0 p-3">
                     {{ $footer ?? null }}
                 </div>
             </div>

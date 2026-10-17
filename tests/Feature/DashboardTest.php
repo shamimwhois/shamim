@@ -96,6 +96,20 @@ test('a plain user is forbidden from the admin home', function () {
         ->assertForbidden();
 });
 
+test('only admins can reach user management', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('admin.users'))
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->seller()->create())
+        ->get(route('admin.users'))
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.users'))
+        ->assertOk();
+});
+
 /*
 |--------------------------------------------------------------------------
 | Role-aware navigation
@@ -112,6 +126,18 @@ test('the sidebar shows the administration section only to admins', function () 
         ->get(route('admin.dashboard'))
         ->assertOk()
         ->assertSee('Admin dashboard');
+});
+
+test('the admin sidebar lists only admin routes', function () {
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('Admin dashboard')
+        ->assertSee('Users')
+        // Sidebar-only entries that belonged to other workspaces are gone.
+        ->assertDontSee(route('seller.dashboard'))
+        ->assertDontSee(route('ideas.index'))
+        ->assertDontSee(route('marketplace.index'));
 });
 
 test('the sidebar shows the selling section only to sellers and admins', function () {

@@ -25,6 +25,8 @@ Route::livewire('blog/{post:slug}', 'pages::blog.show')->name('blog.show');
 
 Route::livewire('about', 'pages::about')->name('about');
 
+Route::livewire('feed', 'pages::feed')->name('feed.index');
+
 /*
 | Feeds and machine-readable endpoints.
 */
@@ -41,7 +43,7 @@ Route::get('robots.txt', RobotsController::class);
 | so the URL states which surface it belongs to and no role's home is nested
 | inside another's:
 |
-|   /dashboard          user    — author workspace (posts, comments, taxonomy)
+|   /dashboard          user    — author workspace (posts and comments; taxonomy is permission-gated)
 |   /seller/dashboard   seller  — selling workspace
 |   /admin/dashboard    admin   — platform administration
 |
@@ -57,8 +59,8 @@ Route::get('robots.txt', RobotsController::class);
 
 Route::middleware(['auth', 'verified'])->prefix('dashboard')->name('dashboard.')->group(function () {
     /*
-     * The user role's home, and the shared author workspace. Available to every
-     * authenticated account: a seller and an admin still write posts here.
+     * The user role's home and shared author workspace. Post and comment pages
+     * are available to every account role; taxonomy has its own permission guard.
      */
     Route::livewire('/', 'pages::dashboard.index')->name('index');
 
@@ -66,7 +68,9 @@ Route::middleware(['auth', 'verified'])->prefix('dashboard')->name('dashboard.')
     Route::livewire('posts/create', 'pages::dashboard.posts.edit')->name('posts.create');
     Route::livewire('posts/{post:id}/edit', 'pages::dashboard.posts.edit')->name('posts.edit');
     Route::livewire('comments', 'pages::dashboard.comments')->name('comments');
-    Route::livewire('taxonomy', 'pages::dashboard.taxonomy')->name('taxonomy');
+    Route::livewire('taxonomy', 'pages::dashboard.taxonomy')
+        ->middleware('permission:'.AccountPermission::ManageTaxonomy->value)
+        ->name('taxonomy');
 });
 
 /*
@@ -88,7 +92,9 @@ Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::AccessAd
     ->name('admin.')
     ->group(function () {
         Route::livewire('dashboard', 'pages::admin.dashboard')->name('dashboard');
-        Route::livewire('users', 'pages::admin.users')->name('users');
+        Route::livewire('users', 'pages::admin.users')
+            ->middleware('permission:'.AccountPermission::ManageUsers->value)
+            ->name('users');
     });
 
 /*
@@ -117,9 +123,10 @@ Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseAiHub
         Route::livewire('ai-hub', 'pages::ai-hub.index')->name('ai-hub.index');
     });
 
-Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseMarketplace->value])
+Route::middleware(['web'])
     ->group(function () {
         Route::livewire('marketplace', 'pages::marketplace.index')->name('marketplace.index');
+        Route::livewire('marketplace/{package}', 'pages::marketplace.show')->name('marketplace.show');
     });
 
 Route::middleware(['auth', 'verified', 'permission:'.AccountPermission::UseIdeas->value])

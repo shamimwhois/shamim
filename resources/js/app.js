@@ -156,14 +156,19 @@ function initTableOfContents() {
 }
 
 /**
- * Reveal-on-scroll.
+ * Reveal-on-scroll — mirrored, AOS-style.
  *
- * Elements marked `data-reveal` fade up once, when first entering the viewport.
- * Opt-in per element so the effect is never applied to content a reader might
- * scroll past too quickly to see.
+ * Elements marked `data-reveal` fade up as they enter the viewport and fade
+ * back out when they leave, so sections settle in on the way down the page
+ * and give way again on the way up. Opt-in per element. The observer is
+ * module-level and persists across Livewire navigations: the visible state
+ * now toggles with the scroll, so nothing is ever "done" and unobserved, and
+ * re-observing an already-observed target is a spec-level no-op.
  */
+let revealObserver = null;
+
 function initReveal() {
-    const targets = document.querySelectorAll('[data-reveal]:not([data-visible])');
+    const targets = document.querySelectorAll('[data-reveal]');
 
     if (targets.length === 0) {
         return;
@@ -176,24 +181,28 @@ function initReveal() {
         return;
     }
 
-    const observer = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (! entry.isIntersecting) {
-                    return;
-                }
+    if (revealObserver === null) {
+        revealObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.setAttribute('data-visible', 'true');
+                    } else {
+                        entry.target.removeAttribute('data-visible');
+                    }
+                });
+            },
+            {
+                // A band below the fold delays the fade-in; any pixel of the
+                // element inside the remaining viewport keeps it shown, so
+                // tall sections never flicker while straddling the edge.
+                rootMargin: '0px 0px -80px 0px',
+                threshold: 0,
+            },
+        );
+    }
 
-                entry.target.setAttribute('data-visible', 'true');
-                observer.unobserve(entry.target);
-            });
-        },
-        {
-            rootMargin: '0px 0px -80px 0px',
-            threshold: 0.05,
-        },
-    );
-
-    targets.forEach((el) => observer.observe(el));
+    targets.forEach((el) => revealObserver.observe(el));
 }
 
 /**
@@ -255,6 +264,410 @@ function initCodeCopy() {
 }
 
 /**
+ * Typewriter effect for the About hero headline.
+ *
+ * Progressive enhancement: the server renders the full text, so a no-JS
+ * reader still gets the headline. With JS we clear it and type it out once,
+ * then leave it still.
+ */
+function initTypewriter() {
+    const targets = document.querySelectorAll('[data-typewriter]:not([data-typed])');
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        targets.forEach((el) => {
+            el.textContent = el.dataset.text || el.textContent;
+            el.dataset.typed = 'done';
+        });
+        return;
+    }
+
+    targets.forEach((el) => {
+        const full = el.dataset.text || '';
+        if (! full) {
+            el.dataset.typed = 'done';
+            return;
+        }
+
+        el.dataset.typed = 'running';
+        el.textContent = '';
+
+        let i = 0;
+        const tick = () => {
+            if (i <= full.length) {
+                el.textContent = full.slice(0, i);
+                i += 1;
+                window.setTimeout(tick, 26);
+            } else {
+                el.dataset.typed = 'done';
+            }
+        };
+
+        window.setTimeout(tick, 200);
+    });
+}
+
+/**
+ * Cycling typewriter for the hero subtitle.
+ *
+ * Not a character-by-character typewriter: the whole phrase appears at once
+ * as random glyphs and then decodes left to right, one character per tick —
+ * the scramble-decode effect. Spaces hold their real value, so the shape of
+ * the sentence is visible while the rest is still noise. After a full
+ * resolve it holds, then the next phrase scrambles in at its full length.
+ * With JS off the server-rendered phrase stays complete.
+ */
+const SCRAMBLE_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#&/%*<>';
+
+const scrambleTickMs = 45;
+const scrambleHoldMs = 1750;
+
+function scramblePhrase(phrase, resolved) {
+    return phrase
+        .split('')
+        .map((char, index) => {
+            if (index < resolved || char === ' ') {
+                return char;
+            }
+
+            return SCRAMBLE_GLYPHS[Math.floor(Math.random() * SCRAMBLE_GLYPHS.length)];
+        })
+        .join('');
+}
+
+function initCycleTypewriter() {
+    const targets = document.querySelectorAll('[data-cycle-el]:not([data-cycled])');
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    targets.forEach((el) => {
+        const phrases = (el.dataset.cycle || '').split(',').map((p) => p.trim()).filter(Boolean);
+
+        if (phrases.length === 0) {
+            el.dataset.cycled = 'done';
+            return;
+        }
+
+        if (reduced) {
+            el.textContent = phrases[0];
+            el.dataset.cycled = 'done';
+            return;
+        }
+
+        el.dataset.cycled = 'running';
+
+        let phraseIndex = 0;
+        let resolved = 0;
+
+        const tick = () => {
+            const phrase = phrases[phraseIndex];
+
+            if (resolved < phrase.length) {
+                resolved += 1;
+                el.textContent = scramblePhrase(phrase, resolved);
+                window.setTimeout(tick, scrambleTickMs);
+                return;
+            }
+
+            el.textContent = phrase;
+
+            window.setTimeout(() => {
+                phraseIndex = (phraseIndex + 1) % phrases.length;
+                resolved = 0;
+                tick();
+            }, scrambleHoldMs);
+        };
+
+        el.textContent = phrases[0];
+        window.setTimeout(tick, 450);
+    });
+}
+
+/**
+ * Magnetic buttons.
+ *
+ * Each `[data-magnetic]` wrapper leans a few pixels toward the pointer while
+ * it moves over the button and springs straight back on leave. Fine pointers
+ * only — touch has no hover to borrow. Reduced-motion users get a static
+ * button. (The pulse rings on the primary pill are pure CSS, not this.)
+ */
+function initMagnetic() {
+    const targets = document.querySelectorAll('[data-magnetic]:not([data-magnetic-ready])');
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    if (
+        ! window.matchMedia('(pointer: fine)').matches ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+        return;
+    }
+
+    const strength = 9;
+    const maxOffset = 7;
+
+    targets.forEach((wrapper) => {
+        wrapper.dataset.magneticReady = 'true';
+
+        wrapper.addEventListener('pointermove', (event) => {
+            const rect = wrapper.getBoundingClientRect();
+            const x = (event.clientX - rect.left - rect.width / 2) / strength;
+            const y = (event.clientY - rect.top - rect.height / 2) / strength;
+            const clampedX = Math.max(-maxOffset, Math.min(maxOffset, x));
+            const clampedY = Math.max(-maxOffset, Math.min(maxOffset, y));
+
+            wrapper.style.transform = `translate(${clampedX.toFixed(2)}px, ${clampedY.toFixed(2)}px)`;
+        });
+
+        wrapper.addEventListener('pointerleave', () => {
+            wrapper.style.transform = '';
+        });
+    });
+}
+
+/**
+ * Count-up figures for the About stats band.
+ *
+ * Progressive enhancement: the server render contains the final value, so a
+ * no-JS reader sees the real numbers. With JS, the numeric part of each
+ * `[data-countup]` figure counts up once, the first time it enters the
+ * viewport; a suffix ("+", "M") rides along and a `data-count-pad` of 2
+ * zero-pads the display ("9" → "09"), matching the band's mono style.
+ */
+function initStatCounters() {
+    const targets = document.querySelectorAll('[data-countup]:not([data-counted])');
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    targets.forEach((el) => {
+        el.dataset.counted = 'true';
+
+        // Non-numeric or malformed pairs render static — skip quietly.
+        if (! el.hasAttribute('data-count-target')) {
+            return;
+        }
+
+        const target = Number(el.dataset.countTarget);
+
+        if (! Number.isFinite(target)) {
+            return;
+        }
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            return;
+        }
+
+        const pad = Number(el.dataset.countPad || 0) || 0;
+        const suffix = el.dataset.countSuffix || '';
+
+        const format = (value) => String(Math.round(value)).padStart(pad, '0') + suffix;
+
+        const animate = () => {
+            const duration = 1200;
+            let start;
+
+            const frame = (now) => {
+                if (start === undefined) {
+                    start = now;
+                }
+
+                const progress = Math.min(1, (now - start) / duration);
+                const eased = 1 - Math.pow(1 - progress, 3);
+
+                el.textContent = format(target * eased);
+
+                if (progress < 1) {
+                    window.requestAnimationFrame(frame);
+                }
+            };
+
+            el.textContent = format(0);
+            window.requestAnimationFrame(frame);
+        };
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    observer.disconnect();
+                    animate();
+                }
+            },
+            { threshold: 0.4 },
+        );
+
+        observer.observe(el);
+    });
+}
+
+/**
+ * Writing-carousel pagination (About page, section 07).
+ *
+ * The carousel is a scroll-snap strip; this wires the header stepper and the
+ * 01/NN counter to its scroll position. Buttons scroll one card at a time and
+ * disable at the ends; scroll position decides which card the counter names.
+ * Idempotent like every initialiser: buttons already carrying the listener
+ * (found via a private symbol-free flag) are skipped.
+ */
+function initWritingCarousel() {
+    document.querySelectorAll('[data-carousel-viewport]').forEach((viewport) => {
+        if (viewport.dataset.carouselBound === 'true') {
+            return;
+        }
+
+        viewport.dataset.carouselBound = 'true';
+
+        const root = viewport.closest('section');
+        const prev = root?.querySelector('[data-carousel-prev]');
+        const next = root?.querySelector('[data-carousel-next]');
+        const counter = root?.querySelector('[data-carousel-counter]');
+        const cards = Array.from(viewport.children);
+
+        if (prev === null || next === null || cards.length === 0) {
+            return;
+        }
+
+        const step = () => (cards[0]?.getBoundingClientRect().width ?? 0) + 16;
+
+        const indexFor = () => Math.round(viewport.scrollLeft / Math.max(1, step()));
+
+        const sync = () => {
+            const index = Math.min(cards.length - 1, Math.max(0, indexFor()));
+
+            if (counter !== null) {
+                counter.textContent = String(index + 1).padStart(2, '0');
+            }
+
+            prev.disabled = viewport.scrollLeft <= 2;
+            next.disabled = viewport.scrollLeft >= viewport.scrollWidth - viewport.clientWidth - 2;
+        };
+
+        prev.addEventListener('click', () => {
+            viewport.scrollBy({ left: -step(), behavior: 'smooth' });
+        });
+
+        next.addEventListener('click', () => {
+            viewport.scrollBy({ left: step(), behavior: 'smooth' });
+        });
+
+        let ticking = false;
+
+        viewport.addEventListener('scroll', () => {
+            if (ticking) {
+                return;
+            }
+
+            ticking = true;
+            window.requestAnimationFrame(() => {
+                ticking = false;
+                sync();
+            });
+        }, { passive: true });
+
+        window.addEventListener('resize', sync, { passive: true });
+        sync();
+    });
+}
+
+/**
+ * About §04 capability stage: cards + mind map.
+ *
+ * Cards carry a pointer-tracked spotlight (--gx/--gy) and a 3D tilt
+ * (--tilt-x/--tilt-y); the SVG beside them draws its wires in when scrolled
+ * into view (is-drawn), and clicking a card sets [data-focus] on the stage so
+ * every branch but the matching one dims. Esc or a second click clears it.
+ * Safe on repeated boot()s: one binding attribute per stage.
+ */
+function initSkillsMap() {
+    document.querySelectorAll('[data-skills-stage]').forEach((stage) => {
+        if (stage.dataset.skillMapBound) {
+            return;
+        }
+        stage.dataset.skillMapBound = '1';
+
+        const cards = Array.from(stage.querySelectorAll('.cap-card'));
+        const branches = Array.from(stage.querySelectorAll('[data-domain]'));
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const setFocus = (index) => {
+            if (index === null) {
+                stage.removeAttribute('data-focus');
+            } else {
+                stage.setAttribute('data-focus', String(index));
+            }
+
+            branches.forEach((branch) => {
+                branch.classList.toggle('is-hot', index !== null && Number(branch.dataset.domain) === index);
+            });
+
+            cards.forEach((card) => {
+                const active = index !== null && Number(card.dataset.domain) === index;
+                card.setAttribute('aria-pressed', active ? 'true' : 'false');
+                card.classList.toggle('is-active', active);
+            });
+        };
+
+        // Entrance: draw the wires when the stage scrolls in, then drop the
+        // stagger delays once the slowest transition has finished.
+        if (reduceMotion) {
+            stage.classList.add('is-drawn', 'is-settled');
+        } else {
+            const revealObserver = new IntersectionObserver((entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    stage.classList.add('is-drawn');
+                    window.setTimeout(() => stage.classList.add('is-settled'), 1900);
+                    revealObserver.disconnect();
+                }
+            }, { threshold: 0.3 });
+            revealObserver.observe(stage);
+        }
+
+        cards.forEach((card) => {
+            card.addEventListener('click', () => {
+                const index = Number(card.dataset.domain);
+                setFocus(stage.getAttribute('data-focus') === String(index) ? null : index);
+            });
+
+            if (reduceMotion) {
+                return;
+            }
+
+            card.addEventListener('pointermove', (event) => {
+                const rect = card.getBoundingClientRect();
+                const px = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+                const py = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+
+                card.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`);
+                card.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`);
+                card.style.setProperty('--tilt-x', `${((0.5 - py) * 7).toFixed(2)}deg`);
+                card.style.setProperty('--tilt-y', `${((px - 0.5) * 9).toFixed(2)}deg`);
+            });
+
+            card.addEventListener('pointerleave', () => {
+                card.style.setProperty('--tilt-x', '0deg');
+                card.style.setProperty('--tilt-y', '0deg');
+            });
+        });
+
+        stage.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && stage.hasAttribute('data-focus')) {
+                setFocus(null);
+            }
+        });
+    });
+}
+
+/**
  * Boot. Livewire swaps page content without a full reload, so every initialiser
  * must be safe to run repeatedly against the current DOM.
  */
@@ -263,6 +676,12 @@ function boot() {
     initTableOfContents();
     initReveal();
     initCodeCopy();
+    initTypewriter();
+    initCycleTypewriter();
+    initMagnetic();
+    initStatCounters();
+    initWritingCarousel();
+    initSkillsMap();
 }
 
 if (document.readyState === 'loading') {

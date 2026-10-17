@@ -6,6 +6,25 @@
 @source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
 @source '../../vendor/livewire/flux/stubs/**/*.blade.php';
 
+/* --- The dynamically named pastel utilities ----------------------------- */
+/* The stat tiles, the sidenav icons and the notification rows all pick their
+   tone from a rotating index, so the class names are assembled at runtime:
+
+       "bg-sui-pastel-{$tone}-wash"  => ! $current
+
+   Tailwind scans source files for literal candidates, and a composed string
+   is not one — so without this declaration twelve utilities would simply
+   never be emitted, and every pastel square would render as an unstyled
+   transparent box. No error, no warning: the page just looks broken.
+
+   `@source inline()` registers the names directly, which is the only way a
+   class that never appears verbatim anywhere can reach the stylesheet. The
+   `@utility sui-pastel-*` composites below stay as the hand-authored
+   shorthand for the places that want wash and ink in one class. */
+@source inline(
+    "bg-sui-pastel-primary-wash bg-sui-pastel-secondary-wash bg-sui-pastel-info-wash bg-sui-pastel-success-wash bg-sui-pastel-warning-wash bg-sui-pastel-danger-wash text-sui-pastel-primary-ink text-sui-pastel-secondary-ink text-sui-pastel-info-ink text-sui-pastel-success-ink text-sui-pastel-warning-ink text-sui-pastel-danger-ink"
+);
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
@@ -20,6 +39,9 @@
     /* --- Typography ------------------------------------------------------ */
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+    /* Vintage calligraphy + serif accents for the About hero typography. */
+    --font-calligraphy: 'Dancing Script', cursive;
+    --font-vintage: 'Cormorant Garamond', 'Garamond', serif;
 
     /* Editorial scale — 1.200 minor third, tuned for long-form reading. */
     --text-2xs: 0.6875rem;   /* 11px — metadata, eyebrows */
@@ -128,16 +150,6 @@
     --color-sui-ink-disabled: #8392ab;   /* non-essential, large text only */
     --color-sui-ink-on-accent: #ffffff;
 
-    /* --- The rail ------------------------------------------------------- */
-    /* The one dark surface in the light theme. `#8392ab` on `#000000`
-       measures 6.66:1, which is why the rail's secondary text is the
-       spec's third text colour rather than its first. */
-    --color-sui-rail: #000000;
-    --color-sui-rail-ink: #ffffff;
-    --color-sui-rail-ink-secondary: #8392ab;
-    --color-sui-rail-hairline: rgb(255 255 255 / 0.10);
-    --color-sui-rail-accent: #5b76d6;    /* 5.0:1 on the rail — safe as a 3:1 bar */
-
     /* --- Accent --------------------------------------------------------- */
     /* Derived, not supplied: the spec fixes the neutrals but leaves the
        accent open. #2b4acb measures 7.13:1 on white and 6.76:1 on the
@@ -176,6 +188,43 @@
     --color-sui-attention-wash: #fffbeb;   /* amber-50  — the notice surface */
     --color-sui-attention-badge: #fbbf24;  /* amber-400 — the badge fill */
     --color-sui-attention-badge-ink: #451a03; /* amber-950 — ink on the badge */
+
+    /* --- Pastel icon washes ---------------------------------------------- */
+    /* The stat-badge family: a soft tinted square carrying a readable glyph.
+       Six tones, because six recurring metrics need six identities and the
+       correction legend already settled on six. Every wash is a 50-level
+       tint and every ink a 700-level value, so each pair clears 4.5:1 on
+       the white card it sits on — the badge carries meaning, not decoration,
+       and decoration still has to be legible. All twelve are re-scoped for
+       the dark card further down. */
+    --color-sui-pastel-primary-wash: #eef1fb;
+    --color-sui-pastel-primary-ink: #2b4acb;
+    --color-sui-pastel-secondary-wash: #f1f3f5;
+    --color-sui-pastel-secondary-ink: #5f6b7e;
+    --color-sui-pastel-info-wash: #eff6ff;
+    --color-sui-pastel-info-ink: #1d4ed8;
+    --color-sui-pastel-success-wash: #f0fdf4;
+    --color-sui-pastel-success-ink: #15803d;
+    --color-sui-pastel-warning-wash: #fffbeb;
+    --color-sui-pastel-warning-ink: #b45309;
+    --color-sui-pastel-danger-wash: #fef2f2;
+    --color-sui-pastel-danger-ink: #b91c1c;
+
+    /* --- Gradient surfaces ------------------------------------------------ */
+    /* The Creative Tim Soft UI signature: the 310deg (to-bottom-left) chip
+       gradients, plus the hero. These are the only gradients in the system,
+       and they exist for decoration, never behind text — the one surface
+       that does carry a string is the hero, whose darkest stop is #141e30
+       (white measures 14.9:1 on it). White glyphs on the gradient chips are
+       the second use, and every chip's lightest stop clears 3:1 against
+       white, which is the large-glyph floor. */
+    --gradient-sui-hero: linear-gradient(310deg, #141e30 0%, #243b55 100%);
+    --gradient-sui-primary: linear-gradient(310deg, #5e72e4 0%, #825ee4 100%);
+    --gradient-sui-secondary: linear-gradient(310deg, #627594 0%, #a8b8d8 100%);
+    --gradient-sui-info: linear-gradient(310deg, #2152ff 0%, #21d4fd 100%);
+    --gradient-sui-success: linear-gradient(310deg, #17ad37 0%, #98ec2d 100%);
+    --gradient-sui-warning: linear-gradient(310deg, #fb6340 0%, #fbb140 100%);
+    --gradient-sui-danger: linear-gradient(310deg, #ea0606 0%, #ff667c 100%);
 
     /* --- Soft shadows --------------------------------------------------- */
     /* Three levels, which is the whole vocabulary: resting, lifted,
@@ -352,17 +401,27 @@
     --color-sui-accent-softer: #f5f7fd;
     --color-sui-accent-ink: #2440b0;
 
-    --color-sui-rail: #000000;
-    --color-sui-rail-ink: #ffffff;
-    --color-sui-rail-ink-secondary: #8392ab;
-    --color-sui-rail-hairline: rgb(255 255 255 / 0.10);
-    --color-sui-rail-accent: #5b76d6;
-
     --color-sui-success-soft: #f0fdf4;
     --color-sui-warning-soft: #fffbeb;
     --color-sui-warning-ink: #78350f;
     --color-sui-danger-soft: #fef2f2;
     --color-sui-info-soft: #eff6ff;
+
+    /* Pastels mirror the @theme values in the light theme — the scope block
+       repeats them so the dark block below has a same-specificity value to
+       outrank, exactly as with every other re-scoped family. */
+    --color-sui-pastel-primary-wash: #eef1fb;
+    --color-sui-pastel-primary-ink: #2b4acb;
+    --color-sui-pastel-secondary-wash: #f1f3f5;
+    --color-sui-pastel-secondary-ink: #5f6b7e;
+    --color-sui-pastel-info-wash: #eff6ff;
+    --color-sui-pastel-info-ink: #1d4ed8;
+    --color-sui-pastel-success-wash: #f0fdf4;
+    --color-sui-pastel-success-ink: #15803d;
+    --color-sui-pastel-warning-wash: #fffbeb;
+    --color-sui-pastel-warning-ink: #b45309;
+    --color-sui-pastel-danger-wash: #fef2f2;
+    --color-sui-pastel-danger-ink: #b91c1c;
 
     /* --- Signal family follows the accent ------------------------------- */
     /* `text-signal-700` is the dashboard's link colour, so the whole
@@ -417,12 +476,6 @@
     --color-sui-ink-disabled: #6b7a94;
     --color-sui-ink-on-accent: #0b1526;
 
-    --color-sui-rail: #070f1d;
-    --color-sui-rail-ink: #f8fafc;
-    --color-sui-rail-ink-secondary: #94a3b8;
-    --color-sui-rail-hairline: rgb(255 255 255 / 0.08);
-    --color-sui-rail-accent: #7d95e0;
-
     --color-sui-accent: #7d95e0;
     --color-sui-accent-hover: #9fb0ea;
     --color-sui-accent-active: #b3c2f0;
@@ -452,6 +505,24 @@
     --color-sui-attention-wash: #451a03;
     --color-sui-attention-badge: #78350f;
     --color-sui-attention-badge-ink: #fde68a;
+
+    /* Pastels invert onto the dark card: the wash becomes a low-luminance
+       tint of the same hue and the ink steps up to its 300/400 family, so
+       each pair keeps its 4.5:1 against #18233c. The gradient chips are
+       deliberately NOT re-scoped — a white glyph on a bright chip reads the
+       same on any surface, and dimming them would cost the signature. */
+    --color-sui-pastel-primary-wash: #1b2a55;
+    --color-sui-pastel-primary-ink: #a9bcf0;
+    --color-sui-pastel-secondary-wash: #22304f;
+    --color-sui-pastel-secondary-ink: #b6c2d4;
+    --color-sui-pastel-info-wash: #101f38;
+    --color-sui-pastel-info-ink: #60a5fa;
+    --color-sui-pastel-success-wash: #10281c;
+    --color-sui-pastel-success-ink: #4ade80;
+    --color-sui-pastel-warning-wash: #2a1f08;
+    --color-sui-pastel-warning-ink: #fbbf24;
+    --color-sui-pastel-danger-wash: #2b1414;
+    --color-sui-pastel-danger-ink: #f87171;
 
     --color-signal-50: #16223f;
     --color-signal-100: #1b2a55;
@@ -520,14 +591,38 @@
    set as properties rather than utilities on purpose: the base layer's
    `body { @apply bg-white text-ink-800 }` and `.dark body { … }` both
    outrank a lone attribute selector, so the dark variant is spelled out
-   here to win by specificity rather than by source order alone. */
+   here to win by specificity rather than by source order alone.
+
+   The ambient washes are the gradient layer of the workspace: a faint pool
+   of the accent anchored off the top edge, so the canvas reads as a lit
+   surface rather than as a flat fill. They are deliberately weak (≤9%) —
+   every ink on the canvas was measured against the *flat* colour, and the
+   wash must stay quiet enough that those measurements keep holding. */
 [data-sui] {
     background-color: var(--color-sui-canvas);
+    background-image: radial-gradient(
+        120rem 60rem at 85% -20%,
+        color-mix(in oklab, var(--color-sui-accent) 5%, transparent),
+        transparent 60%
+    );
+    background-attachment: fixed;
     color: var(--color-sui-ink-secondary);
 }
 
 .dark [data-sui] {
     background-color: var(--color-sui-canvas);
+    background-image:
+        radial-gradient(
+            120rem 60rem at 85% -20%,
+            color-mix(in oklab, var(--color-sui-accent) 9%, transparent),
+            transparent 62%
+        ),
+        radial-gradient(
+            90rem 50rem at -15% 115%,
+            color-mix(in oklab, var(--color-sui-info) 7%, transparent),
+            transparent 58%
+        );
+    background-attachment: fixed;
     color: var(--color-sui-ink-secondary);
 }
 
@@ -599,6 +694,21 @@
         @apply bg-signal-800 text-ink-50;
     }
 
+    /* Form controls and scrollbars follow the applied theme. Flux's inline
+       appearance style sets the dark half (`:root.dark { color-scheme: dark }`);
+       this is the light half, so a light page never renders dark widgets. */
+    :root:not(.dark) {
+        color-scheme: light;
+    }
+
+    /* Alpine's `x-cloak`: an element carries the attribute until Alpine
+       initialises, so a template that starts hidden does not flash before
+       its `x-show` lands. The theme toggle's inactive icon is the newest
+       user; the drawer and the mobile nav panel were already relying on it. */
+    [x-cloak] {
+        display: none;
+    }
+
     /* Respect the user's motion preference — no exceptions.
        The blanket transition/animation clamp below does not stop Alpine's
        JS-driven x-transition classes (Alpine applies them regardless of the
@@ -619,6 +729,29 @@
             transition-duration: 0ms !important;
         }
     }
+}
+
+/* ==========================================================================
+   Theme switching
+   --------------------------------------------------------------------------
+   A short colour cross-fade while the `.dark` class flips. The toggle adds
+   `theme-switching` to <html> for ~350ms and then removes it, so scrolling
+   and layout are never animated — only the paint colours. The global
+   reduced-motion clamp in the base layer outranks this rule, so users who
+   opt out of motion get an instant swap with no extra work here.
+   ========================================================================== */
+
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+    transition:
+        background-color 250ms var(--ease-soft),
+        border-color 250ms var(--ease-soft),
+        color 250ms var(--ease-soft),
+        fill 250ms var(--ease-soft),
+        stroke 250ms var(--ease-soft),
+        box-shadow 250ms var(--ease-soft) !important;
 }
 
 /* ==========================================================================
@@ -758,33 +891,189 @@ select:focus[data-flux-control] {
     @apply inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-accent-ink;
 }
 
-@utility sui-rail {
-    /* The dark surface. Text defaults to the rail's secondary colour, so a
-       component that forgets to set a colour still clears AA. */
-    @apply bg-sui-rail text-sui-rail-ink-secondary;
+
+/* --- Icon shapes ------------------------------------------------------- */
+
+@utility sui-icon-shape {
+    /* Creative Tim's signature icon container: a white rounded square with
+       one soft shadow, holding a glyph. It is the one place the dashboard
+       puts a white chip on a white card — the shadow alone separates the
+       two surfaces, which is the neumorphic idea in its purest form. */
+    @apply grid size-10 shrink-0 place-items-center rounded-md bg-sui-surface text-sui-ink shadow-soft-1;
 }
 
-@utility sui-rail-item {
-    /* A navigation destination on the rail. Hover is a translucent white
-       wash rather than a solid fill, because a solid fill on a black
-       surface either disappears or shouts. */
-    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sui-rail-ink-secondary transition duration-150 ease-soft hover:bg-white/10 hover:text-sui-rail-ink;
+@utility sui-icon-shape-sm {
+    /* The compact variant, for dense nav rows and list items. */
+    @apply grid size-7 shrink-0 place-items-center rounded-sm bg-sui-surface text-sui-ink-secondary shadow-soft-1;
 }
 
-@utility sui-rail-item-active {
-    /* The current destination. The fill is the same translucent wash at a
-       higher opacity; the accent bar on the left edge is what makes it
-       unambiguous without a contrast-heavy solid pill. */
-    @apply bg-white/10 text-sui-rail-ink;
+/* --- Pastel stat badges ------------------------------------------------ */
+
+@utility sui-pastel-primary {
+    @apply sui-icon-shape bg-sui-pastel-primary-wash text-sui-pastel-primary-ink;
 }
 
-@utility sui-rail-group {
-    /* Section label on the rail. */
-    @apply px-3 pb-2 text-2xs font-semibold uppercase tracking-wide text-sui-rail-ink-secondary/80;
+@utility sui-pastel-secondary {
+    @apply sui-icon-shape bg-sui-pastel-secondary-wash text-sui-pastel-secondary-ink;
 }
 
-@utility sui-rail-hairline {
-    @apply border-sui-rail-hairline;
+@utility sui-pastel-info {
+    @apply sui-icon-shape bg-sui-pastel-info-wash text-sui-pastel-info-ink;
+}
+
+@utility sui-pastel-success {
+    @apply sui-icon-shape bg-sui-pastel-success-wash text-sui-pastel-success-ink;
+}
+
+@utility sui-pastel-warning {
+    @apply sui-icon-shape bg-sui-pastel-warning-wash text-sui-pastel-warning-ink;
+}
+
+@utility sui-pastel-danger {
+    @apply sui-icon-shape bg-sui-pastel-danger-wash text-sui-pastel-danger-ink;
+}
+
+/* --- Gradient chips and the hero -------------------------------------- */
+
+/* Background-image only: the caller composes the shape and the glyph
+   colour, because a gradient chip is white-on-gradient while a pastel
+   badge is ink-on-wash, and conflating the two is how a token starts
+   carrying two meanings. */
+@utility sui-gradient-primary {
+    background-image: var(--gradient-sui-primary);
+}
+
+@utility sui-gradient-secondary {
+    background-image: var(--gradient-sui-secondary);
+}
+
+@utility sui-gradient-info {
+    background-image: var(--gradient-sui-info);
+}
+
+@utility sui-gradient-success {
+    background-image: var(--gradient-sui-success);
+}
+
+@utility sui-gradient-warning {
+    background-image: var(--gradient-sui-warning);
+}
+
+@utility sui-gradient-danger {
+    background-image: var(--gradient-sui-danger);
+}
+
+@utility sui-hero {
+    /* The gradient welcome card — the one surface that carries a string on
+       a gradient, and the reason the gradient palette is allowed at all:
+       white on #141e30 measures 14.9:1, so nothing here needs the wash
+       treatment. A faint light pool rides the gradient's top edge and the
+       glow is tinted with the accent, so the card reads as lit from within
+       rather than merely coloured. */
+    @apply rounded-xl text-white;
+    background-image:
+        radial-gradient(48rem 24rem at 85% -40%, rgb(255 255 255 / 0.07), transparent 60%),
+        var(--gradient-sui-hero);
+    box-shadow:
+        var(--shadow-soft-3),
+        0 24px 80px -24px color-mix(in oklab, var(--color-sui-accent) 40%, transparent);
+}
+
+/* --- The modern-effects vocabulary ------------------------------------ */
+/* Glassmorphism, glow and gradient text. Every value resolves through a
+   `[data-sui]`-scoped token (or `color-mix` of one), so each effect adapts
+   to the applied theme by construction — the same reason the Soft UI
+   primitives above are theme-safe. None of these effects ever sits behind
+   body copy: glass carries chrome, glow carries state, gradients carry
+   display type. That division is what keeps them decoration rather than
+   noise. */
+
+@utility sui-glass {
+    /* A glass surface: the card colour at 72% over whatever is behind it,
+       blurred and saturated, with a hairline drawn from the ink token so
+       the edge is visible on both themes, and the top-edge highlight that
+       makes the pane read as a material rather than as a transparency. */
+    background-color: color-mix(in oklab, var(--color-sui-surface) 72%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid color-mix(in oklab, var(--color-sui-ink) 10%, transparent);
+    box-shadow:
+        var(--shadow-soft-2),
+        var(--shadow-soft-highlight);
+}
+
+@utility sui-glow {
+    /* The accent glow. A 1px accent edge plus a wide, soft accent halo —
+       the amount of light a "this is active / this is primary" moment is
+       allowed to emit. Composes with other utilities (`sui-tab-active`
+       applies it) and with variants (`hover:sui-glow`). */
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-sui-accent) 22%, transparent),
+        0 6px 28px -8px color-mix(in oklab, var(--color-sui-accent) 60%, transparent);
+}
+
+@utility sui-text-gradient {
+    /* Gradient ink for display type. The endpoints are variables so a
+       caller can retune them per surface with arbitrary properties —
+       outside the `[data-sui]` scope the dashboard's indigo is not
+       available (the public site keeps its green-teal), so public callers
+       override both endpoints; see docs/themes.md §6. */
+    --text-gradient-from: var(--color-sui-ink);
+    --text-gradient-to: var(--color-sui-accent);
+    background-image: linear-gradient(115deg, var(--text-gradient-from) 15%, var(--text-gradient-to) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* --- The floating chrome ---------------------------------------------- */
+
+@utility sui-nav {
+    /* The floating navbar pill. Glass instead of solid: the surface is the
+       card colour at 76% over whatever the canvas wash is doing beneath it,
+       blurred and saturated, so the chrome reads as a lens over the page.
+       The canvas shows around it on all four sides, and that gap is what
+       makes it read as Soft UI rather than as a conventional topbar. */
+    @apply rounded-xl shadow-soft-2;
+    background-color: color-mix(in oklab, var(--color-sui-surface) 76%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+}
+
+@utility sui-sidenav {
+    /* The floating sidebar — the same glass as the navbar, so the two
+       floating surfaces agree about what material they are made of.
+       Rounded on the outer edge; the hairline lands where it meets the
+       content column. */
+    @apply rounded-xl shadow-soft-2;
+    background-color: color-mix(in oklab, var(--color-sui-surface) 76%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+}
+
+@utility sui-sidenav-item {
+    /* A destination in the light sidenav. Quiet by default — the pastel
+       icon square is what carries the identity, so the row itself stays
+       out of the way until touched. */
+    @apply flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink;
+}
+
+@utility sui-sidenav-item-active {
+    /* The current destination: a soft accent wash under the whole row, the
+       accent ink on the label, a 3px accent bar pressed into the leading
+       edge, and a quiet accent glow behind it all — the one row on the rail
+       that is allowed to glow, because it is the one row that means "you
+       are here". (The bar and glow vanish while the row holds focus, where
+       the focus ring's own box-shadow takes over.) */
+    @apply bg-sui-accent-soft text-sui-accent-ink hover:bg-sui-accent-soft hover:text-sui-accent-ink;
+    box-shadow:
+        inset 3px 0 0 0 var(--color-sui-accent),
+        0 0 20px -8px color-mix(in oklab, var(--color-sui-accent) 50%, transparent);
+}
+
+@utility sui-sidenav-group {
+    /* Section label in the light sidenav. */
+    @apply px-2.5 pb-2 pt-1 text-2xs font-semibold uppercase tracking-wide text-ink-400;
 }
 
 /* --- Form controls ------------------------------------------------------- */
@@ -823,7 +1112,9 @@ select:focus[data-flux-control] {
 }
 
 @utility sui-tab-active {
-    @apply bg-sui-accent text-white shadow-soft-1 hover:bg-sui-accent-hover hover:text-white;
+    /* The active pill is filled, glowing, and nothing else on the row is —
+       the glow does the work a heavier fill would have done. */
+    @apply bg-sui-accent text-white sui-glow hover:bg-sui-accent-hover hover:text-white;
 }
 
 /* --- Chips --------------------------------------------------------------- */
@@ -852,7 +1143,7 @@ select:focus[data-flux-control] {
 }
 
 @utility sui-chip-success {
-    @apply sui-chip border border-emerald-200 bg-sui-success-soft text-sui-success;
+    @apply sui-chip border border-emerald-200 bg-sui-success-soft text-sui-success dark:border-emerald-500/30;
 }
 
 /* --- Correction-type legend ---------------------------------------------- */
@@ -1167,4 +1458,118 @@ select:focus[data-flux-control] {
 
 @media (prefers-reduced-motion: reduce) {
     [data-reveal] { opacity: 1; transform: none; transition: none; }
+}
+
+@import './about-effects.css';
+@import './hero-visual.css';
+
+/* ==========================================================================
+   Accent picker scopes — `data-accent` on <html>
+   --------------------------------------------------------------------------
+   The public header's accent switcher re-tunes the `signal` family — the
+   terminal green-teal default — to one of five other hues. The chosen name
+   is persisted by `window.DevFolioTheme.accent` (see partials/theme-boot)
+   and applied as an attribute before first paint, same contract as dark.
+
+   The 11 stops are theme-agnostic, exactly like the @theme default: the
+   same scale serves both themes, and components pick the lighter stop they
+   need under `dark:`. Signal and the Flux `--color-accent` bridge (which
+   points at signal-700/400) all follow for free.
+
+   `--color-success` is pinned back to green: it derives from signal-600
+   (light) and signal-400 (dark), so without the pin an amber or rose
+   accent would re-colour every success badge with the accent.
+   Dashboards are deliberately untouched — the `data-sui` scope re-tunes
+   signal to its own accessible indigo at a nearer element, and the accent
+   picker is a public-site control, not a dashboard one.
+   ========================================================================== */
+
+html[data-accent='indigo'] {
+    --color-signal-50: #eef1fb;
+    --color-signal-100: #e0e6f8;
+    --color-signal-200: #c7d2f2;
+    --color-signal-300: #a3b6ea;
+    --color-signal-400: #7d95e0;
+    --color-signal-500: #5b76d6;
+    --color-signal-600: #2b4acb;
+    --color-signal-700: #2440b0;
+    --color-signal-800: #1e3793;
+    --color-signal-900: #1b2f78;
+    --color-signal-950: #131f4d;
+
+    --color-success: #059669;
+}
+
+html[data-accent='cyan'] {
+    --color-signal-50: #ecfeff;
+    --color-signal-100: #cffafe;
+    --color-signal-200: #a5f3fc;
+    --color-signal-300: #67e8f9;
+    --color-signal-400: #22d3ee;
+    --color-signal-500: #06b6d4;
+    --color-signal-600: #0891b2;
+    --color-signal-700: #0e7490;
+    --color-signal-800: #155e75;
+    --color-signal-900: #164e63;
+    --color-signal-950: #083344;
+
+    --color-success: #059669;
+}
+
+html[data-accent='amber'] {
+    --color-signal-50: #fffbeb;
+    --color-signal-100: #fef3c7;
+    --color-signal-200: #fde68a;
+    --color-signal-300: #fcd34d;
+    --color-signal-400: #fbbf24;
+    --color-signal-500: #f59e0b;
+    --color-signal-600: #d97706;
+    --color-signal-700: #b45309;
+    --color-signal-800: #92400e;
+    --color-signal-900: #78350f;
+    --color-signal-950: #451a03;
+
+    --color-success: #059669;
+}
+
+html[data-accent='rose'] {
+    --color-signal-50: #fff1f2;
+    --color-signal-100: #ffe4e6;
+    --color-signal-200: #fecdd3;
+    --color-signal-300: #fda4af;
+    --color-signal-400: #fb7185;
+    --color-signal-500: #f43f5e;
+    --color-signal-600: #e11d48;
+    --color-signal-700: #be123c;
+    --color-signal-800: #9f1239;
+    --color-signal-900: #881337;
+    --color-signal-950: #4c0519;
+
+    --color-success: #059669;
+}
+
+html[data-accent='violet'] {
+    --color-signal-50: #f5f3ff;
+    --color-signal-100: #ede9fe;
+    --color-signal-200: #ddd6fe;
+    --color-signal-300: #c4b5fd;
+    --color-signal-400: #a78bfa;
+    --color-signal-500: #8b5cf6;
+    --color-signal-600: #7c3aed;
+    --color-signal-700: #6d28d9;
+    --color-signal-800: #5b21b6;
+    --color-signal-900: #4c1d95;
+    --color-signal-950: #2e1065;
+
+    --color-success: #059669;
+}
+
+/* Dark: only the success pin changes — the chosen scale above is already
+   theme-agnostic, and the dark theme's accent bridge reads signal-400. */
+html.dark[data-accent='indigo'],
+html.dark[data-accent='cyan'],
+html.dark[data-accent='amber'],
+html.dark[data-accent='rose'],
+html.dark[data-accent='violet'] {
+    --color-success: #34d399;
 }

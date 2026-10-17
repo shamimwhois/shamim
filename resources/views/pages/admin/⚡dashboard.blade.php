@@ -110,15 +110,20 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
 }; ?>
 
 <div>
+    {{-- The standard page header, not the gradient welcome card. This page
+         opens on data, and the landing surface should read like every other
+         dashboard sub-page: type on the canvas, the cards doing the lifting.
+         The crumb trail states where the surface sits, and the header still
+         supplies the page's single `h1`. --}}
     <x-app.ui.header
         eyebrow="Administration"
-        :title="'Welcome back, '.Str::of(auth()->user()->name)->explode(' ')->first()"
+        title="Dashboard"
         description="Platform health, accounts, and the moderation queue."
         :breadcrumbs="[['label' => __('Administration')]]"
     >
         <x-slot:actions>
-            <flux:button :href="route('admin.users')" icon="users" wire:navigate>
-                Manage users
+            <flux:button variant="primary" :href="route('admin.users')" icon="users" wire:navigate>
+                {{ __('Manage users') }}
             </flux:button>
         </x-slot:actions>
     </x-app.ui.header>
@@ -135,6 +140,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     label="Accounts"
                     :value="$this->totalAccounts"
                     icon="users"
+                    tone="primary"
                     hint="All roles"
                     :href="route('admin.users')"
                 />
@@ -143,6 +149,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     label="Published posts"
                     :value="$this->publishedPosts"
                     icon="globe-alt"
+                    tone="success"
                     hint="Live on the public site"
                 />
 
@@ -150,7 +157,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     label="Awaiting moderation"
                     :value="$this->pendingComments"
                     icon="shield-exclamation"
-                    :tone="$this->pendingComments > 0 ? 'attention' : 'default'"
+                    :tone="$this->pendingComments > 0 ? 'attention' : 'primary'"
                     :hint="$this->pendingComments > 0 ? 'Needs review' : 'Queue is clear'"
                     :href="route('dashboard.comments')"
                 />
@@ -159,6 +166,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     label="Sellers"
                     :value="collect($this->accountsByRole)->firstWhere('role', AccountRole::Seller)['count'] ?? 0"
                     icon="building-storefront"
+                    tone="info"
                     hint="With selling rights"
                 />
             </div>

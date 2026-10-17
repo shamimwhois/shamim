@@ -1,16 +1,42 @@
 <?php
 
+use App\Enums\AccountRole;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
 use App\Models\User;
+use Livewire\Livewire;
 
 test('the taxonomy screen requires authentication', function () {
     $this->get(route('dashboard.taxonomy'))->assertRedirect(route('login'));
 });
 
+test('the taxonomy screen requires the manage taxonomy permission', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('dashboard.taxonomy'))
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->seller()->create())
+        ->get(route('dashboard.taxonomy'))
+        ->assertOk();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('dashboard.taxonomy'))
+        ->assertOk();
+});
+
+test('the taxonomy permission is rechecked on Livewire updates', function () {
+    $seller = User::factory()->seller()->create();
+
+    $component = Livewire::actingAs($seller)->test('pages::dashboard.taxonomy');
+
+    $seller->forceFill(['role' => AccountRole::User])->save();
+
+    $component->call('resetCategoryForm')->assertForbidden();
+});
+
 test('the taxonomy screen lists categories and tags', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->seller()->create();
     Category::factory()->create(['name' => 'Performance', 'slug' => 'performance']);
     Tag::factory()->create(['name' => 'Caching', 'slug' => 'caching']);
 

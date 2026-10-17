@@ -1,0 +1,711 @@
+﻿/* ------------------------------------------------------------------------ */
+/* About hero typography — modern / vintage / 3D animated                   */
+/* ------------------------------------------------------------------------ */
+
+/* Modern gradient display text (signal teal → deep teal). */
+.about-type-modern {
+    background-image: linear-gradient(110deg, #047857 0%, #10b981 45%, #34d399 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 40px rgb(16 185 129 / 0.18);
+}
+
+.dark .about-type-modern {
+    background-image: linear-gradient(110deg, #34d399 0%, #6ee7b7 50%, #a7f3d2 100%);
+    text-shadow: 0 0 46px rgb(52 211 153 / 0.22);
+}
+
+/* Blinking terminal caret used by the typewriter effect. */
+.about-typewriter-caret {
+    display: inline-block;
+    width: 0.6ch;
+    margin-left: 2px;
+    color: rgb(5 150 105);
+    animation: about-caret-blink 1.05s steps(1) infinite;
+}
+
+.dark .about-typewriter-caret {
+    color: rgb(52 211 153);
+}
+
+@keyframes about-caret-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* 3D floating stage. */
+.about-hero-3d {
+    perspective: 900px;
+}
+
+.about-hero-3d__cube {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    animation: about-cube-spin 14s linear infinite;
+}
+
+.about-hero-3d__face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 1rem;
+    border: 1px solid rgb(5 150 105 / 0.35);
+    background: linear-gradient(135deg, rgb(236 253 245 / 0.85), rgb(167 243 210 / 0.35));
+    backdrop-filter: blur(10px);
+    font-family: var(--font-calligraphy);
+    font-size: 3.5rem;
+    color: #047857;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+.dark .about-hero-3d__face {
+    background: linear-gradient(135deg, rgb(6 78 59 / 0.7), rgb(5 150 105 / 0.25));
+    color: #6ee7b7;
+    border-color: rgb(52 211 153 / 0.35);
+}
+
+.about-hero-3d__face--front  { transform: translateZ(60px); }
+.about-hero-3d__face--back   { transform: rotateY(180deg) translateZ(60px); }
+.about-hero-3d__face--right  { transform: rotateY(90deg) translateZ(60px); }
+.about-hero-3d__face--left   { transform: rotateY(-90deg) translateZ(60px); }
+.about-hero-3d__face--top    { transform: rotateX(90deg) translateZ(60px); }
+.about-hero-3d__face--bottom { transform: rotateX(-90deg) translateZ(60px); }
+
+@keyframes about-cube-spin {
+    from { transform: rotateX(-22deg) rotateY(0deg); }
+    to   { transform: rotateX(-22deg) rotateY(360deg); }
+}
+
+/* Vintage calligraphy headline accent. */
+.about-type-vintage {
+    font-family: var(--font-calligraphy);
+    letter-spacing: 0.01em;
+    background-image: linear-gradient(120deg, #78350f 0%, #b45309 50%, #d97706 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.dark .about-type-vintage {
+    background-image: linear-gradient(120deg, #fbbf24 0%, #fcd34d 60%, #fde68a 100%);
+}
+
+/* Respect reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+    .about-hero-3d__cube { animation: none; }
+    .about-typewriter-caret { animation: none; opacity: 1; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* About section 02 :: "How I work" split panel                              */
+/*                                                                           */
+/* A framed echo of the page hero: the same two theme renders — light JPG    */
+/* under the shared `#hero-portrait-knockout` SVG filter declared once in    */
+/* the hero section, dark baked-alpha WebP with no filter at all — but       */
+/* framed inside a bordered card instead of bleeding off the page. The       */
+/* subject sits in the left ~56% of each landscape source, so the cover      */
+/* window stays left-anchored and crops onto empty field, not the figure.    */
+/* The render is mirrored (scaleX(-1)) so the figure faces the details       */
+/* column on its right; the hover zoom re-applies the flip.                  */
+/* ------------------------------------------------------------------------ */
+
+.about-how__img {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 20% 25%;
+    filter: url('#hero-portrait-knockout');
+    transform: scaleX(-1);
+    transition: transform 700ms var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.about-how:hover .about-how__img {
+    transform: scale(1.03) scaleX(-1);
+}
+
+/* Exactly one render shows per theme — the same CSS swap the hero uses.
+   The frame is aspect-locked (4/5 beside the details column, 16/10 when
+   stacked below lg), so cover scales it width-driven at most viewports and
+   a taller-than-source window never appears. The dark cutout's figure sits
+   in the left ~31% of its landscape source (the light render's sits further
+   right), so each variant keeps its own window anchored toward the figure. */
+.about-how__img--dark { display: none; }
+.dark .about-how__img--light { display: none; }
+.dark .about-how__img--dark { display: block; filter: none; object-position: 5% 50%; }
+
+/* Softer emitted light than the hero's own glow: the bordered frame already
+   carries the panel's visual weight, so this only has to seat the figure. */
+.about-how__glow {
+    position: absolute;
+    inset: -3% -4%;
+    z-index: -1;
+    background: radial-gradient(
+        60% 55% at 50% 45%,
+        rgb(16 185 129 / 0.12),
+        transparent 72%
+    );
+    filter: blur(28px);
+    pointer-events: none;
+}
+
+.dark .about-how__glow {
+    background: radial-gradient(
+        58% 52% at 50% 45%,
+        rgb(45 212 191 / 0.16),
+        rgb(139 92 246 / 0.07) 55%,
+        transparent 75%
+    );
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .about-how__img { transition: none; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* About :: expertise marquee (under the hero)                                */
+/*                                                                            */
+/* The band's layout — hairline seams, card-tone background, pill items — is   */
+/* Tailwind in `expertise-marquee.blade.php`. This file owns only the loop:    */
+/* the track holds its content twice, so translating -50% of its own width     */
+/* lands exactly on the second copy's start — a seamless scroll with no JS.    */
+/* The animation pauses on hover (so a pill is actually readable/clickable)    */
+/* and never runs for reduced-motion users, who see the static first copy.     */
+/* ------------------------------------------------------------------------ */
+
+.about-marquee__track {
+    animation: about-marquee-scroll 38s linear infinite;
+    will-change: transform;
+}
+
+.about-marquee:hover .about-marquee__track {
+    animation-play-state: paused;
+}
+
+@keyframes about-marquee-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .about-marquee__track { animation: none; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Experience section header — stroke-numeral treatments                    */
+/* ------------------------------------------------------------------------ */
+
+/* The giant section ordinal: base layer is transparent with an accent
+   stroke, and a sibling fill layer paints over it — the reference's
+   doubled "01" numeral. mix-in keeps 55% of whatever accent is active. */
+.exp-ordinal-stroke {
+    color: transparent;
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-signal-600) 85%, transparent);
+    -webkit-text-stroke-width: 1.5px;
+}
+
+.dark .exp-ordinal-stroke {
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-signal-400) 55%, transparent);
+}
+
+/* The ghost company watermark: outline-only letters, no fill. The old
+   element-level opacity-[0.05] turned both themes' hairline into a
+   washed-out smudge (invisible on white, blotchy on the cards); the
+   suppression now lives in the stroke colour so the outline stays crisp
+   and reads as deliberate in both themes, at both watermark sizes. */
+.exp-ghost-stroke {
+    color: transparent;
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-ink-900) 14%, transparent);
+    -webkit-text-stroke-width: 1px;
+}
+
+.dark .exp-ghost-stroke {
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-ink-50) 10%, transparent);
+}
+
+/* Section header entrances (04-07): the giant stroke ordinal rises and
+   the accent copy wipes up over it, the display heading fades in, and the
+   wavy rule draws itself left to right. All keyed off the header container's
+   `data-visible` state set by the page's IntersectionObserver, staggered so
+   the eye reads ordinal → heading → rule → lead. */
+.sec-ordinal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 620ms var(--ease-out-quint), transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sec-ordinal > span:last-child {
+    /* The fill copy sits a hair right/down of its outline twin — the
+       double-print the ordinal is named for. Without the offset the
+       light theme's halo hides entirely behind the fill and the numeral
+       reads as a stray duplicate as in "05 05". */
+    transform: translate(6px, 6px);
+    clip-path: inset(105% 0 0 0);
+    transition: clip-path 640ms cubic-bezier(0.22, 1, 0.36, 1) 240ms;
+}
+
+.sec-heading {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 560ms var(--ease-out-quint) 120ms, transform 640ms cubic-bezier(0.22, 1, 0.36, 1) 120ms;
+}
+
+.sec-rule path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 1, 0.36, 1) 320ms;
+}
+
+.sec-lead {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 560ms var(--ease-out-quint) 420ms, transform 600ms cubic-bezier(0.22, 1, 0.36, 1) 420ms;
+}
+
+[data-reveal][data-visible='true'] .sec-ordinal,
+[data-reveal][data-visible='true'] .sec-heading,
+[data-reveal][data-visible='true'] .sec-lead {
+    opacity: 1;
+    transform: none;
+}
+
+[data-reveal][data-visible='true'] .sec-ordinal > span:last-child {
+    clip-path: inset(0 0 0 0);
+}
+
+[data-reveal][data-visible='true'] .sec-rule path {
+    stroke-dashoffset: 0;
+}
+
+/* ------------------------------------------------------------------------ */
+/* About sections 04/06 :: capability chips, circuit map, draw-on-reveal      */   
+/* frames — the mhabir.dev #skills/#projects panel treatments                 */
+/* ------------------------------------------------------------------------ */
+
+/* Draw-on-reveal corner frame: a rect whose full outline is a 100-unit
+   dash that transitions to 0 once the owning card's `[data-reveal]` state
+   flips to data-visible (initReveal's IntersectionObserver). Staggered per
+   card via --frame-delay. */
+.draw-frame rect {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-signal-600) 32%, transparent);
+    stroke-width: 1.5;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 1.15s cubic-bezier(0.22, 1, 0.36, 1) var(--frame-delay, 0ms);
+}
+
+.dark .draw-frame rect {
+    stroke: color-mix(in srgb, var(--color-signal-400) 55%, transparent);
+}
+
+[data-reveal][data-visible='true'] .draw-frame rect {
+    stroke-dashoffset: 0;
+}
+
+/* ------------------------------------------------------------------------ */
+/* About section 04 :: capability stage — card rail + mind map              */
+/*                                                                            */
+/* Left: a bounded, vertically scrolling rail of cap cards (two columns at    */
+/* md, one at lg) with a pointer-tracked spotlight (--gx/--gy) and a 3D tilt  */
+/* (--tilt-x/--tilt-y) driven by initSkillsMap(). Right: a generated mind     */
+/* map — the platform root mid-left, the same copy flowing right in two       */
+/* columns of rich nodes — whose wires draw in on reveal (--wire-delay),      */
+/* pulse dots ride animateMotion, and a clicked card adds [data-focus] to     */
+/* the stage — dimming every branch except the hot one. Once the draw has     */
+/* settled, JS adds .is-settled so later state flips don't inherit the        */
+/* stagger transition-delays.                                                */
+/* ------------------------------------------------------------------------ */
+
+/* Card: perspective lives on the element (it has no shared 3D grouping),   */
+/* so tilt composes with hover lift without wrangling nested scenes.        */
+.cap-card {
+    transform: perspective(750px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateZ(0);
+    transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.3s ease;
+    will-change: transform;
+}
+
+/* The capability rail: two columns at md, one at lg, bounded by a max height
+   and scrolled by the wheel — the scrollbar itself is suppressed because the
+   cards' hover-lift shadow reads better against a clean rail edge. */
+.cap-scroll {
+    scrollbar-width: none;
+}
+
+.cap-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* The map panel beside the rail scrolls its 920px-minimum canvas the same
+   quiet way: wheel, trackpad and touch still pan it, but Windows' classic
+   grey track never appears under the nodes. */
+.map-scroll {
+    scrollbar-width: none;
+}
+
+.map-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Same suppression for the 07 "Recent writing" carousel: the prev/next
+   arrows and the 01/06 counter are its scroll system, so Windows' classic
+   grey track under the cards is only noise. The pb-4 padding stays — it
+   still reserves room for the hover-lift shadow. */
+.writing-scroll {
+    scrollbar-width: none;
+}
+
+.writing-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.cap-card:hover,
+.cap-card:focus-visible {
+    box-shadow: 0 18px 40px -18px rgb(4 120 87 / 0.35);
+}
+
+.dark .cap-card:hover,
+.dark .cap-card:focus-visible {
+    box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.6);
+}
+
+/* Pointer-tracked spotlight. */
+.cap-card__spot {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    background: radial-gradient(
+        9rem 9rem at var(--gx, 50%) var(--gy, 0%),
+        color-mix(in srgb, var(--color-signal-500) 13%, transparent),
+        transparent 72%
+    );
+}
+
+.cap-card:hover .cap-card__spot,
+.cap-card:focus-visible .cap-card__spot {
+    opacity: 1;
+}
+
+/* Icon inside a tinted tile — SVG follows the theme via currentColor. */
+.cap-card__tile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border: 1px solid color-mix(in srgb, var(--color-signal-700) 24%, transparent);
+    border-radius: 0.875rem;
+    background-color: color-mix(in srgb, var(--color-signal-700) 10%, transparent);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Mobile cards: the tile grows to a 5rem anchor beside the title in a    */
+/* 5rem + 1fr grid, while description and tags flow full-width below it. */
+@media (max-width: 1023.98px) {
+    .cap-card__tile {
+        width: 5rem;
+        height: 5rem;
+        border-radius: 1.25rem;
+    }
+
+    .cap-card__icon {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+}
+
+.dark .cap-card__tile {
+    border-color: color-mix(in srgb, var(--color-signal-400) 28%, transparent);
+    background-color: color-mix(in srgb, var(--color-signal-400) 10%, transparent);
+}
+
+.cap-card:hover .cap-card__tile,
+.cap-card.is-active .cap-card__tile {
+    border-color: color-mix(in srgb, var(--color-signal-500) 55%, transparent);
+    background-color: color-mix(in srgb, var(--color-signal-500) 16%, transparent);
+}
+
+.dark .cap-card:hover .cap-card__tile {
+    border-color: color-mix(in srgb, var(--color-signal-400) 55%, transparent);
+    background-color: color-mix(in srgb, var(--color-signal-400) 16%, transparent);
+}
+
+.cap-card__icon {
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--color-signal-700);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
+}
+
+.dark .cap-card__icon {
+    color: var(--color-signal-400);
+}
+
+.cap-card:hover .cap-card__icon,
+.cap-card.is-active .cap-card__icon {
+    transform: rotate(-8deg) scale(1.12);
+    color: var(--color-signal-600);
+}
+
+.dark .cap-card:hover .cap-card__icon {
+    color: var(--color-signal-300);
+}
+
+/* Click affordance — appears only while the card is hot. */
+.cap-card__trace {
+    color: var(--color-signal-700);
+    opacity: 0;
+    transform: translateX(-0.25rem);
+    transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
+}
+
+.dark .cap-card__trace {
+    color: var(--color-signal-400);
+}
+
+.cap-card:hover .cap-card__trace,
+.cap-card.is-active .cap-card__trace {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.cap-card.is-active .cap-card__trace {
+    color: var(--color-signal-500);
+}
+
+.cap-card.is-active {
+    border-color: color-mix(in srgb, var(--color-signal-500) 60%, transparent);
+}
+
+/* Mind map: wires draw themselves once the stage reveals. */
+.skills-wire {
+    stroke-dasharray: 100 100;
+    stroke-dashoffset: 100;
+    transition:
+        stroke-dashoffset 1.1s cubic-bezier(0.6, 0, 0.2, 1) var(--wire-delay, 0s),
+        opacity 0.3s ease,
+        stroke 0.3s ease,
+        stroke-width 0.3s ease;
+}
+
+.skills-stage.is-drawn .skills-wire {
+    stroke-dashoffset: 0;
+}
+
+/* Nodes, taps and the root stagger in alongside their wires. */
+.skills-node,
+.skills-node__tap,
+.skills-root {
+    opacity: 0;
+    transform: translateX(14px);
+    transition:
+        opacity 0.6s ease var(--node-delay, 0.25s),
+        transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--node-delay, 0.25s);
+}
+
+.skills-stage.is-drawn .skills-node,
+.skills-stage.is-drawn .skills-node__tap,
+.skills-stage.is-drawn .skills-root {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Pulses ride animateMotion; only fade them in once drawn. */
+.skills-pulse {
+    opacity: 0;
+    transition: opacity 0.8s ease calc(var(--node-delay, 0.25s) + 0.7s);
+}
+
+.skills-stage.is-drawn .skills-pulse {
+    opacity: 0.9;
+}
+
+/* After the entrance completes, drop the stagger delays so click states     */
+/* respond instantly. */
+.skills-stage.is-settled .skills-wire,
+.skills-stage.is-settled .skills-node,
+.skills-stage.is-settled .skills-node__tap,
+.skills-stage.is-settled .skills-pulse,
+.skills-stage.is-settled .skills-root {
+    transition-delay: 0s;
+}
+
+/* Focus mode: a clicked card dims every branch but its own. */
+.skills-stage[data-focus] .skills-wire { opacity: 0.18; }
+.skills-stage[data-focus] .skills-node { opacity: 0.3; }
+.skills-stage[data-focus] .skills-node__tap { opacity: 0.2; }
+.skills-stage[data-focus] .skills-pulse { opacity: 0; }
+
+.skills-stage[data-focus] .skills-wire.is-hot {
+    opacity: 1;
+    stroke: var(--color-signal-500);
+    stroke-width: 2.25;
+}
+
+.skills-stage[data-focus] .skills-node.is-hot { opacity: 1; }
+.skills-stage[data-focus] .skills-node__tap.is-hot,
+.skills-stage[data-focus] .skills-node.is-hot ~ .skills-node__tap { opacity: 1; }
+
+.skills-node.is-hot .skills-node__frame {
+    stroke: var(--color-signal-500);
+    fill: color-mix(in srgb, var(--color-signal-500) 10%, transparent);
+}
+
+.skills-stage[data-focus] .skills-pulse.is-hot { opacity: 1; }
+
+/* Wire / frame / text colors. */
+.skills-wire { stroke: color-mix(in srgb, var(--color-signal-600) 40%, transparent); }
+.dark .skills-wire { stroke: color-mix(in srgb, var(--color-signal-400) 40%, transparent); }
+
+.skills-node__frame {
+    fill: rgb(255 255 255 / 0.85);
+    stroke: var(--color-ink-200);
+    transition: stroke 0.3s ease, fill 0.3s ease;
+}
+
+.dark .skills-node__frame {
+    fill: color-mix(in srgb, var(--color-ink-950) 92%, transparent);
+    stroke: var(--color-ink-800);
+}
+
+.skills-node__tap {
+    fill: var(--color-signal-600);
+}
+
+.dark .skills-node__tap {
+    fill: var(--color-signal-400);
+}
+
+/* Node title strip: a soft header band behind the node's heading. */
+.skills-node__strip {
+    fill: color-mix(in srgb, var(--color-ink-100) 78%, transparent);
+}
+
+.dark .skills-node__strip {
+    fill: color-mix(in srgb, var(--color-ink-900) 82%, transparent);
+}
+
+.skills-pulse { fill: var(--color-signal-500); }
+
+.skills-root__frame {
+    fill: rgb(255 255 255 / 0.9);
+    stroke: var(--color-signal-600);
+}
+
+.dark .skills-root__frame {
+    fill: color-mix(in srgb, var(--color-ink-950) 92%, transparent);
+    stroke: var(--color-signal-400);
+}
+
+.skills-root__dot {
+    fill: var(--color-signal-500);
+    animation: skills-root-blink 2.4s ease-in-out infinite;
+}
+
+@keyframes skills-root-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.skills-root__title,
+.skills-node__title {
+    fill: var(--color-ink-900);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.dark .skills-root__title,
+.dark .skills-node__title {
+    fill: var(--color-ink-50);
+}
+
+.skills-root__title { font-size: 17px; font-weight: 800; }
+
+.skills-root__meta,
+.skills-node__meta,
+.skills-node__tag {
+    fill: var(--color-ink-500);
+    font-size: 11.5px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.dark .skills-root__meta,
+.dark .skills-node__meta,
+.dark .skills-node__tag {
+    fill: var(--color-ink-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cap-card { transform: none; transition: none; }
+    .cap-card__spot { background: none; }
+    .cap-card__tile { transition: none; }
+    .cap-card__icon { transition: none; }
+    .cap-card__trace { transition: none; opacity: 1; transform: none; }
+    .cap-card:hover .cap-card__icon,
+    .cap-card.is-active .cap-card__icon { transform: none; }
+
+    .skills-wire { transition: none; stroke-dashoffset: 0; }
+    .skills-node,
+    .skills-node__tap,
+    .skills-root,
+    .skills-pulse { transition: none; opacity: 1; transform: none; }
+    .skills-root__dot { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draw-frame rect { transition: none; stroke-dashoffset: 0; }
+
+    .sec-ordinal,
+    .sec-heading,
+    .sec-lead { opacity: 1; transform: none; transition: none; }
+    .sec-ordinal > span:last-child { clip-path: none; transition: none; }
+    .sec-rule path { transition: none; stroke-dashoffset: 0; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* About :: CTA marquee (between Contact and the footer)                      */
+/*                                                                            */
+/* mhabir.dev's floor band: an outlined uppercase phrase drifting slowly      */
+/* leftwards forever. The track holds the phrase six times; translating -50%  */
+/* of its own width therefore lands exactly three copies along, so the loop   */
+/* is seamless with no JS measuring. The stroke color is the reference's      */
+/* `hsl(--primary / 0.35)` mapped onto this site's signal accent.             */
+/* ------------------------------------------------------------------------ */
+
+.cta-marquee__track {
+    animation: cta-marquee-scroll 20s linear infinite;
+    will-change: transform;
+}
+
+@keyframes cta-marquee-scroll {
+    from { transform: translateZ(0); }
+    to   { transform: translate3d(-50%, 0, 0); }
+}
+
+.cta-marquee__stroke {
+    -webkit-text-stroke: 1px color-mix(in srgb, var(--color-signal-600) 35%, transparent);
+    font-stretch: 110%;
+}
+
+.dark .cta-marquee__stroke {
+    -webkit-text-stroke-color: color-mix(in srgb, var(--color-signal-400) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cta-marquee__track { animation: none; }
+}

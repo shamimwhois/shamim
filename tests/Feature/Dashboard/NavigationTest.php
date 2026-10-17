@@ -134,6 +134,30 @@ test('an admin sees every group', function () use ($group) {
     }
 });
 
+test('the admin rail scoped to admin routes shows only administration destinations', function () use ($group, $flatten) {
+    $sections = DashboardNavigation::for(User::factory()->admin()->create(), 'admin');
+
+    // Only the "Manage" band survives, holding the Administration group.
+    expect(array_column($sections, 'label'))->toContain('Manage');
+
+    $admin = $group($sections, 'administration');
+    expect($admin)->not->toBeNull();
+
+    $routes = array_column($flatten($sections), 'route');
+
+    expect($routes)->toBe(['admin.dashboard', 'admin.users'])
+        ->and($routes)->not->toContain('dashboard.posts.index')
+        ->and($routes)->not->toContain('seller.dashboard')
+        ->and($routes)->not->toContain('ideas.index')
+        ->and($routes)->not->toContain('marketplace.index');
+});
+
+test('a scoped admin rail is empty for an account without admin permissions', function () {
+    $sections = DashboardNavigation::for(User::factory()->create(), 'admin');
+
+    expect($sections)->toBe([]);
+});
+
 test('an empty section is dropped along with its heading', function () use ($group) {
     $sections = DashboardNavigation::for(User::factory()->create());
 
