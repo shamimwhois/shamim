@@ -4,8 +4,8 @@ use App\Enums\AccountRole;
 use App\Models\Post;
 use App\Models\User;
 
-test('guests are redirected to the login page', function () {
-    $this->get(route('dashboard.index'))->assertRedirect(route('login'));
+test('guests are bounced to the sign-in dialog', function () {
+    $this->get(route('dashboard.index'))->assertRedirect(route('home', ['signin' => 'required']));
 });
 
 test('authenticated users can visit the dashboard', function () {
@@ -134,9 +134,13 @@ test('the admin sidebar lists only admin routes', function () {
         ->assertOk()
         ->assertSee('Admin dashboard')
         ->assertSee('Users')
-        // Sidebar-only entries that belonged to other workspaces are gone.
+        // Sidebar-only entries that belonged to other workspaces are gone. The rail
+        // is scoped to administration, so it does not reach into a module workspace
+        // either — the console for each module is the only Ideas or Lab destination
+        // an admin sees here, and both of those live under /admin.
         ->assertDontSee(route('seller.dashboard'))
-        ->assertDontSee(route('ideas.index'))
+        ->assertDontSee(route('ideas.dashboard'))
+        ->assertDontSee(route('dev-lab.dashboard'))
         ->assertDontSee(route('marketplace.index'));
 });
 
@@ -156,7 +160,22 @@ test('a plain user never sees the taxonomy link in the sidebar', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('dashboard.index'))
         ->assertOk()
-        ->assertDontSee(route('dashboard.taxonomy'), escape: false);
+        ->assertDontSee(route('admin.taxonomy'), escape: false);
+});
+
+test('the author screens are reachable at their old dashboard paths', function () {
+    // Each relocated page owes a 301 under its old URL. The query string has to
+    // survive too — these pages keep their filters in it.
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)->get('/dashboard/posts?status=draft')
+        ->assertRedirect('/admin/posts?status=draft');
+
+    $this->actingAs($admin)->get('/dashboard/comments')
+        ->assertRedirect('/admin/comments');
+
+    $this->actingAs($admin)->get('/dashboard/taxonomy')
+        ->assertRedirect('/admin/taxonomy');
 });
 
 /*

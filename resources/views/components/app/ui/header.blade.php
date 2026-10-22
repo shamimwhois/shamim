@@ -76,7 +76,7 @@
                     </p>
                 @endif
 
-                <h1 class="mt-2 text-2xl font-semibold tracking-tightest text-ink-900">
+                <h1 class="mt-2 text-2xl font-semibold tracking-tightest text-sui-ink">
                     {{ $title }}
                 </h1>
 

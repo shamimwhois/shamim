@@ -8,7 +8,7 @@ use App\Models\Post;
 |--------------------------------------------------------------------------
 |
 | The vertical rail pinned to the viewport's right edge (hidden below xl):
-| eight icon + label anchors, one per panel of the ribcage, highlighted
+| nine icon + label anchors, one per panel of the ribcage, highlighted
 | on scroll by the shared [data-toc] IntersectionObserver in app.js and
 | slid in by the data-toc-reveal hook once the hero is scrolled past.
 | These tests pin the contract between the nav and the page it indexes —
@@ -17,7 +17,7 @@ use App\Models\Post;
 |
 */
 
-test('the section rail renders all eight anchors in order with icons', function () {
+test('the section rail renders all nine anchors in order with icons', function () {
     $response = $this->get(route('about'))->assertOk();
     $html = $response->getContent();
 
@@ -26,11 +26,16 @@ test('the section rail renders all eight anchors in order with icons', function 
     expect($html)->toContain('aria-label="On this page"')
         ->and($html)->toContain('data-toc')
         ->and($html)->toContain('data-toc-reveal')
-        ->and($html)->toContain('class="about-toc"');
+        ->and($html)->toContain('class="about-toc"')
+        // The footer is the dismiss marker: app.js slides the rail away as
+        // the footer reaches the rail's vertical centre so it never sits on
+        // top of the footer columns.
+        ->and($html)->toContain('data-toc-dismiss');
 
     foreach ([
         ['Intro', 'about-intro'],
         ['Why me', 'about-why'],
+        ['AI Workflow', 'ai-workflow'],
         ['How I work', 'about-principles'],
         ['Capabilities', 'about-capabilities'],
         ['Experience', 'about-experience'],
@@ -45,11 +50,11 @@ test('the section rail renders all eight anchors in order with icons', function 
             ->assertSeeInOrder([$label]);
     }
 
-    expect(substr_count($html, 'about-toc-link__icon'))->toBe(8);
+    expect(substr_count($html, 'about-toc-link__icon'))->toBe(9);
 });
 
 test('every rail target resolves to exactly one section on the page', function () {
-    // Section 07 only renders when the writing carousel has posts to show.
+    // The writing section (08) only renders when the carousel has posts.
     Post::factory()->published()->count(2)->create();
 
     $html = $this->get(route('about'))->assertOk()->getContent();
@@ -59,10 +64,15 @@ test('every rail target resolves to exactly one section on the page', function (
         // href, and its data-toc-target — neither missing nor duplicated.
         expect(substr_count($html, $id))->toBe(3, "The scrollspy target {$id} must exist once and be linked once.");
     }
+
+    // The AI Workflow band is linked once and opens exactly one section; its
+    // heading id shares the ai-workflow prefix, so match the bare id only.
+    expect(substr_count($html, 'data-toc-target="ai-workflow"'))->toBe(1)
+        ->and(substr_count($html, 'id="ai-workflow"'))->toBe(1);
 });
 
 test('scrollspy links carry the observer hooks and clear anchor landing space', function () {
-    // Section 07 only renders when the writing carousel has posts to show.
+    // The writing section (08) only renders when the carousel has posts.
     Post::factory()->published()->count(2)->create();
 
     $html = $this->get(route('about'))->assertOk()->getContent();
@@ -70,10 +80,10 @@ test('scrollspy links carry the observer hooks and clear anchor landing space', 
     // data-active is the attribute app.js toggles; it starts unhighlighted,
     // and the rail starts unrevealed (data-visible="false") until app.js
     // flips it once the hero is scrolled past.
-    expect(substr_count($html, 'data-active="false"'))->toBe(8)
+    expect(substr_count($html, 'data-active="false"'))->toBe(9)
         ->and($html)->toContain('data-visible="false"')
         // The sticky header is ~110px tall; every target clears it.
-        ->and(substr_count($html, 'scroll-mt-28'))->toBe(9)
+        ->and(substr_count($html, 'scroll-mt-28'))->toBe(10)
         // No section is pre-highlighted server-side; app.js owns the state.
         ->and($html)->not->toContain('aria-current="location"');
 });

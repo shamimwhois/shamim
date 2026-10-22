@@ -111,8 +111,11 @@ test('a plain user sees only the groups they hold permissions for', function () 
 
     // Baselines every account has.
     expect($group($sections, 'overview'))->not->toBeNull()
-        ->and($group($sections, 'content'))->not->toBeNull()
         ->and($group($sections, 'modules'))->not->toBeNull();
+
+    // The writing screens live under `/admin`, so a plain account loses the
+    // whole group, not just some of its items.
+    expect($group($sections, 'content'))->toBeNull();
 
     // Role-gated.
     expect($group($sections, 'selling'))->toBeNull()
@@ -123,6 +126,7 @@ test('a seller additionally sees the selling group but not administration', func
     $sections = DashboardNavigation::for(User::factory()->seller()->create());
 
     expect($group($sections, 'selling'))->not->toBeNull()
+        ->and($group($sections, 'content'))->toBeNull()
         ->and($group($sections, 'administration'))->toBeNull();
 });
 
@@ -137,16 +141,21 @@ test('an admin sees every group', function () use ($group) {
 test('the admin rail scoped to admin routes shows only administration destinations', function () use ($group, $flatten) {
     $sections = DashboardNavigation::for(User::factory()->admin()->create(), 'admin');
 
-    // Only the "Manage" band survives, holding the Administration group.
-    expect(array_column($sections, 'label'))->toContain('Manage');
+    // The Writing band survives the scope now that its screens are `/admin`
+    // routes, and sits ahead of the "Manage" band.
+    expect(array_column($sections, 'label'))->toContain('Writing', 'Manage');
 
     $admin = $group($sections, 'administration');
     expect($admin)->not->toBeNull();
 
     $routes = array_column($flatten($sections), 'route');
 
-    expect($routes)->toBe(['admin.dashboard', 'admin.users'])
-        ->and($routes)->not->toContain('dashboard.posts.index')
+    expect($routes)->toBe([
+        'admin.posts.index', 'admin.comments', 'admin.taxonomy',
+        'admin.dashboard', 'admin.users', 'admin.marketplace', 'admin.payment', 'admin.orders', 'admin.payments', 'admin.about', 'admin.ai-hub',
+        'admin.ideas', 'admin.dev-lab',
+    ])
+        ->and($routes)->not->toContain('dashboard.index')
         ->and($routes)->not->toContain('seller.dashboard')
         ->and($routes)->not->toContain('ideas.index')
         ->and($routes)->not->toContain('marketplace.index');
@@ -163,21 +172,39 @@ test('an empty section is dropped along with its heading', function () use ($gro
 
     $labels = array_column($sections, 'label');
 
-    // A plain user can reach nothing under "Manage", so the band disappears
-    // entirely rather than rendering a heading over empty space.
+    // A plain user can reach nothing under "Manage" or under "Writing" — the
+    // authoring screens are `/admin` pages — so both bands disappear entirely
+    // rather than rendering a heading over empty space.
     expect($labels)->not->toContain('Manage')
+        ->not->toContain('Writing')
         ->and($group($sections, 'selling'))->toBeNull();
 });
 
-test('taxonomy is hidden from a plain user but shown to a seller', function () use ($flatten) {
-    $plain = DashboardNavigation::for(User::factory()->create());
-    $seller = DashboardNavigation::for(User::factory()->seller()->create());
+test('the writing screens are hidden from every account without admin access', function () use ($flatten) {
+    $plainRoutes = array_column($flatten(DashboardNavigation::for(User::factory()->create())), 'route');
+    $sellerRoutes = array_column($flatten(DashboardNavigation::for(User::factory()->seller()->create())), 'route');
+    $adminRoutes = array_column($flatten(DashboardNavigation::for(User::factory()->admin()->create())), 'route');
 
-    $plainRoutes = array_column($flatten($plain), 'route');
-    $sellerRoutes = array_column($flatten($seller), 'route');
+    foreach (['admin.posts.index', 'admin.comments', 'admin.taxonomy'] as $route) {
+        expect($plainRoutes)->not->toContain($route)
+            ->and($sellerRoutes)->not->toContain($route)
+            ->and($adminRoutes)->toContain($route);
+    }
+});
 
-    expect($plainRoutes)->not->toContain('dashboard.taxonomy')
-        ->and($sellerRoutes)->toContain('dashboard.taxonomy');
+test('the module consoles stay out of a rail that cannot open them', function () use ($flatten) {
+    $plain = array_column($flatten(DashboardNavigation::for(User::factory()->create())), 'route');
+    $seller = array_column($flatten(DashboardNavigation::for(User::factory()->seller()->create())), 'route');
+    $admin = array_column($flatten(DashboardNavigation::for(User::factory()->admin()->create())), 'route');
+
+    // Both consoles read across accounts, so they belong to the admin rail and
+    // nowhere else. Filtering by permission is what keeps them out of a user
+    // sidebar, which is rendered without a scope.
+    foreach (['admin.ideas', 'admin.dev-lab'] as $console) {
+        expect($plain)->not->toContain($console)
+            ->and($seller)->not->toContain($console)
+            ->and($admin)->toContain($console);
+    }
 });
 
 test('marketplace is restricted to accounts that may sell', function () use ($flatten) {
@@ -193,8 +220,8 @@ test('the modules group matches the account permissions exactly', function () us
     $modules = $group(DashboardNavigation::for($user), 'modules');
 
     $expected = [
-        'ideas.index' => AccountPermission::UseIdeas,
-        'dev-lab.index' => AccountPermission::UseDeveloperLab,
+        'ideas.dashboard' => AccountPermission::UseIdeas,
+        'dev-lab.dashboard' => AccountPermission::UseDeveloperLab,
         'ai-hub.index' => AccountPermission::UseAiHub,
         'marketplace.index' => AccountPermission::UseMarketplace,
     ];
@@ -221,9 +248,9 @@ test('a group holding exactly one visible item becomes static', function () use 
     expect($overview['static'])->toBeTrue()
         ->and($overview['items'])->toHaveCount(1);
 
-    // Content is non-static because a plain user still sees two of its three
-    // items (posts and comments).
-    $content = $group($sections, 'content');
+    // Content is non-static for the account that can see all three of its
+    // items; the whole group is gone for anybody without `admin:access`.
+    $content = $group(DashboardNavigation::for(User::factory()->admin()->create()), 'content');
 
     expect($content['static'])->toBeFalse()
         ->and(count($content['items']))->toBeGreaterThan(1);
@@ -236,7 +263,7 @@ test('a group containing the current route reports itself active', function () u
     $before = DashboardNavigation::for($user);
     expect($group($before, 'content')['active'])->toBeFalse();
 
-    $this->actingAs($user)->get(route('dashboard.posts.index'))->assertOk();
+    $this->actingAs($user)->get(route('admin.posts.index'))->assertOk();
 
     $after = DashboardNavigation::for($user);
 
@@ -255,7 +282,7 @@ test('the active flag follows route patterns rather than exact names', function 
 });
 
 test('only the comments item carries a badge, and it counts pending comments', function () use ($flatten) {
-    $user = User::factory()->create();
+    $user = User::factory()->admin()->create();
     $post = Post::factory()->create(['user_id' => $user->id]);
 
     Comment::factory()->count(3)->create(['post_id' => $post->id, 'status' => 'pending']);
@@ -263,25 +290,26 @@ test('only the comments item carries a badge, and it counts pending comments', f
 
     $items = collect($flatten(DashboardNavigation::for($user)))->keyBy('route');
 
-    expect($items['dashboard.comments']['badge'])->toBe(3)
-        ->and($items['dashboard.posts.index']['badge'])->toBe(0)
+    expect($items['admin.comments']['badge'])->toBe(3)
+        ->and($items['admin.posts.index']['badge'])->toBe(0)
         ->and($items['dashboard.index']['badge'])->toBe(0);
 });
 
-test('the pending badge is scoped to the account when they cannot moderate', function () use ($flatten) {
+test('an account without admin access gets no content group and therefore no badge', function () use ($flatten) {
+    /*
+     * The queue itself is still author-scoped — `pages::admin.comments` lists
+     * only the signed-in account's posts — but the badge is a sidebar
+     * affordance, and the band it belongs to no longer renders for accounts
+     * that cannot open the screen it links to.
+     */
     $author = User::factory()->create();
-    $other = User::factory()->create();
+    $post = Post::factory()->create(['user_id' => $author->id]);
 
-    $mine = Post::factory()->create(['user_id' => $author->id]);
-    $theirs = Post::factory()->create(['user_id' => $other->id]);
+    Comment::factory()->count(2)->create(['post_id' => $post->id, 'status' => 'pending']);
 
-    Comment::factory()->count(2)->create(['post_id' => $mine->id, 'status' => 'pending']);
-    Comment::factory()->count(5)->create(['post_id' => $theirs->id, 'status' => 'pending']);
+    $routes = array_column($flatten(DashboardNavigation::for($author)), 'route');
 
-    $badge = collect($flatten(DashboardNavigation::for($author)))
-        ->keyBy('route')['dashboard.comments']['badge'];
-
-    expect($badge)->toBe(2);
+    expect($routes)->not->toContain('admin.comments');
 });
 
 test('a moderator sees the platform-wide pending count', function () use ($flatten) {
@@ -295,7 +323,7 @@ test('a moderator sees the platform-wide pending count', function () use ($flatt
     Comment::factory()->count(5)->create(['post_id' => $theirs->id, 'status' => 'pending']);
 
     $badge = collect($flatten(DashboardNavigation::for($admin)))
-        ->keyBy('route')['dashboard.comments']['badge'];
+        ->keyBy('route')['admin.comments']['badge'];
 
     expect($badge)->toBe(7);
 });

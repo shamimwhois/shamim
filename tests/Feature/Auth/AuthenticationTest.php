@@ -6,9 +6,9 @@ use Laravel\Fortify\Features;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse;
 
 test('login screen can be rendered', function () {
-    $response = $this->get(route('login'));
-
-    $response->assertOk();
+    // Login is modal-first: the URL bounces to the flagged home, where the
+    // dialog opens server-side. No standalone login page exists.
+    $this->get(route('login'))->assertRedirect(route('home', ['signin' => 'required']));
 });
 
 test('users can authenticate using the login screen', function () {

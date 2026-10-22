@@ -31,13 +31,14 @@ class EnsureAccountPermission
         $user = $request->user();
 
         /*
-         * Guests are bounced to the login page rather than shown a 403: they
-         * may well hold the permission once they authenticate, and a 403 would
-         * be a dead end. `auth` middleware normally runs first, so this is a
-         * defensive branch for routes that omit it.
+         * Guests are bounced to the flagged home — where the login dialog
+         * opens server-side — rather than shown a 403: they may well hold the
+         * permission once they authenticate, and a 403 would be a dead end.
+         * `auth` middleware normally runs first, so this is a defensive branch
+         * for routes that omit it. `guest()` still records the intended URL.
          */
         if ($user === null) {
-            return redirect()->guest(route('login'));
+            return redirect()->guest(route('home', ['signin' => 'required']));
         }
 
         $requireAll = false;

@@ -56,16 +56,27 @@ class FortifyServiceProvider extends ServiceProvider
 
     /**
      * Configure Fortify views.
+     *
+     * The guest-facing screens — login, registration, and the forgot-password
+     * request — are modal-first now: the dialogs live on the public surfaces
+     * (`x-auth.modals`), and these three GET routes bounce the visitor to the
+     * flagged home page whose server-side `show` binding opens the matching
+     * dialog. That keeps every route name alive for no-JS fallbacks and email
+     * links while removing the standalone pages.
+     *
+     * The four mid-flow screens (verify email, two-factor challenge, confirm
+     * password, and the token-bearing reset form) stay as real pages: they are
+     * reached from emails or an in-progress session, not from a guest journey.
      */
     private function configureViews(): void
     {
-        Fortify::loginView(fn () => view('pages::auth.login'));
+        Fortify::loginView(fn () => redirect()->route('home', ['signin' => 'required']));
         Fortify::verifyEmailView(fn () => view('pages::auth.verify-email'));
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
-        Fortify::registerView(fn () => view('pages::auth.register'));
+        Fortify::registerView(fn () => redirect()->route('home', ['signup' => 'required']));
         Fortify::resetPasswordView(fn () => view('pages::auth.reset-password'));
-        Fortify::requestPasswordResetLinkView(fn () => view('pages::auth.forgot-password'));
+        Fortify::requestPasswordResetLinkView(fn () => redirect()->route('home', ['forgot' => 'required']));
     }
 
     /**

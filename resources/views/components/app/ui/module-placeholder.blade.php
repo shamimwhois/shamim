@@ -2,25 +2,40 @@
     'title',
     'description',
     'icon' => 'sparkles',
-    'status' => 'planned',
     'features' => [],
     'spec' => null,
+    'eyebrow' => null,
+    'breadcrumbs' => null,
+    'alreadyWorks' => null,
 ])
 
 {{--
     Module placeholder.
 
-    Every not-yet-built product module renders through this component, so the
-    four placeholder pages cannot drift into four different designs. It states
-    three things honestly: what the module is, what is already built underneath
-    it, and that the module itself is not available yet.
+    Every not-yet-built product module that needs only four sentences renders
+    through this component, so the placeholder pages cannot drift into different
+    designs. It states three things honestly: what the module is, what is
+    already built underneath it, and that the module itself is not available
+    yet. A module that has outgrown those four sentences — Developer Lab today —
+    builds its own panels instead.
+
+    The eyebrow, breadcrumb and "what already works" wording differ per surface
+    — a public landing page has no guard to describe, an admin console has no
+    workspace entry — so those three are overridable. Their defaults are the
+    workspace case, which is what most of the pages are.
 --}}
+@php
+    $eyebrow ??= __('Module');
+    $breadcrumbs ??= [['label' => __('Workspaces')], ['label' => $title]];
+    $alreadyWorks ??= __('The account roles, permissions and navigation for this module are already in place. The route and its guard resolve today — only the module itself is unbuilt.');
+@endphp
+
 <div>
     <x-app.ui.header
         :title="$title"
         :description="$description"
-        :eyebrow="__('Module')"
-        :breadcrumbs="[['label' => __('Workspaces')], ['label' => $title]]"
+        :eyebrow="$eyebrow"
+        :breadcrumbs="$breadcrumbs"
     />
 
     <x-app.ui.body max="prose">
@@ -65,7 +80,7 @@
 
         <x-app.ui.section :title="__('What already works')" icon="check-circle" :padded="true">
             <p class="text-sm leading-normal text-ink-600">
-                {{ __('The account roles, permissions and navigation for this module are already in place. The route and its guard resolve today — only the module itself is unbuilt.') }}
+                {{ $alreadyWorks }}
             </p>
 
             @if ($spec)

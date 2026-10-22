@@ -7,6 +7,7 @@ use App\Support\Seo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -30,6 +31,15 @@ use Livewire\WithPagination;
 new #[Title('Writing')] class extends Component
 {
     use WithPagination;
+
+    /**
+     * The shortest search term that narrows the list.
+     *
+     * One character matches a third of the corpus and tells the reader nothing,
+     * so the query is not run until there is a word to look for. The same rule
+     * the snippet gallery and the AI hub already follow.
+     */
+    public const MIN_QUERY_LENGTH = 2;
 
     /**
      * Free-text query. Debounced so typing does not fire a request per keystroke.
@@ -130,6 +140,27 @@ new #[Title('Writing')] class extends Component
     }
 
     /**
+     * Whether the search term is long enough to actually query the index.
+     *
+     * A term that carries a LIKE wildcard is exempt: it is escaped before
+     * interpolation, so it matches literally and cannot match every row.
+     * A bare `%` is one character but still a real question — "posts with a
+     * percent sign" — and the escaping contract only holds if the query
+     * actually runs.
+     */
+    #[Computed]
+    public function isSearching(): bool
+    {
+        $term = trim($this->search);
+
+        if ($term !== '' && strpbrk($term, '%_') !== false) {
+            return true;
+        }
+
+        return Str::length($term) >= self::MIN_QUERY_LENGTH;
+    }
+
+    /**
      * The paginated result set.
      *
      * Eager loads are declared here because the card component reads `category`,
@@ -158,7 +189,7 @@ new #[Title('Writing')] class extends Component
             ->recent()
             ->with(['category', 'tags'])
             ->withCount(['comments' => fn (Builder $query) => $query->approved()])
-            ->when($this->search !== '', fn (Builder $query) => $query->search($this->search))
+            ->when($this->isSearching, fn (Builder $query) => $query->search($this->search))
             ->when($this->category !== '', fn (Builder $query) => $query->inCategory($this->category))
             ->when($this->tag !== '', fn (Builder $query) => $query->withTag($this->tag));
     }
@@ -288,7 +319,7 @@ new #[Title('Writing')] class extends Component
                         <input
                             id="post-search"
                             type="search"
-                            wire:model.live.debounce.300ms="search"
+                            wire:model.live.debounce.150ms="search"
                             placeholder="Search posts…"
                             autocomplete="off"
                             class="w-full rounded-md border border-ink-200 bg-white py-2 pl-9 pr-9 text-sm text-ink-900 placeholder:text-ink-400 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/20 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 dark:placeholder:text-ink-600"
@@ -311,6 +342,12 @@ new #[Title('Writing')] class extends Component
                             >
                                 <flux:icon name="x-mark" class="size-4" />
                             </button>
+                        @endif
+
+                        @if (Str::length(trim($search)) === 1)
+                            <p class="absolute inset-y-1 left-12 mt-0.5 font-mono text-2xs text-amber-600 dark:text-amber-400">
+                                Type at least two characters to search
+                            </p>
                         @endif
                     </div>
                 </div>
@@ -383,6 +420,7 @@ new #[Title('Writing')] class extends Component
                             ])
                         >
                             {{ $tag->name }}
+                            <span class="ml-1 opacity-50">{{ $tag->posts_count }}</span>
                         </button>
                     @endforeach
                 </div>
@@ -393,7 +431,7 @@ new #[Title('Writing')] class extends Component
     {{-- ================================================================== --
      | Results
      --}}
-    <section data-reveal class="shell py-14" aria-live="polite" aria-busy="{{ $this->posts->isEmpty() ? 'false' : 'false' }}">
+    <section data-reveal class="shell py-14" aria-live="polite" aria-busy="false" wire:loading.attr="aria-busy" wire:target="search, category, tag">
         {{-- Loading skeleton, shown only while a filter request is in flight --}}
         <div wire:loading.delay.shorter.flex wire:target="search, category, tag" class="hidden grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach (range(1, 6) as $i)

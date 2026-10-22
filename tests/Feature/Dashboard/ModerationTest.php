@@ -1,44 +1,64 @@
 <?php
 
+use App\Enums\AccountRole;
 use App\Enums\CommentStatus;
 use App\Models\Comment;
 use App\Models\Post;
 use App\Models\User;
+use Livewire\Livewire;
 
 test('the comments screen requires authentication', function () {
-    $this->get(route('dashboard.comments'))->assertRedirect(route('login'));
+    $this->get(route('admin.comments'))->assertRedirect(route('home', ['signin' => 'required']));
+});
+
+test('the queue is an admin screen', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('admin.comments'))
+        ->assertForbidden();
+});
+
+test('the queue rechecks admin access on Livewire updates', function () {
+    // Moderation actions are writes, and they bypass the route group because an
+    // update posts to `/livewire/update`. The component guard is the check.
+    $moderator = User::factory()->admin()->create();
+
+    $component = Livewire::actingAs($moderator)->test('pages::admin.comments');
+
+    $moderator->forceFill(['role' => AccountRole::User])->save();
+
+    $component->call('clearFilters')->assertForbidden();
 });
 
 test('the moderation queue defaults to pending comments', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $post = Post::factory()->for($author)->published()->create();
 
     Comment::factory()->for($post)->create(['body' => 'Awaiting a decision']);
     Comment::factory()->for($post)->approved()->create(['body' => 'Already published']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.comments'))
+        ->get(route('admin.comments'))
         ->assertOk()
         ->assertSee('Awaiting a decision')
         ->assertDontSee('Already published');
 });
 
 test('the approved tab shows approved comments', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $post = Post::factory()->for($author)->published()->create();
 
     Comment::factory()->for($post)->create(['body' => 'Awaiting a decision']);
     Comment::factory()->for($post)->approved()->create(['body' => 'Already published']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.comments', ['status' => 'approved']))
+        ->get(route('admin.comments', ['status' => 'approved']))
         ->assertOk()
         ->assertSee('Already published')
         ->assertDontSee('Awaiting a decision');
 });
 
 test('comments on another authors posts are never listed', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $stranger = User::factory()->create();
 
     $mine = Post::factory()->for($author)->published()->create();
@@ -48,21 +68,21 @@ test('comments on another authors posts are never listed', function () {
     Comment::factory()->for($theirs)->create(['body' => 'On their post']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.comments'))
+        ->get(route('admin.comments'))
         ->assertOk()
         ->assertSee('On my post')
         ->assertDontSee('On their post');
 });
 
 test('the moderation queue can be searched', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $post = Post::factory()->for($author)->published()->create();
 
     Comment::factory()->for($post)->create(['body' => 'A remark about caching']);
     Comment::factory()->for($post)->create(['body' => 'A remark about testing']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.comments', ['q' => 'caching']))
+        ->get(route('admin.comments', ['q' => 'caching']))
         ->assertOk()
         ->assertSee('A remark about caching')
         ->assertDontSee('A remark about testing');

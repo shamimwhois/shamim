@@ -1,14 +1,20 @@
 # Idea — Master Product & Development Prompt
 
-> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+> **Status: UPSTREAM PRODUCT SPEC — PARTIALLY IMPLEMENTED.**
 >
-> This document is an **input**, not a description of the shipped system. It was
-> written as a build prompt for an "Ideas, Plans, Tasks, Projects &
-> Collaboration" module and predates the current architecture. Nothing described
-> here exists in the codebase today.
+> This document is an **input** that has since been partly built. It was written as a
+> build prompt for an "Ideas, Plans, Tasks, Projects & Collaboration" module and
+> predates the current architecture. Ideas, Plans, Tasks and their categories exist in
+> the codebase, each owned by the account that wrote it, with a public surface for the
+> rows an author chose to publish. Projects, milestones, sharing, revision history,
+> the activity log and notifications do not.
 >
-> Read it as: *what the module should become, once it is built.* Do not read it
-> as: *what the application currently does.*
+> Read §1 and onward as: *what the module was specified to become.* Read
+> [§ What is shipped](#what-is-shipped) below as: *what the application currently
+> does.* Where the two disagree, this document defers — the shipped system is described
+> in [ROUTES](./ROUTES.md), [SCHEMA](./SCHEMA.md), [ERD](./ERD.md),
+> [ARCHITECTURE](./ARCHITECTURE.md) and [COMPONENTS](./COMPONENTS.md), and those are
+> the files kept in step with the code.
 >
 > **Where the rest of the system is documented instead:**
 > [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
@@ -17,20 +23,163 @@
 > [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
 > [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
 >
-> **Already built and reusable by this module:** three account roles and their
-> permission matrix ([PERMISSIONS.md](./PERMISSIONS.md)), the modal system
-> ([COMPONENTS.md](./COMPONENTS.md)), the dashboard shell with permission-driven
-> navigation, and the `/ideas` route with its `ideas:use` guard — currently
-> rendering a placeholder page, which is the seam this module plugs into. There
-> is **no** team or membership layer to reuse: the starter kit's team feature was
-> removed, so collaboration primitives ("Team members", below) would be new
-> work. The module's deferred status and its relationship to the rest of the
-> roadmap are recorded in
-> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission).
+> **Reused from the substrate rather than rebuilt:** three account roles and their
+> permission matrix ([PERMISSIONS.md](./PERMISSIONS.md)) — the module gates on the
+> pre-existing `ideas:use` and `admin:access` cases and **adds no new permission**,
+> which is why the matrix is unchanged; the modal system
+> ([COMPONENTS.md](./COMPONENTS.md)); the dashboard shell with permission-driven
+> navigation; the Soft UI tokens ([SOFT-UI.md](./SOFT-UI.md)); and the module layering
+> the AI Hub and the marketplace established (enum → migration → model → action →
+> policy → single-file Livewire screen).
 >
-> **Naming note.** This spec addresses `https://shamim.it`. In-repository
-> documentation calls the application **DevFolio**; they refer to the same
-> product.
+> **There is still no team or membership layer to reuse.** The starter kit's team
+> feature was removed, so the collaboration half of this spec ("Team members", sharing,
+> invitations) would be new work on a second ACL, and is listed under deviations rather
+> than treated as a screen away.
+>
+> **Naming note.** The word "plan" is already spoken for: `App\Enums\RolePlan` is a
+> dashboard subscription tier. The module's plans are therefore `IdeaPlan`, on the
+> `idea_plans` table, at `/ideas/plans`. Nothing in this module is called `Plan`.
+> In-repository documentation calls the application **DevFolio**, while this spec
+> addresses `https://shamim.it`; they refer to the same product.
+
+## What is shipped
+
+Ten routes beneath `/ideas`, one operator console at `/admin/ideas`, four module-owned
+tables plus the platform's shared `topics` table and the `idea_topic` pivot, four
+enums of its own (`IdeaStatus`, `PlanStatus`, `TaskStatus`, `IdeaPotential`) alongside
+the shared `WorkPriority` and `ContentVisibility`, thirteen actions, four policies,
+eight workspace and public screens.
+
+| Surface | Path | Who reaches it |
+| --- | --- | --- |
+| Public index | `/ideas` | public, published ideas only |
+| Public detail | `/ideas/{idea:slug}` | public when published; otherwise the author or `admin:access` |
+| Workspace home | `/ideas/dashboard` | `auth`, `verified`, `ideas:use` |
+| Capture / edit | `/ideas/create`, `/ideas/{idea:slug}/edit` | same |
+| Categories | `/ideas/categories` | same |
+| Plans | `/ideas/plans`, `/ideas/plans/create`, `/ideas/plans/{plan:slug}`, `/ideas/plans/{plan:slug}/edit` | same |
+| Operator console | `/admin/ideas` | `admin:access` |
+
+The four module tables are `idea_categories` (per-account folders), `ideas`,
+`idea_plans` and `idea_tasks`. Tasks hang off a plan and carry no `user_id` of their
+own: ownership derives through `$task->plan->user_id`, so a task can never drift away
+from the account that owns its plan, and every mutating action re-asserts the parent's
+owner. Filing an idea by subject goes through two tables the module does not own,
+`topics` and the `idea_topic` pivot, shared with the Developer Lab — see
+[§ Two taxonomies](#two-taxonomies-and-which-one-is-public).
+
+Publication is the conjunction the hub and the marketplace already use — `visibility`
+is `ContentVisibility::Public` **and** `published_at` is set — and it is only available
+at the stage the workflow allows: `IdeaStatus::Approved`. `SyncIdeaVisibility` is the
+only writer of the pair.
+
+Routing order is the first constraint on this URL space, because `/ideas/{idea:slug}`
+is a catch-all one segment deep. Workspace literals (`dashboard`, `create`,
+`categories`, `plans`) are registered ahead of it, in one section of
+`routes/web.php` so the ordering is legible on one screen, and
+`app/Rules/IdeaSlug.php` refuses those words plus `edit` as slugs on top of format and
+uniqueness. An account must not be able to name an idea "plans" and shadow the plans
+screen; both defences are required, and both are pinned by tests.
+
+### Two taxonomies, and which one is public
+
+An idea is filed twice, and the difference between the two filings is the point.
+
+`IdeaCategory` is one account's private filing system. It is per-user, its slug is
+unique inside that account (`unique(['user_id', 'slug'])`) rather than across the
+application, every list of it is written through `authoredBy()`, and it stays private.
+Its name is printed on an idea card only when the reader owns the idea, which is
+decided by the `showCategory` prop in
+`resources/views/components/app/ideas/card.blade.php` and defaults to exactly that
+test. A folder says how somebody organises their notes, which is not something the
+site has a right to publish, so no public surface — the index, an idea page, or a
+topic shelf — can leak it.
+
+`App\Models\Topic` is the other half: a platform-owned, public, shared subject
+vocabulary. An operator seeds it, an author picks from it when saving an idea, and it
+is the facet a stranger browses by. One flat table serves both Ideas and the Developer
+Lab, through the `idea_topic` and `lab_snippet_topic` pivots, because "what this is
+about" means the same thing to an idea and to a snippet. It is **not**
+`App\Models\AiTopic`, which is the hub's own hierarchical tree with a `parent_id` — a
+different shape for a different module, and the two are not interchangeable.
+
+Filing is capped at `Topic::MAX_PER_ROW`, eight topics to an idea: a facet is
+navigation, and a wall of twelve chips is not. An id that is not an integer, does not
+exist, or has been switched off by an operator is dropped silently by
+`App\Models\Topic::syncRows()` rather than failing the save, because a stray checkbox
+should not cost somebody twenty minutes of writing. The sync runs inside the
+transaction `App\Actions\Ideas\SaveIdea` already opens, through
+`App\Actions\Ideas\SyncIdeaTopics`, so a row and its subjects cannot disagree
+mid-write. An absent `topics` key is not the same instruction as an empty one: a
+caller that does not file by topic must not clear what the author chose.
+
+A topic is invisible to the public until a **published** idea carries it. The gate is
+`App\Services\PublicTaxonomy`, shared with the gallery and with the two platform pages
+`/topics` and `/topics/{topic:slug}`: a chip appears only when a row a stranger can
+open sits behind it, so a subject an operator switched off and a subject seeded but
+never published under disappear for the same reason. The query parameters the index
+takes beside `?q=` and `?page=` are documented in [API](./API.md).
+
+### Deviations from the spec, and why
+
+| The spec asks for | Shipped instead | Reason |
+| --- | --- | --- |
+| Idea → Plan → Task → **Project** → Release | Ideas, plans and tasks. No `projects` table | A project is a delivery object with its own lifecycle, budget and owners. Four columns on a plan would be a project in name only, and a second table invented now would have to be reconciled with the real one later |
+| Milestones and progress percentage | A task completion ratio on the plan row | Derived from the tasks that exist. A progress number that nobody can edit is honest; one that can be set to 60% by hand is decoration |
+| Sharing, invitations, per-item comments | Not built. Publishing is the only form of sharing | Each of these needs a permission the module does not have, and `AccountPermission` was left untouched on purpose. Adding cases would break the pinned role matrix and require a migration of the matrix data itself |
+| Revision history and an activity log | Not built | A history table is a second write path on every save and a pruning problem on a SQLite monolith. Nothing in the current lifecycle requires it |
+| Estimated value or potential as a number | `IdeaPotential`: Low, Medium, High | Three honest steps instead of a fake decimal |
+| Full-text search | `LIKE` over title, summary and content | The default connection is SQLite, which has no full-text index configured here. This is substring matching, and the UI describes it as substring matching rather than as a search engine. The public index waits for two characters before filtering at all; that floor sits on the screen and not in `Idea::search()`, which still means what its name says |
+| Tags and cover images | Not built | Uploads need a disk, a signed route and a prune command, as the feed's media does. Half-wiring them is worse than waiting |
+| Categories as a shared taxonomy | `idea_categories` stays one account's own folders; the public facet is the platform's own `topics` list | Reusing the blog's `categories` and `tags` would leak user taxonomy into blog filters and public navigation, and the public index still has no *category* facet, because another account's folders are not a public taxonomy. What a stranger may browse by is a subject the platform seeded and the author chose — [§ Two taxonomies](#two-taxonomies-and-which-one-is-public) |
+| Status set from the spec | `IdeaStatus`: Inbox, Draft, UnderReview, Approved, Archived; `PlanStatus`: Draft, Planning, Ready, InProgress, OnHold, Completed, Cancelled | Transitions are enum-owned (`allowedTransitions()` / `canTransitionTo()`), the way `AiPublicationStatus` already treats a workflow, so "Archived back to Approved" is refused by the type rather than by a UI promise |
+| Task statuses: Backlog, To Do, In Progress, Blocked, In Review, Completed, Cancelled | `TaskStatus`: Todo, InProgress, Blocked, Done | Four states is what a checklist on a plan document can actually be walked through. `In Review` and `Cancelled` describe a delivery pipeline a plan does not have, and `Backlog` is what the idea bank already is |
+| Priority including `Normal` | `WorkPriority`: Low, Medium, High, Urgent | The spec's own list has both `Medium` and `Normal`, which is one slot asked to mean two things. `Medium` is the middle, and a task with no priority set is left unranked rather than silently called normal |
+| Task assignee, parent task, subtasks, start date, estimated and actual effort, checklist, comments, attachments, activity history | Title, description, status, priority, due date, sort order, completed timestamp | An assignee needs the sharing model this build does not have, a parent task needs a recursive tree and a reorder rule that is not "swap two rows", and effort needs a time tracker behind it. Each is a column that would be a promise about a feature |
+| Kanban / board views, duplicate idea, duplicate plan | List views with tab filters, and no duplicate action | A board is the same rows in columns, and the columns would be `TaskStatus`'s four cases; the plan screen's tabs already filter on them. Duplication is a slug-and-children copy that reads as trivial until the children are tasks with sort order, and nothing asked for it yet |
+| Publish approved plans to a public portfolio | Plans are never public. `IdeaPlan` has no `visibility` or `published_at`, and its `isVisibleTo()` answers false for a stranger | Decision for this build was that the publishable objects are the idea and the snippet. A plan carries the reasoning behind an idea, including the parts marked out of scope; publishing it is a separate product call, not a checkbox |
+| Notifications (Module I) | Not built | Everything in that list except "assigned tasks" depends on sharing, and assigned tasks do not exist. `app/Notifications` was empty and has been removed rather than kept as a hint of intent |
+| Link multiple relevant ideas | One plan carries one `idea_id`, unique in the schema | The link is provenance, and provenance is singular: "this plan came out of that idea". A many-to-many would need a pivot whose only purpose is saying which of several ideas was the source |
+
+### What conversion does
+
+`ConvertIdeaToPlan` is the one behaviour in this module with a guarantee attached: the
+idea row survives unchanged, the plan carries `idea_id` as a `nullOnDelete` link so
+deleting the idea never destroys the plan it produced, the plan slug derives from the
+idea slug with a `-plan` suffix, the summary and content are copied forward into the
+plan's problem statement and notes, and the idea's status does **not** move. Having a
+plan is not a later stage of thinking about an idea, so the two workflows stay separate
+objects. Eligibility and singularity are enforced twice: the action refuses an idea that
+is not `Approved` or that already has a plan, and `idea_plans.idea_id` carries a UNIQUE
+index, so the second attempt cannot be written by a request that skipped the class. The
+requirement lives in that one class and is pinned by a test rather than left to the
+screen that triggers it.
+
+### What a published idea says about itself
+
+Publishing is a machine-readable claim as well as a page. A published idea emits an
+`Article` node and a `BreadcrumbList`, pushed through `App\Support\Seo::$jsonLd` from
+`resources/views/pages/ideas/⚡show.blade.php`. The author node is a `Person` carrying
+a `name` and never an email address — an address in structured data is an address
+published for harvesting, and "this person wrote it" does not need one — and its `url`
+appears only when the account has a handle, for the same reason the byline renders a
+plain name instead of a link when it does not. There is no `image` and no `license`
+rather than an invented one. A draft that its author is reading sets `noindex` and
+emits no structured data at all, because a draft announcing itself to a search engine
+is a leak with extra steps.
+
+Reading is the page's job, so it borrows the layer the blog articles already use
+instead of inventing a second one: a table of contents derived from
+`MarkdownRenderer::outline()` run over the same single Markdown render the body is
+printed from, the scroll progress rule that `resources/js/app.js` drives from the
+`data-reading-target` attribute, word count and reading time, a share bar above and
+below the prose, and previous/next links. Neither figure is stored — a column would be
+a second answer to a question the content already answers, and it would be wrong the
+first time its author edited the idea. The neighbours walk the whole published set
+while the related-ideas rail stays with the same author, so the two are different ways
+out of the page rather than the same way twice.
+
 
 ## 1. AI Developer Role
 

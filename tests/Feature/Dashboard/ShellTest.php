@@ -68,17 +68,26 @@ test('every workspace layout fills every region of the shared shell', function (
             $response->assertSee($marker, false, sprintf('[%s] is missing the [%s] region.', $key, $region));
         }
 
-        // The floating navbar carries the Creative Tim set: a real search,
-        // a notification panel backed by the comment queue, and a profile
-        // menu with the way out. A navbar that renders the pill but none of
-        // its machinery is the failure this guards.
+        // The floating navbar carries the Creative Tim set. The profile menu
+        // is the machinery every workspace must have; a navbar that renders the
+        // pill without it is the failure this guards.
         $response
             ->assertSee('data-flux-dropdown', false)
-            ->assertSee('data-flux-menu', false)
-            ->assertSee('name="q"', false)
-            ->assertSee(route('dashboard.posts.index'), false)
-            ->assertSee(__('Notifications'), false)
-            ->assertSee(__('Review the queue'), false);
+            ->assertSee('data-flux-menu', false);
+
+        // The post search and the pending-comment bell both link into
+        // `/admin`, so they render only where that workspace is reachable.
+        if ($role === AccountRole::Admin->value) {
+            $response
+                ->assertSee('name="q"', false)
+                ->assertSee(route('admin.posts.index'), false)
+                ->assertSee(__('Notifications'), false)
+                ->assertSee(__('Review the queue'), false);
+        } else {
+            $response
+                ->assertDontSee('name="q"', false)
+                ->assertDontSee(__('Review the queue'), false);
+        }
     }
 })->group('shell');
 
@@ -180,7 +189,7 @@ test('the wordmark is one component rendered in every sidenav position', functio
         ->get(route('admin.dashboard'))
         ->getContent();
 
-    // Sidenav brand, drawer brand, mobile top bar. Three positions, one glyph.
+    // Sidenav brand, drawer brand, navbar breadcrumb. Three positions, one glyph.
     expect(substr_count($html, '&gt;_</span>'))->toBe(3);
 
     // ...and the glyph is defined in exactly one file, which is the point of
@@ -209,7 +218,12 @@ test('the guest layout renders the public chrome and carries no workspace scope'
 })->group('shell');
 
 test('the auth layout is reachable and renders the split panel', function () {
-    $this->get(route('login'))
+    // Login itself is modal-first now: its URL redirects to the flagged home.
+    $this->get(route('login'))->assertRedirect(route('home', ['signin' => 'required']));
+
+    // The reset-password screen stands in for the auth layout — the only
+    // remaining auth screen a guest can reach directly.
+    $this->get(route('password.reset', ['token' => 'shell-check']))
         ->assertOk()
         ->assertSee('id="auth-form"', false)
         ->assertSee('Sign in to your workspace.', false)

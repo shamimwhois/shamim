@@ -10,17 +10,20 @@ use App\Models\User;
  *
  * ShellTest proves the shell renders; this suite proves what the *page* puts
  * inside it. The Creative Tim redesign moved the dashboard's identity into
- * four reusable sections — the gradient welcome card, the toned metric row,
- * the activity chart and the task list — and each of them has a behaviour
- * that can silently rot:
+ * reusable sections — the gradient welcome card, the toned metric row, the
+ * activity chart, the most-read list — and each of them has a behaviour that
+ * can silently rot:
  *
  *   the hero becoming a second `h1` on a page that already has one,
  *   the chart drawing a flat line when the author has published nothing,
- *   the task list inventing work that does not exist,
  *   a metric tile claiming a click it cannot deliver.
  *
- * All four are invisible in a screenshot and obvious in a month of use, so
+ * All three are invisible in a screenshot and obvious in a month of use, so
  * they are pinned here rather than in a review.
+ *
+ * The page is read-only. Writing, moderation and taxonomy moved to `/admin`,
+ * which a plain account cannot open, so this suite also pins that no link to
+ * those screens is emitted from a page nobody here can follow.
  */
 function author(array $attributes = []): User
 {
@@ -40,16 +43,16 @@ test("the hero is the page's single top-level heading", function () {
         ->and($response->getContent())->toContain('sui-hero');
 });
 
-test('the hero greeting uses the account first name and carries the primary action', function () {
+test('the hero greeting uses the account first name', function () {
     $user = author(['name' => 'Ada Lovelace']);
 
     $response = $this->actingAs($user)->get(route('dashboard.index'));
 
     $response->assertOk()
         ->assertSee('Welcome back, Ada', false)
-        // The action is a white surface on the dark hero, not a second
-        // gradient — and it points at the create screen that exists.
-        ->assertSee(route('dashboard.posts.create'), false);
+        // The hero has no action any more: the create screen it pointed at is
+        // an `/admin` page this account cannot open.
+        ->assertDontSee(__('New post'), false);
 });
 
 test('every metric tile keeps its assigned pastel tone', function () {
@@ -122,52 +125,33 @@ test('the chart falls back to an empty state instead of a flat line', function (
         ->and($html)->toContain('Nothing published in the last twelve weeks yet.');
 });
 
-test('the task list is derived from persisted state and never invents work', function () {
+test('the page offers no link to a screen this account cannot open', function () {
     $user = author();
 
     Post::factory()->for($user, 'user')->count(2)->create();
     $post = Post::factory()->for($user, 'user')->published()->create();
-
     Comment::factory()->count(3)->create(['post_id' => $post->id]);
 
     $html = $this->actingAs($user)->get(route('dashboard.index'))->getContent();
 
+    /*
+     * The overview reports; it does not route. Every writing destination is an
+     * `/admin` screen, so a link here would be a 403 wearing a friendly label —
+     * and the old task list, which generated one row per queue, went with them.
+     */
     expect($html)
-        ->toContain('Finish 2 draft posts')
-        ->and($html)->toContain('Review 3 waiting comments')
-        // Each row links to the queue where the work happens, because a
-        // checkbox only the database can tick is a control that lies.
-        ->and($html)->toContain(route('dashboard.comments'))
-        ->and($html)->toContain(route('dashboard.posts.index', ['status' => 'draft']));
+        ->not->toContain(route('admin.posts.index'))
+        ->not->toContain(route('admin.posts.create'))
+        ->not->toContain(route('admin.comments'))
+        ->not->toContain(route('admin.taxonomy'))
+        ->not->toContain('Up next');
 });
 
-test('a brand new account is offered the first post rather than an empty list', function () {
-    $html = $this->actingAs(author())->get(route('dashboard.index'))->getContent();
-
-    expect($html)->toContain('Write your first post')
-        ->and($html)->not->toContain('Every task on this list is done.');
-});
-
-test('an author with nothing outstanding sees the quiet task state', function () {
-    $user = author();
-
-    Post::factory()->for($user, 'user')->published()->create();
-
-    $html = $this->actingAs($user)->get(route('dashboard.index'))->getContent();
-
-    /* The second line is the task list's own copy — the first is shared with
-       the navbar's notification panel, and asserting on it would let this
-       test pass on the strength of a different component. */
-    expect($html)->toContain('Every task on this list is done.')
-        ->and($html)->not->toContain('Finish 1 draft posts')
-        ->and($html)->not->toContain('Write your first post');
-});
-
-test('a metric tile with no destination is not a link', function () {
-    /* Total views is the one tile without a route: advertising a click it
-       cannot deliver is worse than a tile that is plainly a surface. The
-       hover lift is the marker, because it is emitted only for the tiles
-       that render as an anchor. */
+test('no metric tile is a link', function () {
+    /* Every tile used to route into the author workspace; all of those screens
+       are `/admin` pages now, so none of them is a destination for the account
+       that renders this page. The hover lift is the marker — it is emitted only
+       for the tiles that render as an anchor, so a count of zero is the proof. */
     $user = author();
 
     Post::factory()->for($user, 'user')->published()->create(['view_count' => 1234]);
@@ -175,7 +159,7 @@ test('a metric tile with no destination is not a link', function () {
     $html = $this->actingAs($user)->get(route('dashboard.index'))->getContent();
 
     expect($html)->toContain('1,234')
-        ->and(substr_count($html, 'hover:border-sui-border hover:shadow-soft-2'))->toBe(5);
+        ->and(substr_count($html, 'hover:border-sui-border hover:shadow-soft-2'))->toBe(0);
 });
 
 test('no interpolated class placeholder survives into the markup', function () {

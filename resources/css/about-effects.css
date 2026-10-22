@@ -34,6 +34,42 @@
     51%, 100% { opacity: 0; }
 }
 
+/* --------------------------------------------------------------------------
+   The decode line: signal and noise
+   --------------------------------------------------------------------------
+   The hero's subtitle is a scramble-decode — a phrase arrives as noise and
+   locks in left to right. Rendering that as one string hides the effect:
+   the eye has no way to tell which characters have resolved and which are
+   still static, so the whole line just looks like it is flickering.
+
+   Splitting the line into the two halves makes the decode legible as a
+   decode. `signal` is the text that has arrived; `noise` is the glyph
+   still standing in for the rest. The noise is drawn in the accent with a
+   chromatic split — the RGB tear of a signal that has not settled — and
+   it is a little brighter than the signal, because unresolved text
+   should read as *active* rather than as *faded*.
+
+   The split is one pixel wide on purpose. Wider and it stops reading as
+   a rendering fault and starts reading as a drop shadow.
+   -------------------------------------------------------------------------- */
+.about-decode-signal {
+    color: inherit;
+}
+
+.about-decode-noise {
+    color: color-mix(in oklab, var(--color-signal-600) 82%, var(--color-ink-500));
+    text-shadow:
+        0.5px 0 0 color-mix(in oklab, var(--color-signal-400) 60%, transparent),
+        -0.5px 0 0 color-mix(in oklab, var(--color-signal-700) 55%, transparent);
+}
+
+.dark .about-decode-noise {
+    color: color-mix(in oklab, var(--color-signal-400) 88%, var(--color-ink-300));
+    text-shadow:
+        0.5px 0 0 color-mix(in oklab, var(--color-signal-300) 55%, transparent),
+        -0.5px 0 0 color-mix(in oklab, var(--color-signal-600) 60%, transparent);
+}
+
 /* 3D floating stage. */
 .about-hero-3d {
     perspective: 900px;
@@ -718,6 +754,14 @@
 /* rail itself slides in (data-visible) once the hero is scrolled past.      */
 /* Styled here rather than via Tailwind utilities so the reveal state never  */
 /* depends on the JIT picking up an arbitrary variant.                      */
+/*                                                                          */
+/* The rail rests collapsed to a narrow column of icons — a floating strip   */
+/* that never competes with the hero art. Hovering the strip reveals the    */
+/* labels, which widen the rail leftwards (the rail is anchored to the      */
+/* viewport's right edge, so it grows into the page, never off it). The      */
+/* chevron above the column pins that choice: open, shut, or back to        */
+/* following the pointer. app.js owns the state and writes it as             */
+/* data-pinned; the stylesheet owns the reveal.                              */
 /* ------------------------------------------------------------------------ */
 
 .about-toc {
@@ -726,7 +770,15 @@
     top: 50%;
     right: 1rem;
     z-index: 30;
-    transform: translate(115%, -50%);
+    flex-direction: column;
+    align-items: flex-end;
+    padding: 0.375rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--color-ink-200) 70%, transparent);
+    background-color: color-mix(in srgb, var(--color-white) 78%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-lift);
+    transform: translate(calc(100% + 2rem), -50%);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.5s ease, transform 0.5s ease;
@@ -734,8 +786,13 @@
 
 @media (min-width: 1280px) {
     .about-toc {
-        display: block;
+        display: flex;
     }
+}
+
+.dark .about-toc {
+    border-color: color-mix(in srgb, var(--color-ink-800) 80%, transparent);
+    background-color: color-mix(in srgb, var(--color-ink-950) 82%, transparent);
 }
 
 .about-toc[data-visible='true'] {
@@ -744,9 +801,49 @@
     pointer-events: auto;
 }
 
+/* The chevron: always on screen. Collapsed it points the way the labels
+   open (leftwards, into the page); open it points back the way they came. */
+.about-toc__toggle {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    margin-bottom: 0.25rem;
+    border-radius: 0.5rem;
+    color: var(--color-ink-400);
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.about-toc__toggle:hover {
+    color: var(--color-ink-800);
+    background-color: color-mix(in srgb, var(--color-ink-900) 6%, transparent);
+}
+
+.dark .about-toc__toggle {
+    color: var(--color-ink-500);
+}
+
+.dark .about-toc__toggle:hover {
+    color: var(--color-ink-100);
+    background-color: color-mix(in srgb, var(--color-ink-50) 8%, transparent);
+}
+
+.about-toc__toggle-icon {
+    transition: transform 0.25s var(--ease-out-quint);
+}
+
+.about-toc[data-pinned='open'] .about-toc__toggle-icon,
+.about-toc:not([data-pinned]):hover .about-toc__toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* The icon sits at the rail's right edge and the label opens to its left,
+   so widening the rail grows it into the page rather than off the screen. */
 .about-toc-link {
     display: flex;
+    flex-direction: row-reverse;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.5rem;
     padding: 0.375rem 0.5rem;
     border-radius: 0.375rem;
@@ -762,13 +859,42 @@
     color: var(--color-ink-500);
 }
 
+/* max-content keeps the label at its own width; the capped max-width is the
+   animated half, so the row widens to exactly the label's length. min-width
+   is zeroed because a flex item's automatic minimum would otherwise hold the
+   label open at its content width and the rail could never collapse. */
 .about-toc-link__label {
+    width: max-content;
+    max-width: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
     color: var(--color-ink-500);
-    transition: color 0.2s ease;
+    transition: max-width 0.28s var(--ease-out-quint), opacity 0.2s ease, color 0.2s ease;
 }
 
 .dark .about-toc-link__label {
     color: var(--color-ink-400);
+}
+
+/* Following the pointer (no pin): hovering the strip reveals the labels. */
+.about-toc:not([data-pinned]):hover .about-toc-link__label {
+    max-width: 12rem;
+    opacity: 1;
+}
+
+/* Pinned open by the chevron. */
+.about-toc[data-pinned='open'] .about-toc-link__label {
+    max-width: 12rem;
+    opacity: 1;
+}
+
+/* Pinned shut by the chevron — the labels stay closed whatever the pointer
+   does. */
+.about-toc[data-pinned='shut'] .about-toc-link__label {
+    max-width: 0;
+    opacity: 0;
 }
 
 .about-toc-link:hover,
@@ -808,7 +934,23 @@
 
 @media (prefers-reduced-motion: reduce) {
     .about-toc,
+    .about-toc__toggle,
+    .about-toc__toggle-icon,
     .about-toc-link,
     .about-toc-link__icon,
     .about-toc-link__label { transition: none; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Section rule refinement                                                    */
+/* ------------------------------------------------------------------------ */
+
+/* The squiggle dissolves to the right instead of stopping dead: it reads as
+   an underline drawn by hand on any canvas — white, ink, or the AI Workflow
+   band's permanent navy — and it removes the hard right edge that made the
+   rule look truncated on narrow screens. Pure mask, so the stroke keeps its
+   theme-aware currentColor. */
+.sec-rule {
+    -webkit-mask-image: linear-gradient(to right, #000 42%, rgb(0 0 0 / 0.12));
+    mask-image: linear-gradient(to right, #000 42%, rgb(0 0 0 / 0.12));
 }

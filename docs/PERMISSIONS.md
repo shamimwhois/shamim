@@ -119,6 +119,11 @@ That is a product decision, not an oversight — it means an ordinary account
 cannot put arbitrary content on the public site. Anyone permitted to author must
 also be trusted to publish.
 
+The `post:*` permissions describe *what a policy allows*, not *which screen an
+account can open*. Since the authoring screens moved to `/admin`, a plain user
+holds `post:create` and `post:update-own` but has no route that exercises them:
+the matrix is frozen, and the navigation reads `admin:access` instead.
+
 ### Moderation — 2
 
 | Permission | `user` | `seller` | `admin` |
@@ -129,6 +134,11 @@ also be trusted to publish.
 Comment moderation — approving and rejecting — is **admin-only**. Sellers may
 manage taxonomy (categories and tags) because product listings need them.
 
+`taxonomy:manage` no longer gates a screen: the taxonomy editor moved to
+`/admin/taxonomy`, which is guarded by `admin:access`. The permission still
+exists in the matrix, and a seller still holds it, but nothing reads it to
+decide whether a page renders.
+
 ### Platform — 3
 
 | Permission | `user` | `seller` | `admin` |
@@ -137,16 +147,41 @@ manage taxonomy (categories and tags) because product listings need them.
 | `ai-hub:use` | ✓ | ✓ | ✓ |
 | `ideas:use` | ✓ | ✓ | ✓ |
 
-The three modules every account may reach. Each guards one top-level route —
-`/dev-lab`, `/ai-hub`, `/ideas` — which currently renders a placeholder page
-stating the module is not yet available. The route and the permission are real
-now so the URL space is claimed and the navigation works; only the module bodies
-are outstanding.
+The three modules every account may reach. Two of them are built end to end —
+Ideas and the Developer Lab — and the AI Hub is built as a reading surface. Each
+permission now guards a **workspace**, not a landing page. `ai-hub:use` is the
+exception written out rather than smoothed over: the hub has no authoring surface
+for an ordinary account, so its `use` ability lights a nav entry and the hub's
+real write gate is `ai-hub:manage`. `marketplace:use` has the same shape and one
+call site (`DashboardNavigation.php:333`), detailed in §5. The enforcement map:
+
+| Permission | What it gates |
+| --- | --- |
+| `ideas:use` | `/ideas/dashboard`, `/create`, `/categories`, `/plans`, `/plans/create`, `/plans/{plan:slug}`, `/plans/{plan:slug}/edit`, `/ideas/{idea:slug}/edit` — and the `boot()` check in each of the six `pages::ideas.*` workspace components |
+| `dev-lab:use` | `/dev-lab/dashboard`, `/sandbox`, `/snippets`, `/snippets/create`, `/snippets/{snippet:slug}/edit`, `/history` — and the `boot()` check in each of the five `pages::dev-lab.*` workspace components |
+| `ai-hub:use` | the sidebar entry and nothing else. `app/Support/DashboardNavigation.php:324` is its only call site in the application. The hub's articles, topics and resources are readable by strangers at `/ai-hub/**` with no route guard, and the writing that does exist is gated by `ai-hub:manage` |
+
+The **public** halves of those modules — `/ideas`, `/ideas/{slug}`, `/dev-lab`,
+`/dev-lab/gallery`, `/dev-lab/snippets/{slug}` — carry no guard at all. Reading
+somebody's published idea or snippet is not a permission, and the URL a guest is
+allowed to see is decided by the row's own visibility pair rather than by the
+account holding it.
+
+That split is what the three `use` permissions actually mean now: **authoring**,
+not oversight. This is precisely why `/admin/ideas` and `/admin/dev-lab` are
+gated by `admin:access` alone rather than by `ideas:use` or `dev-lab:use`.
+Reusing a `use` permission as the moderation lock would let every account that can
+write into a module read everybody else's rows, which is the opposite of the
+ownership rule the workspaces are built on.
 
 These are **baseline** permissions: they sit in `AccountRole::User` and are
 inherited upward by spread, so every role holds them. That is intentional — a
 developer tool and an ideas backlog are not privileges, and gating them would
 mean a seller loses a capability the moment they are promoted past `user`.
+Because they are baseline, being a plain `user` is enough to capture an idea,
+convert it to a plan, run the sandbox and publish a snippet. What a `user`
+cannot do is reach any `/admin` screen, including the two module consoles, which
+is the whole difference between the workspace and the console.
 
 ### Selling — 7
 
@@ -164,18 +199,42 @@ This group is **the seller role's reason to exist**. Every permission is
 `-own` or `:create` — a seller operates on their own inventory and nobody
 else's. The `-any` counterparts live in the Administration group.
 
-`marketplace:use` guards `/marketplace`, the Developer Marketplace &
-Digital Product Ecosystem module. It is the one module gated **above** the
-baseline: browsing and selling in a marketplace is the seller's function, so a
-plain `user` does not reach it. The page is a placeholder for now.
+`marketplace:use` is the module's nav ability, and that is the literal extent of
+it: the only call site in the application is
+`app/Support/DashboardNavigation.php:333`, which decides whether the Marketplace
+entry appears in the sidebar. **It guards no route.** The catalogue is built —
+`marketplace_categories`, `marketplace_products`, `marketplace_product_versions`
+and `marketplace_reviews` back a public storefront at `/marketplace` and
+`/marketplace/{product:slug}`, both reachable by a stranger — and the routes that
+do carry a guard in this module are `/seller/dashboard` on `product:create` and
+`/admin/marketplace` on `product:review`. Like `ai-hub:use`, it is a door light
+rather than a lock; unlike `ai-hub:use`, it also sits above the baseline, because
+browsing and selling in a marketplace is the seller's function and a plain `user`
+does not reach it.
 
-> **Not implemented.** The six `product:*` / `sale:*` / `support:*` permissions
-> are fully defined and enforced by the middleware, but there is **no `Product`
-> model** to authorize against. The seller dashboard is reachable and its sidebar
-> entries filter correctly; the listings page does not exist. See
-> [`audit/PHASE-0-AUDIT.md`](audit/PHASE-0-AUDIT.md) §10.
+`/seller/dashboard` is the seller home and the `/seller` landing, not a listing
+manager. It states that product listings are not available yet, because the
+authoring half of the pipeline was never written: there is no create or edit
+screen for a `MarketplaceProduct` anywhere in `resources/views`, and no
+`MarketplaceProductPolicy`. The gap is recorded in
+[`audit/PHASE-0-AUDIT.md`](./audit/PHASE-0-AUDIT.md) and in
+[`API.md` §6.6](./API.md#66-seller-resources).
 
-### Administration — 10
+> **Not implemented — commerce, not catalogue.** A reader may browse and rate an
+> existing listing, and an operator may moderate one from `/admin/marketplace`.
+> What does not exist is the money, the queue and the verb: there is no checkout,
+> no order, no support ticket and no seller-facing create screen, so
+> `sale:view-own`, `sale:view-any`, `refund:process`, `payment:configure` and
+> `support:manage-own` are five permissions declared in the enum, granted to roles,
+> rendered in the matrix above, and **never checked by anything**. They are not
+> "enforced by the middleware with nothing to authorize against"; they are
+> unenforced because no route names them. The gap is
+> deliberate and
+> recorded in [`audit/PHASE-0-AUDIT.md`](audit/PHASE-0-AUDIT.md) §10 rather than
+> papered over: a permission is declared ahead of its surface so the matrix is
+> complete, and the surface that would consume it is a payments decision.
+
+### Administration — 12
 
 | Permission | `user` | `seller` | `admin` |
 | --- | :---: | :---: | :---: |
@@ -189,10 +248,30 @@ plain `user` does not reach it. The page is a placeholder for now.
 | `refund:process` | | | ✓ |
 | `payment:configure` | | | ✓ |
 | `audit:view` | | | ✓ |
+| `about:manage` | | | ✓ |
+| `ai-hub:manage` | | | ✓ |
 
 Note that `admin:access` — the permission guarding the whole `/admin` sub-tree —
 is itself a permission rather than a role check. A route declares
 `permission:admin:access`; nothing anywhere declares `role:admin`.
+
+Two of these twelve are worth reading against §3 rather than in isolation,
+because they are the pattern a third module would copy. `about:manage` and
+`ai-hub:manage` each declare a **narrower lock inside** the panel: `/admin/about`
+carries `permission:admin:access` *and* `permission:about:manage`, and so does
+`/admin/ai-hub`. Holding the panel key is therefore not the same as holding every
+lock behind the door, which is the property that lets an operator be given the
+hub without being given the users screen.
+
+`/admin/ideas` and `/admin/dev-lab` deliberately declare only `admin:access`, and
+the reason is the absence of a thirteenth permission rather than an oversight.
+`ideas:use` and `dev-lab:use` describe **authoring** — every account holds them —
+so using one as a moderation lock would hand every writer on the platform the
+cross-account console. A console that needs its own permission is a console with
+something narrower to divide; these two read everything the module has and edit
+nothing, which is exactly what the panel key already means. Adding
+`ideas:manage` or `dev-lab:manage` to the enum would be inventing a distinction
+the screens do not make.
 
 **Why no `role:admin` check exists.** A route guarded by role name must be
 edited every time that role's permissions change, and a "temporarily grant one
@@ -265,6 +344,27 @@ Three behaviours worth stating explicitly:
   500, 'Route declares no valid permission.')` catches a typo'd alias, because
   a guard that silently allows everything is the worst possible failure.
 
+### Level 1 is not enough for a Livewire page
+
+Every screen in this app is a Livewire component, and a Livewire mutation does not
+hit its own URL: clicking "delete" on `/ideas/my-idea` POSTs to `/livewire/update`.
+The route group's `permission:ideas:use` never runs on that request, so Level 1
+authorises the *page view* and nothing else.
+
+Two things close the gap, and both are required:
+
+1. **`boot()` on the component.** `abort_unless(auth()->user()?->hasPermission(...),
+   403)` at the top of every guarded screen, workspace and console alike. It runs on
+   the initial render *and* on every subsequent mutation, so an account that lost
+   its grant mid-session is refused on the next click rather than the next page load.
+2. **`authorize()` inside each action.** `boot()` proves the account may be in the
+   room; the policy call proves it may do *this* verb to *this* row.
+
+A workspace action resolves its model through an `authoredBy()`-scoped
+`findOrFail`, so a foreign id is a `404` rather than a `403` that leaks the id
+exists. An admin console action takes an id, `find`s it unscoped, then calls the
+policy — the console is the one place where reading across accounts is the point.
+
 ### Level 2 — Policies
 
 Route middleware cannot answer "may this account edit **this** post" — the model
@@ -273,6 +373,14 @@ is not bound until the component runs. Policies do.
 | Policy | Methods |
 | --- | --- |
 | `PostPolicy` | `viewAny`, `viewPublic`, `view`, `create`, `update`, `delete`, `restore`, `forceDelete`, `publish` |
+| `FeedPostPolicy` | `viewAny`, `view`, `create`, `update`, `delete`, `publish`, `viewAttachment`, `removeAttachment` |
+| `AiArticlePolicy` | `viewPublic`, `viewAny`, `view`, `create`, `update`, `delete`, `publish` |
+| `IdeaPolicy` | `viewAny`, `view`, `create`, `update`, `delete`, `publish`, `pin` |
+| `IdeaPlanPolicy` | `viewAny`, `view`, `create`, `update`, `delete` |
+| `IdeaTaskPolicy` | `view`, `create`, `update`, `delete` |
+| `IdeaCategoryPolicy` | `viewAny`, `view`, `create`, `update`, `delete` |
+| `LabWorkspacePolicy` | `viewAny`, `view`, `create`, `update`, `delete` |
+| `LabSnippetPolicy` | `viewAny`, `view`, `create`, `update`, `delete`, `publish` |
 | `UserPolicy` | `viewAny`, `view`, `updateRole`, `update`, `delete` |
 
 Two methods deserve comment:
@@ -284,6 +392,40 @@ Two methods deserve comment:
 - `UserPolicy::updateRole` is the escalation guard (see §6), and it is the
   policy that replaced the removed `TeamPolicy` as the place where "who may
   administer whom" is decided.
+
+### The two module policies answer a different question
+
+`AiArticlePolicy` and `FeedPostPolicy` are **permission-only**: a holder of
+`ai-hub:manage` may edit any article, because the AI Hub is a curated library and
+curation is the job. The Ideas and Developer Lab policies invert that, because a
+workspace is somebody's own material. Three rules, all of them true in every one of
+the six module policies:
+
+- **`viewAny` and `create` are the module permission.** `ideas:use` or
+  `dev-lab:use`, nothing more specific. An account that may capture ideas may
+  capture them for itself.
+- **`update` is ownership, full stop.** `$model->isOwnedBy($user)` with no admin
+  clause. An operator holding `admin:access` can read a foreign idea in the
+  console and cannot rewrite it — `IdeaPolicy::update` is the sentence that says
+  so, and it is the reason the consoles have no edit buttons.
+- **`delete` is ownership *or* `admin:access`,** on `IdeaPolicy` and
+  `LabSnippetPolicy` only. Taking down somebody's public idea is moderation, and
+  moderation is what an operator key buys. `IdeaPlanPolicy` keeps the same clause
+  so a plan can be removed with its parent, and `IdeaCategoryPolicy` and
+  `LabWorkspacePolicy` have no such clause at all: a category rename and a
+  workspace are private working furniture with nothing in them to moderate.
+
+`view` delegates to the model's `isVisibleTo()`, which is a single three-answer
+question: published, so anybody; no signed-in account, so nobody; otherwise the
+author or a holder of `admin:access`. A private row therefore 404s for a stranger
+rather than 403-ing, which is the correct answer for content whose existence is not
+public knowledge.
+
+`IdeaTaskPolicy` is the one policy that takes a second hop. A task carries no
+`user_id` — ownership derives from the plan it belongs to — so every method
+resolves through `IdeaPlanPolicy` against `$task->plan`. That is what makes it
+structurally impossible for a task to drift away from its plan's author: there is
+no column on the row for it to drift from.
 
 `UserPolicy::updateRole` is the escalation guard, and it is checked twice:
 
@@ -367,25 +509,44 @@ only the leaf carries a permission:
 'items' => [
     [
         'label'       => 'Comments',
-        'route'       => 'dashboard.comments',
-        'pattern'     => 'dashboard.comments',
+        'route'       => 'admin.comments',
+        'pattern'     => 'admin.comments',
         'icon'        => 'chat-bubble-left-right',
-        'permissions' => [AccountPermission::CreatePost],
+        'permissions' => [AccountPermission::AccessAdminPanel],
         'badge'       => self::BADGE_PENDING_COMMENTS,
     ],
     // …
 ]
 ```
 
-Note that **Comments requires `CreatePost`, not `ModerateComments`**. Every
-account that can write a post has a moderation queue — its own. The
-`ModerateComments` permission widens the *scope* of that queue to the whole
-platform (see `pendingCommentCount()`), it does not gate access to the screen.
+Note that **all three `content` items require `AccessAdminPanel`, not
+`CreatePost`**. The screens they link to live under `/admin` and are guarded by
+`permission:admin:access`; a permission that gates a route is the permission the
+menu must check, or the nav advertises a 403. `ModerateComments` still widens the
+*scope* of the queue to the whole platform (see `pendingCommentCount()`), it does
+not gate access to the screen.
 
 `for(User $user)` filters by permission, drops any group left empty, then drops
 any section left empty, and **both the nav and the route guard read from this one
 source**. A menu item therefore cannot be visible to an account whose route
 would refuse it.
+
+### Modules point at their workspace, never at their landing page
+
+The `modules` group sends `ideas.*` at `ideas.dashboard` and `dev-lab.*` at
+`dev-lab.dashboard`, gated on `UseIdeas` and `UseDeveloperLab` — the same two
+permissions that guard those route groups. It does not link `ideas.index` or
+`dev-lab.index`, which is what it used to do while those were the only two routes
+in the space. A public landing page is a destination for a stranger; a sidebar is a
+list of places to *work*, and an account that has signed in and been granted the
+module wants the screen where its own rows are. The `pattern` stays a wildcard, so
+the entry stays lit on every screen in the space rather than only on the dashboard.
+
+The two consoles — `admin.ideas` and `admin.dev-lab` — sit in the `administration`
+section gated on `AccessAdminPanel`. They are the only module entries an ordinary
+account cannot see, and because the user and seller sidebars render the same
+`for(User $user)` output with no scope, permission filtering alone is what keeps
+them out. That is the same property the `admin.posts.*` move relied on.
 
 ### The one navigation map without permissions
 
@@ -470,6 +631,39 @@ These tests were written against a first draft of this document and **caught two
 errors in it** (comment moderation is admin-only rather than seller-accessible,
 and a permission-group total did not match the enum). That is the argument for
 pinning composition: prose drifts silently, tests do not.
+
+### What the module suites add
+
+`tests/Feature/Ideas/*`, `tests/Feature/DevLab/*` and
+`tests/Feature/Admin/{IdeasConsoleTest,DevLabConsoleTest}.php` are the negative half
+of the Level 1 / Level 2 split above, because a workspace is where an authorization
+mistake is cheapest to make and most expensive to discover:
+
+- `GET /ideas/{somebody else's slug}` returns `404` while the idea is unpublished,
+  and `Livewire::call('delete', $foreignId)` from the dashboard returns `404` and
+  leaves the row standing — the scoped lookup refuses before the policy is reached,
+  and refuses without confirming the row exists
+- a guest posting to the Livewire endpoint against `pages::ideas.dashboard` or
+  `pages::dev-lab.sandbox` is `403`, which is the `boot()` guard: the URL the screen
+  was rendered from has nothing to do with the request a mutation makes
+- the visibility matrix is asserted as a conjunction: a public flag with no publish
+  timestamp is not enough, a private idea is invisible to a guest *and* to another
+  signed-in account, and an operator holding `admin:access` may read an idea that is
+  not published
+- ownership resolves through the parent where a child has no owner column: *a task
+  cannot be moved onto somebody else's plan*, and *an account may not move another
+  account's idea through the workflow*
+- `RecordLabExecution` refuses a `php` run before it looks at the day's count, so a
+  hand-crafted request cannot mint a run entry for a language the lab does not run
+- the public snippet page escapes stored code — *the public page escapes stored code
+  instead of printing it as markup* — because escaping is a policy and not a habit,
+  and the sandboxed frame is asserted to carry `sandbox="allow-scripts"` with no
+  origin grant rather than trusted by inspection
+
+`tests/Feature/Enums/PermissionModelTest.php` was deliberately **not** touched by
+either module. It pins the exact per-role sets, so it is the test that fails if
+somebody answers "the Ideas console needs its own permission" by editing the enum
+instead of reading `IdeaPolicy::update`.
 
 ---
 

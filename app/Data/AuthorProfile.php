@@ -12,7 +12,7 @@ readonly class AuthorProfile
 {
     /**
      * @param  array<int, array{title: string, description: string, icon: string, tags: array<int, string>}>  $expertise
-     * @param  array<int, array{name: string, role: string, summary: string, outcome: string, stack: array<int, string>, url: string|null}>  $projects
+     * @param  array<int, array{name: string, role: string, summary: string, outcome: string, stack: array<int, string>, url: string|null, slug?: string}>  $projects
      * @param  array<int, array{company: string, period: string, roles: array<int, array{title: string, period: string, highlights: array<int, array{text: string, stack: array<int, string>}>}>}>  $experience
      * @param  array<int, array{label: string, value: string}>  $stats
      * @param  array<string, array{label: string, url: string|null, handle: string|null}>  $links

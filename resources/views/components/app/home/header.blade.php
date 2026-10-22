@@ -8,11 +8,28 @@
      */
     $nav = [
         ['label' => 'Feed', 'route' => 'feed.index', 'pattern' => 'feed.*'],
+        ['label' => 'Communities', 'route' => 'communities.index', 'pattern' => 'communities.*'],
         ['label' => 'Writing', 'route' => 'blog.index', 'pattern' => 'blog.*'],
         ['label' => 'AI Knowledge', 'route' => 'ai-hub.index', 'pattern' => 'ai-hub.*'],
         ['label' => 'Marketplace', 'route' => 'marketplace.index', 'pattern' => 'marketplace.*'],
+        ['label' => 'Ideas', 'route' => 'ideas.index', 'pattern' => 'ideas.*'],
+        ['label' => 'Dev Lab', 'route' => 'dev-lab.index', 'pattern' => 'dev-lab.*'],
         ['label' => 'About', 'route' => 'about', 'pattern' => 'about'],
     ];
+@endphp
+
+{{--
+    A guest clicking a destination marked `protected` gets the login dialog in
+    place of the walk to a route that would only bounce them. The intercepted
+    link drops `wire:navigate` for guests on purpose: Livewire's navigate
+    listener is a capture-phase listener on the document, so it runs before any
+    handler on the element itself — leaving the attribute in place would
+    navigate through the modal before it can open. Without JS the plain href
+    still reaches the route, which bounces the guest home with the dialog open.
+    No nav destination is marked today: every page in the bar is public.
+--}}
+@php
+    $openLoginModal = '$flux.modal(\'login\').show(); $event.preventDefault()';
 @endphp
 
 <header
@@ -34,23 +51,33 @@
             <span>{{ config('portfolio.author.short_name', config('app.name')) }}</span>
         </a>
 
-        {{-- Desktop nav --}}
-        <nav class="hidden items-center gap-1 md:flex" aria-label="Primary">
+        {{-- Desktop nav — from `lg`. Eight destinations plus the utility
+             controls do not fit a 768px row without a label breaking onto a
+             second line, and an uneven bar reads as a bug rather than as a
+             tight fit, so the tablet band keeps the disclosure panel below. --}}
+        <nav class="hidden items-center gap-1 lg:flex" aria-label="Primary">
             @foreach ($nav as $item)
-                @php $current = request()->routeIs($item['pattern']); @endphp
+                @php
+                    $current = request()->routeIs($item['pattern']);
+                    $guestProtected = ! empty($item['protected']) && auth()->guest();
+                @endphp
                 <a
                     href="{{ route($item['route']) }}"
-                    wire:navigate
+                    @if ($guestProtected)
+                        x-on:click="{!! $openLoginModal !!}"
+                    @else
+                        wire:navigate
+                    @endif
                     @if ($current) aria-current="page" @endif
                     @class([
-                        'focus-ring relative rounded-sm px-3 py-2 text-sm font-medium transition-colors',
+                        'focus-ring relative whitespace-nowrap rounded-sm px-2 py-2 text-sm font-medium transition-colors xl:px-3',
                         'text-ink-900 dark:text-ink-50' => $current,
                         'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100' => ! $current,
                     ])
                 >
                     {{ $item['label'] }}
                     @if ($current)
-                        <span aria-hidden="true" class="absolute inset-x-3 -bottom-px h-px bg-signal-500 dark:bg-signal-400"></span>
+                        <span aria-hidden="true" class="absolute inset-x-2 -bottom-px h-px bg-signal-500 xl:inset-x-3 dark:bg-signal-400"></span>
                     @endif
                 </a>
             @endforeach
@@ -76,7 +103,7 @@
                     Dashboard
                 </flux:button>
             @else
-                <flux:button variant="primary" size="sm" :href="route('login')">
+                <flux:button variant="primary" size="sm" :href="route('login')" x-on:click="{!! $openLoginModal !!}" data-test="sign-in-trigger">
                     Sign in
                 </flux:button>
             @endauth
@@ -85,7 +112,7 @@
         {{-- Mobile trigger --}}
         <button
             type="button"
-            class="focus-ring -mr-2 grid size-10 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 md:hidden dark:text-ink-300 dark:hover:bg-ink-900"
+            class="focus-ring -mr-2 grid size-10 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 lg:hidden dark:text-ink-300 dark:hover:bg-ink-900"
             @click="open = ! open"
             :aria-expanded="open"
             aria-controls="mobile-nav"
@@ -111,14 +138,21 @@
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 -translate-y-2"
-        class="border-t border-ink-200 bg-white md:hidden dark:border-ink-800 dark:bg-ink-950"
+        class="border-t border-ink-200 bg-white lg:hidden dark:border-ink-800 dark:bg-ink-950"
     >
         <nav class="shell flex flex-col gap-1 py-4" aria-label="Primary mobile">
             @foreach ($nav as $item)
-                @php $current = request()->routeIs($item['pattern']); @endphp
+                @php
+                    $current = request()->routeIs($item['pattern']);
+                    $guestProtected = ! empty($item['protected']) && auth()->guest();
+                @endphp
                 <a
                     href="{{ route($item['route']) }}"
-                    wire:navigate
+                    @if ($guestProtected)
+                        x-on:click="{!! $openLoginModal !!}"
+                    @else
+                        wire:navigate
+                    @endif
                     @if ($current) aria-current="page" @endif
                     @class([
                         'focus-ring rounded-sm px-3 py-3 text-base font-medium transition-colors',
@@ -159,6 +193,8 @@
             @else
                 <a
                     href="{{ route('login') }}"
+                    x-on:click="{!! $openLoginModal !!}"
+                    data-test="sign-in-trigger-mobile"
                     class="focus-ring rounded-sm px-3 py-3 text-base font-medium text-ink-600 transition-colors hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-900"
                 >
                     {{ __('Sign in') }}

@@ -135,7 +135,7 @@ hierarchy (`app/Enums/AccountRole.php`):
 | --- | --- | --- | --- |
 | `user` | 1 | 6 | — |
 | `seller` | 2 | 15 | everything `user` has |
-| `admin` | 3 | 28 | everything, plus administration |
+| `admin` | 3 | 30 | everything, plus administration |
 
 **Token abilities must never exceed the account's role.** A token is a
 *restriction* on top of a role, never a grant. A `user`-role account that
@@ -347,21 +347,39 @@ dashboards — map onto the same abilities:
 
 | Surface | Path | Ability | Notes |
 | --- | --- | --- | --- |
-| Reader / author workspace | `/dashboard` | `post:create` | The user role's home; sellers and admins also author here. |
+| Reader workspace | `/dashboard` | *(auth + verified only)* | The user role's home. It carries **no** ability guard: the route middleware is `auth` and `verified`, and the sidebar inside it is what filters by permission. A token that can read this surface is a signed-in account, nothing more. Authoring lives in the admin space. |
 | Seller workspace | `/seller/dashboard` | `product:create` | The selling home. |
 | Admin dashboard | `/admin/dashboard` | `admin:access` | Platform administration. |
 | Admin user list | `/admin/users` | `user:manage` | Paginated; mirrors `GET /users`. |
+| Admin authoring screens | `/admin/posts`, `/admin/comments`, `/admin/taxonomy` | `admin:access` | The post list, editor, moderation queue and taxonomy editor. Scoped to the signed-in account's own posts. |
 
-The four product modules are each a permission-guarded top-level space. All are
-declared ahead of the modules they front (see §12), so the permission is the
-contract and the page renders a placeholder until the module is built:
+The four product modules are each a permission-guarded top-level space, and all
+four are built. `ideas:use`, `dev-lab:use`, `ai-hub:use` and `marketplace:use`
+describe the *workspace* half of each space; the *public* half — the landing and
+detail pages — carries no guard at all, because what is published is published to
+strangers. Every module surface therefore splits into three layers, and an API
+resource must state which layer it belongs to:
 
-| Module | Path | Ability |
+| Layer | Example | Guard |
 | --- | --- | --- |
-| Ideas, Plans, Tasks, Projects & Collaboration | `/ideas` | `ideas:use` |
-| Developer Lab | `/dev-lab` | `dev-lab:use` |
-| AI Knowledge Hub | `/ai-hub` | `ai-hub:use` |
-| Developer Marketplace & Digital Product Ecosystem | `/marketplace` | `marketplace:use` |
+| Public read | `GET /ideas/{slug}` | none; the row is served only when its publication pair says it may be |
+| Own workspace | `POST /ideas`, `PATCH /ideas/{id}` | the module permission, plus ownership inside the policy |
+| Platform oversight | `/admin/ideas`, `/admin/dev-lab` | `admin:access` alone, and it may read and remove but never rewrite |
+
+| Module | Path | Ability | What it fronts |
+| --- | --- | --- | --- |
+| Ideas, Plans & Tasks | `/ideas` | `ideas:use` | A capture workspace: ideas with a status workflow, plans converted from them, tasks owned through their plan, per-account categories, and a publishable public surface. `ideas:use` guards the eight workspace routes and every `boot()` in `pages::ideas.*`. |
+| Developer Lab | `/dev-lab` | `dev-lab:use` | An editor workspace: HTML/CSS/JS run in a client-side sandbox, snippets stored per language with a public gallery, execution history counted per day. `dev-lab:use` guards the six workspace routes and every `boot()` in `pages::dev-lab.*`. |
+| AI Knowledge Hub | `/ai-hub` | `ai-hub:use` | A curated library of generated articles, topics and resources. Note that the hub's reading pages carry **no** route guard — they are public — so `ai-hub:use` is the sidebar entry and nothing more, while `ai-hub:manage` guards the admin console and the hub's two curated shelves. |
+| Developer Marketplace | `/marketplace` | `marketplace:use` | A storefront: anyone reads the catalogue without signing in, the platform console gates on `product:review`, and the seller home gates on `product:create` — the only ability in the selling group with a route behind it, and it guards a dashboard, not a listing screen. `marketplace:use` again lights the nav entry rather than a route. |
+
+The asymmetry is worth stating, because the four modules were built in two
+different shapes. A **workspace** module has content that belongs to an account, so
+its permission guards the screens where that content is written. A **storefront** or
+**library** module has content that belongs to the platform and is meant to be read
+by strangers, so its permission guards only the door, and the real authorisation
+lives in the narrower `product:*` and `ai-hub:manage` abilities. An API resource
+inherits whichever shape its module has.
 
 Ability strings are exactly the `AccountPermission` enum values. Because there
 is only one axis, a token ability can always be expressed as a plain
@@ -369,22 +387,159 @@ account-level string — there is no per-resource scope that would need to be
 resolved from a membership row, and consequently no ability name that reads as
 a narrower grant than it is.
 
+What the enum does **not** contain is a narrower module permission, and an API
+designer should notice, because the instinct is to add `ideas:manage` for the
+console. `IdeaPolicy` already encodes the difference: `update` is ownership-only
+even for an admin, and `delete` admits `admin:access`. A token that could edit
+somebody else's idea would be a token for an ability the web application refuses.
+
 ### 6.6 Seller resources
 
-Placeholder. A `seller`-role account can publish product listings in the web
-application's design, but **no product model exists yet** — see
-`docs/audit/PHASE-0-AUDIT.md`. These endpoints are named for completeness and
-marked **unimplementable** until the model lands:
+The **catalogue** half of the seller role is real. `MarketplaceProduct`,
+`MarketplaceCategory`, `MarketplaceProductVersion` and `MarketplaceReview` all
+exist and are seeded; the public storefront (`pages::marketplace.*`) reads them
+without an account; and `/admin/marketplace` moderates them through
+`app/Actions/Marketplace/*` (approve, reject, feature, review moderation).
+`MarketplaceProduct` carries a `user_id`, a `published()` scope and an
+`isVisibleTo()` predicate, so the ownership column the API would need is already
+in the schema.
+
+The **authoring** half is not. `/seller/dashboard` is the only route in the
+`permission:product:create` group, and it states that listings are not available
+yet; there is no create or edit screen anywhere, and no `MarketplaceProductPolicy`
+for one to resolve through. Nothing in `resources/views` creates a
+`MarketplaceProduct`. The shell was built for a seller-facing product pipeline
+that has not been written.
+
+The **transaction** half is not either. There is no `Sale` model and no
+`SupportTicket` model, so the four abilities that would front them —
+`sale:view-own`, `sale:view-any`, `refund:process`, `payment:configure` — and
+`support:manage-own` have no surface anywhere in the application. They are
+granted, grouped and rendered in the permission matrix, and never checked.
 
 | Method | Path | Ability | Status |
 | --- | --- | --- | --- |
-| `GET` | `/products` | *(public)* | Blocked on the `Product` model |
-| `POST` | `/products` | `product:create` | Blocked |
-| `PATCH` | `/products/{id}` | `product:update-own` | Blocked |
+| `GET` | `/products` | *(public)* | Backed by `MarketplaceProduct`; published listings only |
+| `GET` | `/products/{slug}` | *(public)* | Same `isVisibleTo()` rule as the storefront |
+| `POST` | `/products` | `product:create` | **Blocked — no authoring screen and no policy** |
+| `PATCH` | `/products/{id}` | `product:update-own` | **Blocked — same**. Admin-side changes go through the console |
+| `POST` | `/products/{id}/submit` | `product:submit` | **Blocked**. `ProductStatus` already models the submitted state |
+| `GET` | `/sales` | `sale:view-own` | **Blocked — no `Sale` model** |
+| `POST` | `/sales/{id}/refund` | `refund:process` | **Blocked** |
 
-Listing them is not padding. It records that the seller role is
-**half-designed**: the plan limits exist (`RolePlan::productListingLimit()`)
-but there is nothing for them to limit.
+Listing the blocked rows is not padding. It records that the seller role is
+**half-built in a specific direction**: the inventory exists and is displayed,
+while the two verbs a seller would actually need — write a listing, sell a
+listing — do not. `RolePlan::productListingLimit()` has something to limit but
+nothing to limit it against, and `RolePlan`'s other selling claims describe a
+revenue ledger that has not been written.
+
+### 6.7 Ideas resources
+
+The Ideas module is four tables (`ideas`, `idea_plans`, `idea_tasks`,
+`idea_categories`); this table lists the two a client reads first, and the three
+verbs that are not CRUD: publish, pin and convert. A published idea also carries
+subjects from the platform's `topics` table through the `idea_topic` pivot, which is
+shared with the Developer Lab and is not a fifth module table.
+
+| Method | Path | Ability | Notes |
+| --- | --- | --- | --- |
+| `GET` | `/ideas` | *(public)* | Published rows only — `visibility = public` **and** `published_at` set. Filters below. |
+| `GET` | `/ideas/{slug}` | *(public)* | Served when `Idea::isVisibleTo()` passes: published to anyone, otherwise the author or an operator. A private row is `404`, not `403`. |
+| `POST` | `/ideas` | `ideas:use` | Creates in `inbox`. Slug derives from the title unless supplied. |
+| `PATCH` | `/ideas/{id}` | `ideas:use` | **Author only.** `IdeaPolicy::update` has no admin clause, and the API must not be the loophole. |
+| `DELETE` | `/ideas/{id}` | `ideas:use` | Author, or `admin:access`. Permanent — the module has no soft deletes. |
+| `POST` | `/ideas/{id}/status` | `ideas:use` | Author only, and only along `IdeaStatus::allowedTransitions()`; an illegal jump is `422`, not a silent write. |
+| `POST` | `/ideas/{id}/publish` | `ideas:use` | Sets the pair. Refuses unless the idea is `Approved` — approving is a stage, publishing is a decision. |
+| `POST` | `/ideas/{id}/pin` | `ideas:use` | Toggles a reading order. Does not change status or visibility. |
+| `POST` | `/ideas/{id}/convert` | `ideas:use` | Writes an `IdeaPlan`, links it by `idea_id`, leaves the idea row otherwise untouched. A second call is `409`: one idea converts once. |
+| `GET` | `/ideas/categories` | `ideas:use` | The caller's own folders. Slug uniqueness is **per account**, which is why two accounts may both have a folder named "backend". |
+
+Plans and tasks follow the same shape under `/ideas/plans` and
+`/ideas/plans/{id}/tasks`, mirroring the web URL space one for one. A
+`PATCH /ideas/tasks/{id}` is authorised through its parent plan, because an
+`idea_tasks` row carries no `user_id` — there is no column for ownership to drift
+from — so the API cannot accept a task id alone as proof of anything.
+
+Collection filters for `GET /ideas`: `status`, `category`, `pinned`, `topic`,
+`author`, `q` (title, summary and body), `sort` (`-published_at` default for public
+reads, pinned-then-newest inside a workspace), `per_page`. `category` is one
+account's private folder and therefore belongs to the workspace half only; the public
+half is narrowed by `topic` and `author`, which is the split the live page already
+makes in its own URL (§7.1).
+
+Fields:
+
+```json
+{
+  "id": 12,
+  "slug": "offline-first-sync-notes",
+  "title": "Offline-first sync notes",
+  "summary": "…",
+  "content": "…markdown…",
+  "status": "under_review",
+  "priority": "high",
+  "potential": "medium",
+  "visibility": "private",
+  "published_at": null,
+  "is_pinned": true,
+  "view_count": 0,
+  "author": { "id": 7, "name": "…" },
+  "plan": null
+}
+```
+
+`visibility` and `published_at` are both exposed and both read-only: a client sets
+publication with `POST /ideas/{id}/publish`, never by patching either column, because
+the pair is an invariant owned by `SyncIdeaVisibility`.
+
+### 6.8 Developer Lab resources
+
+| Method | Path | Ability | Notes |
+| --- | --- | --- | --- |
+| `GET` | `/snippets` | *(public)* | The gallery: published rows, filterable by `language`, `topic`, `author` and `sort` — the facets the live gallery page already puts in its URL (§7.1). |
+| `GET` | `/snippets/{slug}` | *(public)* | `404` unless `LabSnippet::isVisibleTo()` passes. `code` is data in a JSON response — the escaping question the HTML view has to answer never reaches an API client. |
+| `POST` | `/snippets` | `dev-lab:use` | Requires a title and a language the lab knows (`html`, `css`, `javascript`, `php`). |
+| `PATCH` | `/snippets/{id}` | `dev-lab:use` | Author only. |
+| `DELETE` | `/snippets/{id}` | `dev-lab:use` | Author, or `admin:access`. Deleting a snippet leaves its execution rows standing — `lab_executions` denormalises the label for exactly that reason. |
+| `POST` | `/snippets/{id}/publish` | `dev-lab:use` | Refuses a snippet whose code is whitespace; there is nothing for a stranger to read. |
+| `GET` | `/workspaces` | `dev-lab:use` | The caller's buffers. Bound by `id` — a workspace has no slug because it is never public. |
+| `PUT` | `/workspaces/{id}` | `dev-lab:use` | Upsert of the HTML/CSS/JS trio. A blank pane stores `null`, not `""`. |
+| `GET` | `/executions` | `dev-lab:use` | This account's run history, newest first. Read only — see below. |
+| `GET` | `/executions/today` | `dev-lab:use` | The count that remains of `config('dev_lab.daily_run_limit')`. |
+
+There is deliberately **no** `POST /executions`. `RecordLabExecution` would do
+nothing except *record* a run: the sandbox is a browser, so an HTTP client has no
+frame, no `console` to capture and no rendered document to return. There is no
+server-side runner in this build and `LabLanguage::isBrowserRunnable()` is false for
+`php`, so even a web request that asks to run PHP is refused before its row is
+written. The write belongs to the client that actually executed something, which is
+the only party that can report a result honestly, so the API exposes history and not
+a run.
+
+Collection filters for `GET /snippets`: `language`, `topic`, `author`, `q`, `sort`,
+`per_page`. `language` and `topic` are separate axes over the same result set — what
+the code is written in, and what it is for.
+
+Fields:
+
+```json
+{
+  "id": 3,
+  "slug": "css-container-query-card",
+  "title": "Container query card",
+  "language": "css",
+  "code": "…",
+  "description": "…",
+  "visibility": "public",
+  "published_at": "2026-10-20T09:14:00+00:00",
+  "view_count": 41,
+  "runnable": false
+}
+```
+
+`runnable` is the server's answer to `isBrowserRunnable()`, exposed so a client does
+not draw a Run button that the next request will refuse.
 
 ---
 
@@ -402,6 +557,49 @@ but there is nothing for them to limit.
   fall-through to a default.
 - **Sparse fields:** `fields[posts]=id,title,slug`. Omitted fields are dropped
   from the response. Useful on mobile.
+
+### 7.1 The parameters the public landing pages already take
+
+Two Livewire pages already keep this state in the URL: `GET /ideas` and
+`GET /dev-lab/gallery`. They are screens and not JSON endpoints, and they are
+recorded here because the filter sets in §6.7 and §6.8 are meant to mirror them, and
+because [ROUTES](./ROUTES.md) resolves every one of them to this section instead of
+restating the table. Each is a `#[Url]`-bound property on the component with its
+default suppressed, so an unfiltered page keeps a clean canonical URL.
+
+| Parameter | Type | Behaviour |
+| --- | --- | --- |
+| `topic` | slug | Filter to one platform-owned subject. Absent or empty is no filter. |
+| `author` | handle | Filter to one author by their `users.handle`. Absent or empty is no filter. |
+| `sort` | enum | `recent`, `oldest`, `views`, `title`, plus `tab` on `/ideas`. See below. |
+| `q` | string | Substring match — title, summary and body on the ideas index; title, description and the saved code on the gallery. Two-character floor. |
+| `tab` | enum | Ideas index only. Its existing stage band (`promoted` default, plus the tab's own order feeding `sort=tab`). |
+| `lang` | enum | Gallery only. `LabLanguage` case; the chip row counts published snippets per language and hides a language with none. |
+| `page` | int | Page number. Both pages still paginate, at `config('ideas.per_page.public')` and `config('dev_lab.per_page.public')`. |
+
+Neither facet is validated by looking the value up on its own. `topic` is checked
+through `App\Services\PublicTaxonomy::topic()`, which is built from the same
+`published()` count that built the chips, and `author` against the author chips from
+the same class — only accounts with at least one published row in that family and a
+non-empty handle are on the list. A hand-typed value that fails the gate is ignored
+rather than answered with a 404: an inactive subject, a subject with no published row
+behind it, or a handle nobody published under behaves exactly as if nothing had been
+chosen. These are readers' URLs, typed and pasted, and a page that refuses a stale
+filter is a page that teaches somebody nothing.
+
+Sorting is one whitelist of words per page, translated into an `ORDER BY` by
+`applySort()` in `resources/views/pages/ideas/⚡index.blade.php` and its twin in
+`pages/dev-lab/⚡gallery.blade.php`. `/ideas` defaults to `tab`, its own "leave the
+tab's order alone" value, which is therefore the word excluded from the URL; the
+gallery defaults to `recent`. `recent` means `published_at` descending with an `id`
+tie-break on both pages. An unknown sort word falls through to the default rather
+than failing — a browser extension or a stale bookmark is not a request to reject.
+
+A search term shorter than two characters does not filter at all: it is ignored and
+the page says so in a status line. This is a screen rule. `Idea::search()` and
+`LabSnippet::search()` were not touched, because a model scope that silently drops
+one-letter terms would be lying about its own contract for the sake of one page's
+noise problem.
 
 ---
 
@@ -491,8 +689,8 @@ Recorded so the design is falsifiable rather than aspirational.
 | 2 | Read-only public resources: posts, categories, tags | Phase 1 |
 | 3 | Write resources: post create/update, comment create | Phase 2 |
 | 4 | Administrative resources: users, role changes | Phase 3 |
-| 5 | Platform modules: `ideas:use`, `dev-lab:use`, `ai-hub:use`, `marketplace:use` | Phase 4 |
-| 6 | Seller products | **Blocked — no `Product` model** |
+| 5 | Ideas + Developer Lab resources (§6.7, §6.8) — the models, policies and screens already exist, so these rows are transcription, not design | Phase 4 |
+| 6 | Marketplace reads from the existing models; listing writes need a `MarketplaceProductPolicy` and an authoring screen first | Sales **blocked — no `Sale` model**, listing writes **blocked — no policy** (see §6.6) |
 
 Each phase ships with Laravel Resource classes, Form Requests, a policy per
 resource, and feature tests asserting both the happy path and the denial path.
@@ -513,5 +711,13 @@ it.
    notified of changes rather than poll. No design exists for this.
 3. **Slug vs. id as the canonical key.** §6.1 exposes both and sets no rule for
    which a client should store. This needs an answer before v1 freezes.
-4. **Seller product model.** Until `Product` exists, the seller half of the
-   role model cannot be exercised over the API at all.
+4. **The revenue ledger.** `MarketplaceProduct` exists and is displayed, so the
+   catalogue is not an open question. Two halves are: a seller still cannot write
+   a listing (§6.6), and there is no `Sale` model, no refunds, and nothing that
+   explains what `payment:configure` is meant to configure. Until those exist,
+   `RolePlan`'s selling limits are countable but not enforceable against anything
+   a seller can do.
+5. **Execution reporting.** §6.8 refuses to expose `POST /executions` because an
+   HTTP client cannot honestly report a browser run. If a server-side runner is
+   ever built, that endpoint becomes implementable and the question of what it
+   returns — output, exit status, both truncated — becomes real.

@@ -18,30 +18,61 @@ Naming follows Laravel's convention throughout:
 
 ## 0. The directory map
 
-Every component lives under `components/app/`. That prefix is not decoration:
-it namespaces this application's components away from every package's anonymous
-components, so `<x-app.ui.modal>` can never be shadowed by a vendor package
-registering `<x-modal>` — which is exactly the collision the old flat
-`components/modal.blade.php` was exposed to.
+Almost every component lives under `components/app/`. That prefix is not
+decoration: it namespaces this application's components away from every
+package's anonymous components, so `<x-app.ui.modal>` can never be shadowed by
+a vendor package registering `<x-modal>` — which is exactly the collision the
+old flat `components/modal.blade.php` was exposed to.
+
+Eleven files sit outside it, and they are the honest exception rather than an
+oversight:
+
+| Directory | Tag | Count | Why it is not under `app/` |
+| --- | --- | --- | --- |
+| `components/auth/` | `<x-auth.login-modal>` and siblings | 4 | The three Fortify mid-flow modals plus the `modals` bundle that mounts them. They are the authentication surface, which predates the `app/` split and is namespaced by *concern*, not by role. |
+| `components/feed/` | `<x-feed.card>` and siblings | 6 | The activity feed's own vocabulary. `<x-feed.avatar>` has eleven call sites across the public and authenticated surfaces, so it is shared, but it is feed-shaped, not primitive-shaped. |
+| `components/communities/` | `<x-communities.card>` | 1 | One community directory card. |
+
+The rule these three obey is the same rule `ideas/` and `dev-lab/` obey — **a
+module owns its vocabulary** — and they simply got there before the `app/`
+prefix was applied consistently. Bringing them under `app/` would mean rewriting
+every tag in the table above for no change in behaviour, so the naming is
+documented rather than fixed. Anything new goes under `app/`.
 
 ```
-components/app/
-├── home/          guest chrome — the public header and footer
-├── ui/            shared primitives, role-agnostic by definition
-│   ├── auth/      authentication screens
-│   ├── editor/    the Markdown editor and its AI affordances
-│   ├── modal/     the shared modal system
-│   └── post/      post cards, TOC, share bar
-├── icon/          icon components — brand marks and the wordmark glyph
-├── user/          the author workspace's chrome
-├── seller/        the selling workspace's chrome
-└── admin/         the administration workspace's chrome
+components/
+├── auth/          the Fortify mid-flow modals and their bundle
+├── feed/          the activity feed's card, composer, filters, inspector, rail, avatar
+├── communities/   the community directory card
+└── app/
+    ├── home/          guest chrome — the public header and footer
+    ├── ui/            shared primitives, role-agnostic by definition (41 files)
+    │   ├── auth/      authentication screens
+    │   ├── editor/    the Markdown editor and its AI affordances
+    │   ├── modal/     the shared modal system
+    │   └── post/      post cards, TOC, share bar
+    ├── icon/          icon components — brand marks and the wordmark glyph
+    ├── ideas/         the Ideas module's own components
+    ├── dev-lab/       the Developer Lab's landing panels, its public snippet row, and its code pane
+    ├── ai-hub/        the hub's article and topic cards
+    ├── marketplace/   product cards and catalogue blocks
+    ├── user/          the reader workspace's chrome
+    ├── seller/        the selling workspace's chrome
+    ├── admin/         the administration workspace's chrome
+    └── errors/        the status pages
 ```
 
-The rule that keeps it clean: **a component goes in `ui/` unless a role owns
-it.** `ui/` is the only directory that may not branch on role — the moment a
-component needs to know whether it is rendering for a seller, it belongs in
+The rule that keeps it clean: **a component goes in `ui/` unless a role or a
+module owns it.** `ui/` is the only directory that may not branch on role — the
+moment a component needs to know whether it is rendering for a seller, it belongs in
 that role's directory. `icon/` holds components whose entire body is a glyph.
+
+The four module directories exist because a module's vocabulary is not a primitive.
+`<x-app.ideas.card>` knows what an `IdeaStatus` badge looks like and
+`<x-app.dev-lab.code-pane>` knows about the byte ceiling; putting either in `ui/`
+would offer the whole application a component that is only meaningful inside one URL
+space. The test for the placement is one question: would a screen in a *different*
+module reach for this? If not, it stays in its module.
 
 The layouts mirror the same audience-first shape:
 
@@ -52,7 +83,7 @@ layouts/
 ├── auth/          every authenticated account, on the way in
 │   └── split      the implementation behind layouts::auth
 ├── app/           the general authenticated workspace
-│   └── dashboard  /dashboard and the four platform modules
+│   └── dashboard  /dashboard, the Ideas and Developer Lab workspaces, the hub shelves
 ├── seller/        the seller role
 │   └── dashboard  /seller/dashboard
 └── admin/         the admin role
@@ -199,20 +230,19 @@ found in this codebase — see [§11](#11-known-issues).
 
 ---
 
-### `<x-app.ui.app-logo>` / `<x-app.ui.app-logo-icon>`
+### `<x-app.ui.app-logo-icon>`
 
 | Component | Prop | Type | Default |
 | --- | --- | --- | --- |
-| `<x-app.ui.app-logo>` | `sidebar` | `bool` | `false` |
 | `<x-app.ui.app-logo-icon>` | — | — | no props |
 
-`sidebar` switches between `flux:brand` and `flux:sidebar.brand`. The icon is a
-bare inline SVG (`viewBox="0 0 40 42"`, 5 `currentColor` paths) so it inherits
-text colour and needs no asset request.
+The icon is a bare inline SVG (`viewBox="0 0 40 42"`, 5 `currentColor` paths) so it
+inherits text colour and needs no asset request. The auth layout composes
+`<flux:brand>` itself and renders this icon directly.
 
-The wrapper `<x-app.ui.app-logo>` is currently **unused** — the auth layout
-composes `<flux:brand>` itself and renders the icon directly. See
-[§11](#11-known-issues).
+The `<x-app.ui.app-logo>` wrapper that used to sit beside it — a `sidebar` prop
+switching between `flux:brand` and `flux:sidebar.brand` — had no call sites left and
+has been deleted.
 
 ---
 
@@ -295,6 +325,124 @@ right, and does nothing when clicked.
 
 ---
 
+### `<x-app.ui.theme-toggle>`
+
+No props. The single control for the application's two themes, and it appears on
+three surfaces — the workspace navbar, the public site header, and the auth
+layout — which is the entire reason it is a component rather than markup copied
+three times.
+
+The button owns no state. The click flips `$flux.dark`, and Flux's appearance
+store applies the `.dark` class on `<html>` and persists to
+`localStorage['flux.appearance']`, the same key `partials/head.blade.php` reads
+before first paint. Exactly one writer, so the toggle cannot desynchronise from
+the boot script. `window.DevFolioTheme` (defined inline by `partials/theme-boot`)
+does the two things that are not Flux's job: the short colour cross-fade and the
+`theme-color` meta that tints the mobile browser chrome.
+
+It always shows the theme you would switch *to* — a sun while dark is applied —
+and its accessible name says the same, so the icon and the label cannot disagree.
+
+---
+
+### `<x-app.ui.accent-picker>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `panelId` | `?string` | `'accent-picker' . uniqid()` |
+
+The companion to the toggle: where that flips dark and light, this re-tunes the
+site's single accent hue across six swatches (emerald is the default, then
+indigo, cyan, amber, rose, violet). One attribute carries the choice,
+`data-accent` on `<html>`, and the per-hue variable scopes live at the end of
+`resources/css/app.css`. `window.DevFolioTheme.accent` persists it to
+`localStorage['devfolio.accent']` and stamps the attribute before first paint, so
+there is no flash of the default hue on the next load.
+
+Emerald is the *absence* of the attribute rather than a stored value — the same
+trick the dark default uses to avoid fighting the OS preference, applied to
+colour.
+
+`panelId` is not decoration. The public header renders this component twice, once
+in the desktop nav and once in the mobile panel, and both copies emit an
+`aria-controls` pointing at a panel `id`. Two identical DOM ids is the bug, so
+each instance is given a distinct one, and the `uniqid()` default only holds when
+there is exactly one on the page.
+
+---
+
+### `<x-app.ui.welcome-card>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `eyebrow` | `?string` | `null` |
+| `title` | `string` | — |
+| `description` | `?string` | `null` |
+| `icon` | `string` | `'sparkles'` |
+| `level` | `int` | `2` |
+
+The one surface in the system allowed to carry a gradient, which is why the
+gradient palette exists at all: white on the hero's darkest stop measures 14.9:1,
+so nothing here compromises, and the secondary text at 70% white still clears AA
+on both stops.
+
+`level` exists because a page has exactly one `h1`. The card opens the four
+dashboards that use it — `pages::dashboard.index`, `ideas.dashboard`,
+`dev-lab.dashboard`, `seller.dashboard` — so each passes `1`, and a caller
+greeting inside a page that already has its own heading leaves the default `2`.
+
+The `actions` slot is where the caller composes its own `<flux:button>`s; the card
+states where they sit and how they align, not what they look like.
+
+---
+
+### `<x-app.ui.chart-card>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `title` | `string` | — |
+| `description` | `?string` | `null` |
+| `series` | `array<int, int>` | `[]` |
+| `labels` | `array` | `[]` |
+| `empty` | `?string` | `null` |
+
+An area chart drawn as inline SVG. The dashboard needs one chart, and a charting
+dependency that renders axes, tooltips and eleven legends is the wrong trade for
+one area-plus-sparkline, so there is no chart library in `package.json` and none
+is planned. The SVG scales from its `viewBox`, so it is crisp at any width, and
+every colour in it is a token.
+
+The series arrives as plain integers from the page — this component does no
+querying. The caller owns what "activity" means; the card owns what it looks like.
+
+Segments are straight with round joins, deliberately: a Catmull-Rom smoothing
+would overshoot and invent peaks the data does not contain. The scale is
+zero-based with the baseline padded, so a week with nothing published still sits
+on the axis instead of at the edge of the `viewBox`. `empty` is the sentence
+rendered when the series is all zeros — there is no skeleton state invented for a
+request that returned nothing.
+
+---
+
+### `<x-app.ui.social-icon>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `network` | `?string` | `null` |
+
+Brand glyphs for the icon-only social row on `/about`. `network` takes the
+`AuthorProfile` link keys; an unknown key renders nothing, because the caller's
+`@if` already guards and a question-mark box where a GitHub mark should be is
+worse than a gap.
+
+These are hand-drawn paths rather than Flux icons for one reason: a brand glyph
+is not in an icon library's remit, and `lucide`/Heroicons names for them are
+either absent or trademark-shaded. They are `aria-hidden` and always inside a
+link with visible or `sr-only` text, which is the accessibility requirement the
+component depends on rather than re-asserts.
+
+---
+
 ## 2. Authentication components
 
 ### `<x-app.ui.auth.header>`
@@ -344,6 +492,47 @@ outside the login screen without editing it.
 ### `<x-app.ui.auth.passkey-registration>`
 
 No props. Registration counterpart, used in the security settings page.
+
+---
+
+### The guest auth dialogs: `components/auth/`
+
+Four files that live outside `components/app/` — see [§0](#0-the-directory-map) —
+and are the guest half of the sign-in journey.
+
+| Component | Props | Renders |
+| --- | --- | --- |
+| `<x-auth.modals>` | — | The bundle. One `@guest` block mounting the three dialogs below. |
+| `<x-auth.login-modal>` | — | The login form, in a `<x-app.ui.modal name="login">`. |
+| `<x-auth.register-modal>` | — | The registration form. |
+| `<x-auth.forgot-password-modal>` | — | The reset *request*, which emails the link. |
+
+`<x-auth.modals>` is included exactly once, at
+`resources/views/layouts/guest/home.blade.php:34`, so every public page carries
+the dialogs without every page declaring them. It renders nothing for a signed-in
+account, and each dialog *also* guards itself, which is deliberate: the bundle is
+a convenience for the layout, not the access control.
+
+**The division between dialog and page is by entry point, not by importance.**
+Login, registration and the forgot-password request are guest clicks, so they are
+modals. Password reset (it arrives on a token-bearing link from an email),
+two-factor challenge, confirm-password and verify-email are reached mid-session or
+from outside the site, so they remain standalone screens under `pages/auth/` in
+`layouts::auth.split`. An email link needs a real URL; a guest click does not.
+
+Each dialog reads its own open state from the request rather than from a trigger,
+so a redirected or validation-failed flow reopens it: `?forgot=required`,
+`old('auth_flow') === 'forgot'`, or a flashed `status` with no `signin`/`signup`
+flag alongside it. Closing strips the parameter with `history.replaceState`, which
+is what keeps a reload from reopening a dialog the visitor just dismissed. The
+forgot-password dialog also chains to login (`$openLogin`) rather than dead-ending,
+because "I don't remember" and "I have an account" are one conversation.
+
+`data-test` hooks exist on the forms and their fields
+(`forgot-modal-form`, `forgot-modal-email`, `forgot-modal-submit`,
+`forgot-modal-login-link`) because the flow is exercised by the suite, and a modal
+whose open state is inferred from a query string is exactly the kind of thing that
+silently stops opening.
 
 ---
 
@@ -459,7 +648,7 @@ on the tree that `tests/Feature/Dashboard/NavigationTest.php` pins down, not
 behaviour the view branches on.
 
 `$label` is the nav's accessible name. Each role's sidebar passes its own, so an
-account moving between the author workspace, the storefront and platform
+account moving between the reader home, the storefront and platform
 administration hears a landmark that says where it is rather than the same
 generic "Dashboard" three times over.
 
@@ -536,35 +725,318 @@ A single metric tile.
 
 ### `<x-app.ui.module-placeholder>`
 
-The shared shell for a product module that has a route, a permission and a
-sidebar entry but no feature yet. Every unbuilt module renders through this
-component, so the four placeholder pages cannot drift into four different
-designs. It wraps `<x-app.ui.header>` — with breadcrumbs
-`Workspaces / {title}` — inside a `<x-app.ui.body max="prose">`, and states
-three things honestly: what the module is, what is already built underneath it,
-and that the module itself is not available yet.
-
+The shared shell for a product module that has a route but no feature yet.
+Unbuilt modules render through this component unless they need more than the
+four sentences it can say, so the placeholder pages cannot drift into different
+designs. It wraps `<x-app.ui.header>` inside a `<x-app.ui.body max="prose">`, and
+states three things honestly: what the module is, what is already built
+underneath it, and that the module itself is not available yet.
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `title` | `string` | — | Also rendered as the section heading |
 | `description` | `string` | — | One-line summary of the module |
 | `icon` | `string` | `'sparkles'` | Must be a real Flux icon |
-| `status` | `string` | `'planned'` | Declared for future use; the badge is currently a fixed "Not yet available" |
 | `features` | `array` | `[]` | Planned features, each rendered as a checked list item |
 | `spec` | `?string` | `null` | Path to the module's specification document |
+| `eyebrow` | `?string` | `__('Module')` | Passed through to `<x-app.ui.header>` |
+| `breadcrumbs` | `?array` | `Workspaces / {title}` | Passed through to `<x-app.ui.header>`; a public page states `Home / {title}` instead |
+| `alreadyWorks` | `?string` | the workspace-permission sentence | The "What already works" body. The default describes a guarded workspace page, so a public landing or an admin console overrides it rather than claiming a guard it does not have |
+
+A `status` prop used to be declared here, defaulting to `'planned'`. Nothing in the
+template read it and neither surviving call site passed it, so it has been deleted:
+a documented knob that changes nothing is worse than no knob.
 
 ```blade
 <x-app.ui.module-placeholder
-    :title="__('Developer Lab')"
-    :description="__('A browser-based environment to write, run, inspect and debug code.')"
+    :title="__('Developer Lab shelf')"
+    :description="__('A curated shelf inside the AI Knowledge Hub.')"
     icon="beaker"
     :spec="'docs/lab.md'"
-    :features="[__('Write and run code in the browser'), __('Work through guided challenges')]"
+    :features="[__('Hand-picked snippets'), __('Hub-side ordering')]"
+    :already-works="__('The lab itself is built; this shelf is the hub\'s view of it, which needs a curation model that does not exist yet.')"
 />
 ```
 
-Used by `pages::dev-lab.index`, `pages::ai-hub.index`,
-`pages::marketplace.index` and `pages::ideas.index`.
+Its remaining call sites are **the two hub shelves**, `pages::ai-hub.dev-lab` and
+`pages::ai-hub.ideas`. Both are deliberately still placeholders and neither is a lie
+about the module it names: what is missing is a *hub-side curation model* — an
+article-like row that says which snippets or ideas the hub has chosen and in what
+order — which is a different object from the Ideas bank or the Lab's own gallery. The
+Ideas and Developer Lab modules themselves outgrew this shell.
+
+| Former call site | Now |
+| --- | --- |
+| `pages::ideas.index` | the public published index, with the category filter and the tab row |
+| `pages::admin.ideas` | the platform-wide ideas console |
+| `pages::admin.dev-lab` | the platform-wide snippets and executions console |
+| `pages::dev-lab.index` | the assembled landing below |
+
+A component that is only ever used by two screens is a component that is about to be
+deleted, and this one is no exception: it survives because an honest placeholder beats
+a public 500, and the two shelves are the last pages that need that argument made for
+them.
+
+---
+
+### The Developer Lab components
+
+`resources/views/components/app/dev-lab/` holds eight components: the five panels the
+public landing is assembled from, the editor's code pane, one cluster inside a panel,
+and the row every public surface draws a published snippet with. The landing declares
+no markup beyond the header and the body: `sections()` returns an ordered list of
+`{component, data}` pairs and the template renders each one through
+`<x-dynamic-component>`, so the order of the page, the wording of every panel and
+the audience rule all sit in one readable array while the styling lives in the
+components.
+
+| Component | Props | Renders |
+| --- | --- | --- |
+| `x-app.dev-lab.overview` | `data` — `title, description, icon, status, statusTone?` | The named panel with a chip that says which kind of lab this is |
+| `x-app.dev-lab.capabilities` | `data` — `groups: list<{label, icon, items, done?}>` | One `<x-app.ui.section>` holding the groups |
+| `x-app.dev-lab.capability` | `label, icon, items, done = true` | A single cluster: heading plus its list, ticked or dashed as a unit |
+| `x-app.dev-lab.showcase` | `data` — `panes: {html, css, js}, title?, description?` | The landing's run-it-here panel: the sandbox's own factory over the repository's example, frame and console side by side, nothing executing until Run |
+| `x-app.dev-lab.status` | `data` — `title?, icon?, tone?, description, spec, points?` | The honesty panel: what runs where, and what is still a runner-shaped gap |
+| `x-app.dev-lab.access` | `data` — `heading, description, icon, tone, action?, secondary?` | The only audience-dependent panel; `action` and `secondary` are optional `<flux:button>`s |
+| `x-app.dev-lab.snippet-card` | `snippet, href?, compact = false` | One published snippet as a public row: title, language badge, teaser, line count, author, published date |
+| `x-app.dev-lab.code-pane` | `label, model, rows = 18, placeholder?, hint?, max?, id?` | One labelled monospace textarea with a byte counter and Tab-to-indent |
+
+Five of the eight take one `data` array because that is what a dynamic component can
+forward: `x-dynamic-component` passes attributes, so the page hands each panel a
+single named bag and the panel destructures it. `capability`, `code-pane` and
+`snippet-card` are reached by a static tag — from inside `capabilities`, from the
+sandbox and the snippet form, and from the gallery, the landing's featured strip and
+the topic page — so they keep ordinary named props.
+
+`access` renders whatever the page hands it rather than deciding anything, which is
+what keeps the audience rule in one place. The landing's `access()` has exactly three
+branches — a guest, an account holding `dev-lab:use`, and an account that does not — and
+the difference between them is three data arrays rather than three templates. The middle
+one is offered the sandbox directly, because there is something to open.
+
+`capability`'s `done` flag is per cluster, never per item, and that is the deliberate
+constraint. A tick means the sentence is true today; a dash means it is a statement
+about the roadmap. Mixing the two inside one list is how a page ends up with a check
+beside a feature nobody can find, so a cluster is honest about itself or it is not
+shown. `statusTone` on `overview` exists for the same reason in miniature: a lab that
+runs code in the visitor's tab and a lab that is still a plan make different promises,
+and a neutral chip between them costs a reader their time.
+
+`showcase` is the only panel on a public page that mounts a frame and executes
+something in it, and it earns that by executing only the repository's own code: the
+three panes come from `config('dev_lab.showcase')`, not from a visitor and not from a
+database row. It mounts the same `labSandbox` factory the sandbox screen mounts and
+runs it through `runStored()` — the path the published snippet page already used —
+because `run()` reads `$wire.html`, `$wire.css` and `$wire.js`, and the landing has no
+editor to read them from. Nothing happens until the reader presses the button, and the
+state that remembers this is the factory's own `dirty` flag, so pressing Stop returns
+the reader to the offer rather than leaving an empty frame where the offer was. The
+iframe carries `sandbox="allow-scripts"` and nothing else; the panel is not a second,
+weaker copy of the boundary because the author of the code happens to be this
+application. It states the boundary twice — a monospace chip reading `allow-scripts
+only` beside the title, and the sentence that says `alert()` will not open — because a
+modal that never arrives inside an opaque-origin frame reads as a bug rather than as a
+rule.
+
+`snippet-card` is the gallery's row lifted out of the page that drew it, so every
+public surface answers "what is this code, what is it written in, and who kept it" the
+same way: the gallery grid, the landing's featured strip — `compact`, smaller, not
+different in meaning — and the code shelf on `/topics/{topic}`. The default target is
+`route('dev-lab.snippets.show', $snippet->slug)`, so a caller that wants the published
+page passes nothing, and a caller that wants somewhere else is saying so on purpose.
+The workspace list and the admin console deliberately do not use it: those rows carry
+the visibility state and the publish control, and reading them as cards would trade a
+list you can act on for a grid you cannot. The component says that in its own docblock,
+the way `x-app.ideas.card` does, because the restriction is the design and not an
+oversight. Lifting the row out also retired the landing's `languageBadge()` computed,
+which by then was a second definition of a badge the card was drawing; it is deleted
+rather than left beside the thing it duplicated.
+
+`code-pane` is the honest version of "a code editor" for a build that took a
+dependency ban as a decision rather than an inconvenience. Highlighting a `<textarea>`
+is not possible without an overlay library, so the pane gives a monospace field, a Tab
+key that indents instead of escaping focus, and a live byte count against
+`config('dev_lab.max_code_bytes')`. There is no syntax highlighting anywhere in the
+module, published view included: the public snippet page prints escaped, single-colour
+monospace code inside `<pre><code>`, which is the security requirement, not a
+highlighter.
+
+### The one client-side runtime the Lab has
+
+`resources/js/lab-sandbox.js` is imported by `resources/js/app.js` for its side
+effects and assigns `window.labSandbox`, so `⚡sandbox.blade.php`,
+`⚡snippet-show.blade.php` and `components/app/dev-lab/showcase.blade.php` can name it
+in an `x-data` attribute the same way the editor names `editor-ai.js`. Three surfaces
+share it because the security boundary is one boundary: the author's own panes, a
+stranger's published snippet, and the repository's own example on the landing must not
+acquire different rules by accident.
+
+Its shape is the reason a test cannot prove it works. `labSandbox()` holds `frame`,
+`lines`, `nonce`, `dirty`, `wide`, `active` and `maxLines` — and deliberately **not** the
+code: `run()` reads `html`, `css` and `js` off `$wire`, so the preview runs the same bytes
+that a Save would write, including edits typed since the last debounce. `runWith()` takes
+three strings somebody else already fixed, which is how a published snippet page offers
+the same frame for a stranger's code without acquiring different rules, and
+`runStored()` is the thin wrapper over the `panes` a page handed in at mount — which is
+what the landing's showcase calls, because it has no database row and no editor either.
+`stop()` replaces
+the frame with an empty document, which is the non-reload way out of a loop. Nothing in
+that path round-trips to the server, which is why Run shows output instantly and why the
+only write the screen makes is the one that counts the run. The shim is a separate
+top-level function serialised into the document with `toString()`, so the code running
+inside the frame is the code in this file; the message it posts is authenticated by
+`event.source === preview.contentWindow`, not by origin, because an opaque origin's
+origin is the string `"null"`. Changing any of that is a security change, and
+`docs/lab.md` is where it has to be written down as well.
+
+### The Ideas components
+
+`resources/views/components/app/ideas/` holds two, and they are the whole shared
+vocabulary of the module: everything else on an Ideas screen is `<x-app.ui.*>`.
+
+| Component | Props | Renders |
+| --- | --- | --- |
+| `x-app.ideas.card` | `idea, href?, showStatus = true, showCategory? = null` + an optional footer `slot` | One idea row: pin marker, title, three-line excerpt, stage badge, priority badge, a category chip the author alone sees, a "Not published" lock when the row is private |
+| `x-app.ideas.status-badge` | `status, size = 'sm'` | A `<flux:badge>` carrying the enum's `label()` in the enum's `badgeColor()` |
+
+`card` is used by four callers that must not diverge — the public index, the workspace
+bands, the related shelf on the published idea page, and the ideas shelf on
+`/topics/{topic}` — which is why the target is a prop: the card links to the published
+idea by default and to the workspace edit screen when the caller says so. The module
+console is not one of them: it renders its own rows, because a row an editor takes down
+needs the visibility control beside it rather than underneath a link. The stage and the
+priority sit *under* the excerpt because they qualify the idea rather than identify it.
+The footer slot is where each caller's own actions would go, against the same row shape;
+no caller passes one today, which is why the divider is conditional rather than a bare
+strip of nothing under every card.
+
+The category chip is the one piece of a card that is not a fact about the idea. An
+`App\Models\IdeaCategory` name is one account's private filing system — the half of the
+taxonomy `IdeaCategory` exists to keep private — so `showCategory` defaults to null,
+meaning "author only", and the card resolves it against `auth()->id()` rather than
+against the page it happens to sit on. A stranger reading the public index, the related
+shelf, or a topic shelf therefore never sees how somebody else organises their notes,
+and the three Ideas call sites needed no change to make that true. The subject chips are
+the opposite case: those are platform-owned, which is why they appear in public and the
+folder does not.
+
+`status-badge` takes `IdeaStatus`, `PlanStatus` or `TaskStatus` rather than an idea,
+and that is the point. Each enum owns its own `badgeColor()` mapping, so a re-tiered
+workflow is one edit in the enum instead of a hunt through Blade, and the three
+badges in one plan row cannot disagree about what "In progress" looks like. It renders
+a word, never a coloured dot: a dot says *there is a status* and a word says what it
+is.
+
+---
+
+### The AI Hub components
+
+`resources/views/components/app/ai-hub/` holds five, and they are the hub's whole
+shared row vocabulary. Four are reached by a static tag from the hub's screens;
+`pill` is reached from inside the other four.
+
+| Component | Props | Renders |
+| --- | --- | --- |
+| `x-app.ai-hub.article-card` | `article` | One article row: featured flag, primary topic, title, excerpt, reading time, status. |
+| `x-app.ai-hub.path-card` | `path` | A learning path tile linking `ai-hub.path`. |
+| `x-app.ai-hub.topic-card` | `topic` | A topic tile linking `ai-hub.topic`, listing its active children. |
+| `x-app.ai-hub.resource-card` | `resource` | An outbound resource tile: `target="_blank"` with `rel="noopener noreferrer nofollow"`. |
+| `x-app.ai-hub.pill` | `icon?, tone = 'neutral'` | The monospace uppercase chip the four cards and the hub headers share. |
+
+`pill` exists because four different row types needed the same chip and one of
+them renders its own icon; repeating that markup per card is how four shelves
+drift apart in practice. **Two tones only, `neutral` and `signal`.** The hub has
+one accent, and a difficulty ramp drawn in four colours would be read as a
+quality score rather than as a label, which is the mistake the Ideas badges avoid
+by carrying a word instead of a colour.
+
+`resource-card` is the only tile in the application that leaves the site, and it
+carries `nofollow` because the destination is curator-chosen, not
+editorially-endorsed — the same reason the about page's social links do.
+
+These five are *not* what the two hub shelves under `/ai-hub/ideas` and
+`/ai-hub/dev-lab` render. Those are still
+`<x-app.ui.module-placeholder>`s pending a hub-side curation model; see
+[§ `module-placeholder`](#x-appuimodule-placeholder).
+
+---
+
+### The Feed components
+
+`resources/views/components/feed/` holds six. They live outside `components/app/`
+— see [§0](#0-the-directory-map) — and five of them are composed by exactly one
+screen, `pages::feed.index`, which is why they read as a set rather than as
+primitives.
+
+| Component | Props | Renders |
+| --- | --- | --- |
+| `x-feed.card` | `post: FeedPost`, `fresh = false` | The timeline row: byline with the community it landed in, body, the type's own artefact, tags, then the meta bar. |
+| `x-feed.avatar` | `initials`, `tone = 'neutral'\|'azure'\|'mint'`, `size = 'sm'\|'md'\|'lg'` | A round monospace initials disc. `aria-hidden`, because it always sits beside the name. |
+| `x-feed.composer` | `initials = ''` | The collapsed entry line plus the six type chips. |
+| `x-feed.filters` | `sort, type, category, tag, topics, tags = []` | Sort tabs left, topic/type/tag menus right. |
+| `x-feed.nav-rail` | `sort, category, type = 'all', topics, typeCounts, communities = [], communityCount = 0` | The left rail: Navigation, Communities, Forum, Showcase. |
+| `x-feed.inspector` | `posts, trendingTags, bounties, contributors, communities, featuredProducts, reader = null, readerInitials = '', tag = null, refusedSlug = null` | The right rail: the reader's own context, then the discovery widgets. |
+
+**`x-feed.avatar` is the exception that proves the naming rule.** It has call
+sites in three other feed components, in `pages::admin.feed`,
+`pages/feed.composer-modal` and `pages/feed.show`, so it is genuinely shared —
+but it is *feed-shaped*, not primitive-shaped: its tones are the feed's
+azure/mint register, not the `sui-*` tokens a `ui/` component would draw on.
+Moving it under `app/ui/` would advertise a palette it does not use.
+
+`filters` and `nav-rail` hold no state of their own. Every control calls `$set`
+against the parent's `#[Url]`-bound properties (`?sort=`, `?category=`, `?type=`,
+`?tag=`), so a rail choice survives a reload and a feed view is a shareable URL.
+The three menus inside `filters` are plain Alpine disclosures because a dropdown
+that round-trips to the server on open is a slower dropdown, not a better one.
+Search is deliberately absent: the app header owns it, next to the brand, so it
+is reachable at every scroll position rather than only at the top of the rail.
+
+`nav-rail` used to accept a `reader` prop that the feed page passed and the rail
+never read. The prop and the passing are both gone. Leaving it would have been the
+more dangerous choice: an undeclared attribute on a Blade component is not ignored,
+it is merged onto the root element, so deleting only the `@props` entry would have
+turned `:reader="$this->reader"` into an object-to-string conversion in the view.
+
+`composer` is an entry point, not an editor. Collapsed it costs one input row,
+and every one of its controls opens `feed-composer-modal`, which is where the
+writing surface, media, audience and publish verb actually live. Its six modes
+mirror the feed's own content types — question, discussion, showcase, snippet,
+article, poll — so the composer cannot drift from what the module filters and
+renders, and the chosen chip travels as the `feed-composer-open` detail so a click
+is not lost on the way in. **A guest never reaches the modal:** the same controls
+open the login dialog instead, because the honest answer to "I want to post" is
+"sign in", not a form that will fail on submit.
+
+`card` renders the type's artefact rather than a generic body: a post carrying
+`code` gets the code block, one carrying `poll` gets the options, and one with a
+`hasDetail()` thread gets the always-dark terminal panel — with the thread body
+suppressed on a question that is unsolved, so an open question does not present a
+partial discussion as a complete one. The topic tile is derived from the post's
+own `topic` string, its first two characters upper-cased, so no per-post image,
+colour, or glyph field exists to maintain.
+`fresh` is the entry animation class, applied when the row just landed, and it is
+a prop rather than a sniffed timestamp so the caller decides which rows are new.
+
+---
+
+### `x-communities.card`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `community` | `Community` | — |
+| `member` | `bool` | `false` |
+
+One community directory row, and the only component in
+`resources/views/components/communities/`. Its name links to
+`route('feed.index', ['category' => $community->topic])`, **not to a detail page,
+because there is no community detail route**: the module is a directory plus the
+feed, and a community *is* the topic filter it opens. That is the same view the
+feed rail's community rows select, so the two surfaces cannot offer different
+destinations for the same community.
+
+`member` renders the membership marker. The count itself is never stored on the
+row: it comes from `memberships_count`, the `withCount` value, so a counter column
+cannot drift from the rows it summarises.
 
 ---
 
@@ -724,22 +1196,72 @@ seller's payouts link later is one line in
 
 ---
 
-### `<x-app.ui.topbar>`
+### `<x-app.ui.navbar>`
 
 | Prop | Type | Default |
 | --- | --- | --- |
-| `label` | `?string` | `__('Dashboard home')` |
+| `crumb` slot | `Renderable` | — |
 
-The bar that replaces the sidenav below `lg`. Three things, in the order a thumb
-reaches them: the button that opens the drawer, the wordmark that goes home,
-and the role badge that says which workspace you are standing in. Nothing else
-— at this width the bar is 56px tall and every additional control is a control
-you miss.
+The floating navbar, and the only top-level chrome strip every authenticated
+surface shares. It is a white pill with 16px corners inside the content column,
+canvas visible on all four sides; depth comes from `sui-nav`, one soft shadow,
+not from a border and not from a full-width band.
 
-The brand link carries `aria-label` because its visible text is the author's
-short name, which says who owns the site and not where the link goes. `$label`
-supplies the destination — "Selling dashboard", "Admin dashboard" — drawn from
-the role's own route by the role's header component.
+Four regions, left to right:
+
+1. the drawer trigger, `lg:hidden` — at `lg` and up the sidenav is beside the
+   bar and a button that opens nothing would be a lie;
+2. the `$crumb` slot, which is the role's `nav-crumb`, in a `min-w-0 flex-1`
+   wrapper so a long workspace name truncates instead of pushing the actions out;
+3. search, `hidden md:block` — a GET form whose action is
+   `route('admin.posts.index')`, so it is a real query against the posts table
+   rather than a decoration;
+4. the action group: view site, `<x-app.ui.theme-toggle>`, notifications, the
+   profile menu.
+
+**Search and the bell are `admin:access`-gated, and they are gated because they
+are author tools, not because the bar is role-aware.** Both link into `/admin` —
+the form to `admin.posts.index`, every bell row to `admin.comments` — so
+`components/app/ui/navbar.blade.php:50` reads
+`hasPermission(AccountPermission::AccessAdminPanel)` and skips rendering the
+query at all when it is absent. An account that cannot open the target would
+otherwise be shown a bell that counts a queue it can never display. The theme
+toggle and the profile menu stay for everyone. The bar keeps no `role` prop and
+branches on nothing else, which is what makes one file serve three layouts.
+
+The bell is data, not a badge: it counts the pending comments the sidebar badge
+counts and lists the four most recent, scoped to the author's own posts unless
+`comment:moderate` is held (`:55-63`). The empty panel says "Nothing waiting."
+rather than pretending there is a notification system behind it.
+
+The profile menu is hand-built because `flux:profile` owns its avatar, and the
+avatar here is the same accent-soft initial `<x-app.ui.sidenav-footer>` uses. The
+menu itself is Flux's, so keyboard navigation and outside-click come from the
+framework.
+
+---
+
+### `<x-app.ui.nav-crumb>`
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `label` | `?string` | `__('Dashboard')` |
+
+The breadcrumb that fills the navbar's `crumb` slot. Two levels, no more:
+
+- **Root** — the workspace name from `$label`, linking to
+  `route(auth()->user()->dashboardRoute())` and carrying
+  `<x-app.icon.logo-mark>`. On the smallest screens this is also the only place
+  the product identifies itself, because the sidenav is behind the drawer there.
+- **Leaf** — the label of the navigation section holding the current route,
+  walked out of `DashboardNavigation::for()` and reading the same
+  permission-filtered map the sidebar renders (`:25-33`). It therefore cannot
+  name a section the account is not allowed to see. When nothing is active —
+  the dashboard root, a settings page — it falls back to `__('Overview')`,
+  which is always true of a role's home.
+
+`<nav aria-label="Breadcrumb">` with `aria-current="page"` on the leaf; the "/"
+separator is `aria-hidden`.
 
 ---
 
@@ -751,43 +1273,42 @@ thin.
 | Component | Props | Body |
 | --- | --- | --- |
 | `<x-app.user.sidebar>` | `variant: 'default'\|'icons'` | `<x-app.ui.nav :label="__('Author workspace')" />`, or `<x-app.ui.nav-icons>` when `variant="icons"` |
-| `<x-app.user.footer>` | `label: ?string` | `<x-app.ui.sidenav-footer :label="__('Author account')" />` |
-| `<x-app.user.header>` | `label: ?string` | `<x-app.ui.topbar :label="__('Author dashboard')" />` |
+| `<x-app.user.footer>` | — | `<x-app.ui.sidenav-footer :label="__('Author account')" />` |
+| `<x-app.user.header>` | — | `<x-app.ui.nav-crumb :label="__('Author workspace')" />` |
 | `<x-app.seller.sidebar>` | `variant` | same, labelled `__('Selling workspace')` |
-| `<x-app.seller.footer>` | `label` | `__('Seller account')` |
-| `<x-app.seller.header>` | `label` | `__('Selling dashboard')` |
-| `<x-app.admin.sidebar>` | `variant` | same, labelled `__('Administration')` |
-| `<x-app.admin.footer>` | `label` | `__('Administrator account')` |
-| `<x-app.admin.header>` | `label` | `__('Admin dashboard')` |
+| `<x-app.seller.footer>` | — | `__('Seller account')` |
+| `<x-app.seller.header>` | — | `__('Selling workspace')` |
+| `<x-app.admin.sidebar>` | `variant` | same, labelled `__('Administration')`. It also forwards `scope="admin"` to `x-app.ui.nav` and `nav-icons` — that is a prop of the shared nav, not of this component |
+| `<x-app.admin.footer>` | — | `__('Administrator account')` |
+| `<x-app.admin.header>` | — | `__('Administration')` |
 
-**The one genuine per-role difference is the nav's accessible name.** The items
-are not any role component's business: `DashboardNavigation` already filters
-them by permission, and an admin holds every one of them, so the Administration
-group appears in the admin sidebar and nowhere else *without the admin sidebar
-knowing any other role exists*. That is the whole value of the split — role
-differentiation comes from composing permission-filtered data under a
-role-specific name, never from duplicated navigation logic.
+None of the six footers or headers takes a `label` prop: each hard-codes its own
+string, because the string is what the file exists to contribute and a caller
+that could pass a different one would defeat the point. Only the sidebars take
+anything, and only `variant`.
+
+**The admin rail is the one role chrome with real behaviour in it.** It forwards
+`scope="admin"` to `DashboardNavigation::for()`, which narrows the rail to the
+platform-administration route prefix. The author and seller rails pass no scope
+and get the permission-filtered whole. That is a navigation concern, not an
+access-control decision, and it lives in the data source rather than in the view
+— `components/app/ui/nav.blade.php:14-17` states that it stays
+presentation-only.
+
+**Beyond that, the one genuine per-role difference is the nav's accessible name.**
+The items are not any role component's business otherwise: `DashboardNavigation`
+already filters them by permission, and an admin holds every one of them, so the
+Administration group appears in the admin sidebar and nowhere else *without the
+admin sidebar knowing any other role exists*. Role differentiation comes from
+composing permission-filtered data under a role-specific name, never from
+duplicated navigation logic.
 
 Each role file carries a docblock naming what that role is most likely to need
-that is not a navigation item: the seller's payouts and listings, the admin's
-health indicator, failed-job count and deploy stamp, the author's drafts queue.
+that is not a navigation item: the seller's listings, the admin's health
+indicator, failed-job count and deploy stamp, the author's drafts queue.
 Those belong in the role's directory when they arrive — which is why the
-directories exist before their contents do.
-
----
-
-### `<x-app.ui.desktop-user-menu>`
-
-| Prop | Type | Default |
-| --- | --- | --- |
-| `showRole` | `bool` | `true` |
-
-**Currently unused.** The account block it used to render is now
-`<x-app.ui.sidenav-footer>`, which replaces it outright: same dropdown-style
-identity, plus the sidenav toggle and the utility links the old shell rendered
-separately. Its `data-test="sidebar-menu-button"` hook died with it — nothing
-ever asserted on it. The file is retained only as the historical record of the
-pre-sidenav chrome, and it is the first file to delete — see
+directories exist before their contents do. The seller's payouts link was the
+promised example, and it never arrived with anything renderable behind it; see
 [§11](#11-known-issues).
 
 ---
@@ -838,12 +1359,28 @@ a specific element rather than always the document.
 
 ### `<x-app.ui.post.share-bar>`
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `post` | `Post` | Needs an absolute canonical URL |
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `post` | `?Post` | `null` | The blog shape: passing a post resolves the URL and the title from it |
+| `url` | `?string` | `null` | An absolute page URL for a caller that is not a post |
+| `title` | `?string` | `null` | The heading the intent links pre-fill |
 
 Renders share targets from `config/portfolio.php`. See
 [`<x-app.icon.share>`](#x-appiconshare).
+
+It used to take a `Post` and nothing else, which is all a component needs while it has
+one module calling it and a problem the moment it has two. Two lines of it were ever
+blog-specific — the ones resolving `$url` and `$title` from `$post` — and everything
+under them already worked on a string, so `post` became the default branch rather than
+the only input. The two blog call sites pass `:post` exactly as before and render
+identically; `pages::ideas.show` passes `:url` and `:title` twice, above and below the
+prose. The snippet detail page renders no share bar: what it offers instead is a copy of
+the code.
+
+The three tiers are unchanged — the Web Share sheet where `navigator.share` exists, the
+`config('portfolio.sharing')` primary and secondary intent lists, and copy-link as the
+fallback that always works. The channel list is data rather than markup, so adding a
+network is a config edit and not another edit of this file.
 
 ---
 
@@ -915,14 +1452,17 @@ appeared in four files under three different corner radii.
 
 The `>_` terminal glyph in a rounded box. The component owns the glyph and the
 box only — **the palette arrives through `$attributes`**, because the same mark
-is an accent-filled chip on the sidenav and in the topbar, and a bordered
-monogram on the public About page:
+is an accent-filled chip in the dashboard shell and in the navbar's breadcrumb,
+and a bordered monogram on the public About page:
 
 ```blade
 <x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />          {{-- sidenav + drawer --}}
-<x-app.icon.logo-mark size="sm" class="bg-sui-accent text-sui-ink-on-accent" />  {{-- mobile topbar --}}
-<x-app.icon.logo-mark size="lg" class="border … bg-ink-900 font-mono text-signal-400 …" />
+<x-app.icon.logo-mark size="sm" class="bg-sui-accent text-sui-ink-on-accent" />          {{-- nav-crumb root link --}}
+<x-app.icon.logo-mark size="lg" class="border … bg-ink-900 font-mono text-signal-400 …" /> {{-- public header --}}
 ```
+
+On a dashboard page it renders three times: the sidenav, the drawer that reuses
+the same brand slot, and the breadcrumb root in `<x-app.ui.nav-crumb>`.
 
 `tests/Feature/Dashboard/ShellTest.php` asserts the glyph is defined in exactly
 one file and rendered exactly three times in a dashboard page — once per
@@ -965,6 +1505,58 @@ identity consumers treat them as belonging to the same person — plus an
 `sr-only` " (opens in a new tab)" announcement, since `target="_blank"` is
 invisible to a screen reader.
 
+### `partials/head.blade.php`
+
+Not a component — the include all five layouts put their `<head>` through, recorded
+here because the one thing in it that a page must not get wrong is not a component
+either. It prints **exactly one** `<script type="application/ld+json">` block, guarded
+by `$seo->jsonLd !== [] && ! $seo->noindex`, encoded with
+`JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES`.
+
+The flag set is the reason that line is safe rather than bold. It is the only unescaped
+print of database text in the head: `JSON_HEX_TAG` turns `<` and `>` into `\u003C` and
+`\u003E`, so an idea whose title contains `</script>` cannot close the element it is
+being written inside, and the other three flags do the same job for the quote and
+ampersand forms a stored string is full of. `JSON_UNESCAPED_SLASHES` is there so the
+URLs inside the document stay readable. Nothing on the line is interpolated from
+markup; the value arrives as a PHP array from the page component and is encoded here.
+
+The value is `App\Support\Seo::$jsonLd`, a **list** rather than a single object, because
+a page legitimately has several things to say about itself. Four pages say anything: the
+published idea page emits an `Article` and a `BreadcrumbList`, the published snippet
+page a `SoftwareSourceCode` and the same trail, and the two topic pages a
+`CollectionPage` plus the trail back to the front door. One script holds the whole list,
+because two top-level objects in a single `application/ld+json` block are not valid JSON
+and would leave the parser with neither claim.
+
+A `noindex` page emits nothing. Structured data is a claim addressed to a search engine
+about a document the same head has just told it not to list, and the workspace screens
+are exactly that.
+
+### `<x-app.errors.page>`
+
+One prop: `code`. Renders the HTTP error page for every supported status —
+400, 401, 403, 404, 500, 503 — from the copy in `App\Support\HttpErrorCatalog`,
+which is also the source for the dynamic route's `whereIn` pattern, so a status
+can never exist in one place and not the others. An unsupported code refuses to
+render (404) rather than showing an empty frame.
+
+The page renders inside `layouts::guest.home`, so an error keeps the site's
+header, footer and theme plumbing, and carries `noindex` SEO plus a real
+`data-modal-open`-style escape hatch: one primary button back to the homepage.
+The status code is drawn twice on purpose — a giant decorative numeral (hidden
+from assistive tech) and the meaningful title as the `h1` — so a screen reader
+hears "Page not found" once instead of "four zero four" spelled out.
+
+Two render paths share the component: the framework's own `errors.{status}`
+view discovery (real `abort()`s anywhere in the app) and the dynamic
+`/errors/{code}` preview route. Because exception rendering runs outside the
+`web` middleware group, the component shares an empty `$errors` bag for that
+path — the guest shell's auth dialogs would otherwise die on an undefined
+variable. Uncaught non-HTTP exceptions are mapped to the styled 500 by a
+renderable in `bootstrap/app.php`, but only outside debug mode, where the
+developer needs the trace more than the friendly page.
+
 ---
 
 ## 9. Layouts
@@ -975,10 +1567,10 @@ so a layout's name states who it is for before what it contains.
 | Layout | Audience | Used by |
 | --- | --- | --- |
 | `layouts::guest.home` | unauthenticated visitors | Home, blog index, post detail, about — **and the default** |
-| `layouts::auth` / `layouts::auth.split` | every authenticated account, mid-flow | All seven Fortify screens |
-| `layouts::app.dashboard` | authenticated accounts generally | `/dashboard` and the four platform modules |
+| `layouts::auth` / `layouts::auth.split` | every authenticated account, mid-flow | The four mid-flow Fortify screens (verify email, two-factor challenge, confirm password, password reset); login, registration and forgot-password are modal-first now and render `x-auth.modals` in the guest shell instead |
+| `layouts::app.dashboard` | authenticated accounts generally | `/dashboard`, the eleven Ideas and Developer Lab workspace screens, and the two AI Hub shelves |
 | `layouts::seller.dashboard` | the seller role | `/seller/dashboard` |
-| `layouts::admin.dashboard` | the admin role | `/admin/dashboard`, `/admin/users` |
+| `layouts::admin.dashboard` | the admin role | `/admin/dashboard`, `/admin/users`, and every other screen under `/admin` including the two module consoles |
 
 `layouts::auth` is the entry point and `layouts::auth.split` is the
 implementation behind it; the pair exists so the seven Fortify screens all
@@ -1038,18 +1630,31 @@ new #[Layout('layouts::app.dashboard')] class extends Component { … }
 
 | Page | Layout |
 | --- | --- |
-| `pages::dashboard.index`, `dashboard.comments`, `dashboard.taxonomy`, `dashboard.posts.*` | `layouts::app.dashboard` |
-| `pages::dev-lab.index`, `ai-hub.index`, `marketplace.index`, `ideas.index` | `layouts::app.dashboard` |
+| `pages::dashboard.index` | `layouts::app.dashboard` |
+| `pages::admin.posts.index`, `admin.posts.edit`, `admin.comments`, `admin.taxonomy` | `layouts::admin.dashboard` — they render the admin rail, so the shared shell is not enough |
+| `pages::ideas.index`, `pages::ideas.show`, `pages::dev-lab.index`, `pages::dev-lab.gallery`, `pages::dev-lab.snippet-show`, `pages::topics`, `pages::topic`, `pages::ai-hub.index`, `pages::marketplace.index` | *(none — the guest shell, deliberately)* |
+| `pages::ideas.dashboard`, `ideas.edit`, `ideas.categories`, `ideas.plans`, `ideas.plan`, `ideas.plan-edit`, `pages::dev-lab.dashboard`, `dev-lab.sandbox`, `dev-lab.snippets`, `dev-lab.snippet`, `dev-lab.history` | `layouts::app.dashboard` — a workspace is the account's own surface, so it wears the general shell rather than a role's |
 | `pages::seller.dashboard` | `layouts::seller.dashboard` |
-| `pages::admin.dashboard`, `pages::admin.users` | `layouts::admin.dashboard` |
+| `pages::admin.dashboard`, `pages::admin.users`, `pages::admin.ideas`, `pages::admin.dev-lab` | `layouts::admin.dashboard` |
 | `pages::settings.*` | *(none — the guest shell, deliberately)* |
 
-That last row is a wrinkle worth knowing about. The settings pages carry no
-`#[Layout]` attribute and therefore render in the guest shell: settings is the
-one authenticated surface that does not want the workspace chrome around it, so
-it keeps the quiet public frame. It does mean those pages are written in
-`ink-*`/`signal-*` utilities rather than `sui-*` — a `tests/Feature/Dashboard/ShellTest.php`
-assertion pins the behaviour so it cannot regress silently.
+Those last rows are a wrinkle worth knowing about. Pages with no `#[Layout]`
+attribute render in the guest shell. For settings that is a choice against
+workspace chrome on an authenticated surface; for the public module surfaces — the two
+landings, the gallery, the published idea and snippet pages, the shared topic pair, the
+hub and the marketplace — it is the point: a guest has no workspace to be drawn inside,
+and a sidebar that resolves to nothing for an account-less visitor is worse than no
+sidebar. It does mean those pages are written in `ink-*`/`signal-*` utilities rather
+than `sui-*` — a `tests/Feature/Dashboard/ShellTest.php` assertion pins the behaviour
+so it cannot regress silently — and it is the reason `pages::ideas.show` and
+`pages::dev-lab.snippet-show` carry a comment saying so, because "a public detail page
+looks like the site it belongs to" is a decision somebody has to remember, not an
+accident of an omitted attribute.
+
+The split also means the same idea renders two different ways depending on who is
+looking: the published page is editorial and the workspace card is Soft UI. That is
+consistent with the rest of the app, where `/blog/{slug}` and `/admin/posts` have never
+looked alike.
 
 `component_namespaces` (which gives `pages::` and `layouts::`) and
 `component_locations` (which lists `resources/views/components` and
@@ -1074,17 +1679,43 @@ anonymous classes addressed by **name string**, never `::class`.
 | `pages::blog.index` | `pages/blog/⚡index.blade.php` | `/blog` |
 | `pages::blog.show` | `pages/blog/⚡show.blade.php` | `/blog/{post:slug}` |
 | `pages::dashboard.index` | `pages/dashboard/⚡index.blade.php` | `/dashboard` |
-| `pages::dashboard.comments` | `pages/dashboard/⚡comments.blade.php` | `/dashboard/comments` |
-| `pages::dashboard.taxonomy` | `pages/dashboard/⚡taxonomy.blade.php` | `/dashboard/taxonomy` |
-| `pages::dashboard.posts.index` | `pages/dashboard/posts/⚡index.blade.php` | `/dashboard/posts` |
-| `pages::dashboard.posts.edit` | `pages/dashboard/posts/⚡edit.blade.php` | `/dashboard/posts/{post:id}/edit` |
 | `pages::seller.dashboard` | `pages/seller/⚡dashboard.blade.php` | `/seller/dashboard` |
 | `pages::admin.dashboard` | `pages/admin/⚡dashboard.blade.php` | `/admin/dashboard` |
+| `pages::admin.posts.index` | `pages/admin/posts/⚡index.blade.php` | `/admin/posts` |
+| `pages::admin.posts.edit` | `pages/admin/posts/⚡edit.blade.php` | `/admin/posts/{post:id}/edit` |
+| `pages::admin.comments` | `pages/admin/⚡comments.blade.php` | `/admin/comments` |
+| `pages::admin.taxonomy` | `pages/admin/⚡taxonomy.blade.php` | `/admin/taxonomy` |
 | `pages::admin.users` | `pages/admin/⚡users.blade.php` | `/admin/users` |
+| `pages::admin.marketplace` | `pages/admin/⚡marketplace.blade.php` | `/admin/marketplace` |
+| `pages::admin.dev-lab` | `pages/admin/⚡dev-lab.blade.php` | `/admin/dev-lab` |
+| `pages::admin.ideas` | `pages/admin/⚡ideas.blade.php` | `/admin/ideas` |
 | `pages::dev-lab.index` | `pages/dev-lab/⚡index.blade.php` | `/dev-lab` |
+| `pages::dev-lab.gallery` | `pages/dev-lab/⚡gallery.blade.php` | `/dev-lab/gallery` |
+| `pages::dev-lab.dashboard` | `pages/dev-lab/⚡dashboard.blade.php` | `/dev-lab/dashboard` |
+| `pages::dev-lab.sandbox` | `pages/dev-lab/⚡sandbox.blade.php` | `/dev-lab/sandbox` (takes no route parameter) |
+| `pages::dev-lab.snippets` | `pages/dev-lab/⚡snippets.blade.php` | `/dev-lab/snippets` |
+| `pages::dev-lab.snippet` | `pages/dev-lab/⚡snippet.blade.php` | `/dev-lab/snippets/create` **and** `/dev-lab/snippets/{snippet:slug}/edit` |
+| `pages::dev-lab.snippet-show` | `pages/dev-lab/⚡snippet-show.blade.php` | `/dev-lab/snippets/{snippet:slug}` |
+| `pages::dev-lab.history` | `pages/dev-lab/⚡history.blade.php` | `/dev-lab/history` |
 | `pages::ai-hub.index` | `pages/ai-hub/⚡index.blade.php` | `/ai-hub` |
-| `pages::marketplace.index` | `pages/marketplace/⚡index.blade.php` | `/marketplace` |
+| `pages::marketplace.index` | `pages/marketplace/⚡index.blade.php` | `/marketplace`, `/marketplace/categories/{category:slug}` |
+| `pages::marketplace.show` | `pages/marketplace/⚡show.blade.php` | `/marketplace/{product:slug}` |
 | `pages::ideas.index` | `pages/ideas/⚡index.blade.php` | `/ideas` |
+| `pages::ideas.show` | `pages/ideas/⚡show.blade.php` | `/ideas/{idea:slug}` |
+| `pages::ideas.dashboard` | `pages/ideas/⚡dashboard.blade.php` | `/ideas/dashboard` |
+| `pages::ideas.edit` | `pages/ideas/⚡edit.blade.php` | `/ideas/create` **and** `/ideas/{idea:slug}/edit` |
+| `pages::ideas.categories` | `pages/ideas/⚡categories.blade.php` | `/ideas/categories` |
+| `pages::ideas.plans` | `pages/ideas/⚡plans.blade.php` | `/ideas/plans` |
+| `pages::ideas.plan` | `pages/ideas/⚡plan.blade.php` | `/ideas/plans/{plan:slug}` |
+| `pages::ideas.plan-edit` | `pages/ideas/⚡plan-edit.blade.php` | `/ideas/plans/create` **and** `/ideas/plans/{plan:slug}/edit` |
+| `pages::topics` | `pages/⚡topics.blade.php` | `/topics` |
+| `pages::topic` | `pages/⚡topic.blade.php` | `/topics/{topic:slug}` |
+
+Three of those pairs — `ideas.edit`, `ideas.plan-edit`, `dev-lab.snippet` — are one
+component serving create and edit. The screen reads its bound model, and when there is
+none it is a form for a new row; the field list, the validation and the reserved-slug
+rule are then written exactly once. The alternative, two components per object, is two
+places to forget the slug rule.
 | `pages::settings.profile` | `pages/settings/⚡profile.blade.php` | `/settings/profile` |
 | `pages::settings.security` | `pages/settings/⚡security.blade.php` | `/settings/security` |
 | `pages::settings.appearance` | `pages/settings/⚡appearance.blade.php` | `/settings/appearance` |
@@ -1094,6 +1725,50 @@ anonymous classes addressed by **name string**, never `::class`.
 
 `pages/settings/layout.blade.php` is a **plain Blade component**, not an SFC —
 the settings shell, invoked as `<x-pages::settings.layout>`.
+
+### The public topic pair
+
+`resources/views/pages/⚡topics.blade.php` (`topics.index`, `/topics`) and
+`resources/views/pages/⚡topic.blade.php` (`topics.show`, `/topics/{topic:slug}`) are the
+taxonomy's own shelf — one place that answers "what is this site about" without asking
+the reader to choose a module first. They render in the public shell with no `#[Layout]`
+attribute, the way the hub's identically shaped `ai-hub/topics` pair does, and the two
+pairs stay at different URLs on purpose: `App\Models\Topic` is the flat, platform-wide
+subject vocabulary that files both ideas and snippets, while `AiTopic` is the hub's tree
+of parents and subtopics. Two shapes of "topic" in one page would be a site-wide
+ambiguity, so the two live apart and say so in their own copy.
+
+Both read `App\Services\PublicTaxonomy` rather than querying `Topic` directly, and that
+is the reason they are a pair instead of two pages that happen to look alike. The service
+owns the gate once: `is_active` is necessary and not sufficient, and a topic whose only
+rows are drafts is absent rather than listed at zero, because a chip that opens an empty
+list is a dead end wearing navigation. Its counts run through the `published()` scope on
+the pivot relation, so the ideas landing, the gallery and `/topics` all print the same
+numbers. `⚡topic` aborts 404 through `PublicTaxonomy::isBrowseable()`, which refuses both
+the topic an operator switched off and the one that was seeded and never used: printing
+either name above two empty shelves would contradict the operator and confirm to anybody
+probing slugs that the row exists.
+
+Each shelf on `⚡topic` shows one page of rows and links into the module's own list
+carrying `?topic=`, instead of rebuilding a worse version of that list's search, sorting
+and pagination here. The heading states the full count, so nothing is cut without saying
+so, and the facet and the topic page cannot disagree because they read one scope.
+
+### Marketplace components
+
+`resources/views/components/app/marketplace/` holds the storefront's reusable
+pieces. They are **public-site only**: the moderation console renders its own
+table rows, because the public site and the dashboard resolve the `ink-*` scale
+in opposite directions in dark mode (see §3) and one class list cannot be
+correct in both.
+
+| Component | Renders |
+| --- | --- |
+| `<x-app.marketplace.product-card>` | The catalogue card: category, name, tagline, rating, downloads, price. The whole card is one link. Rendered in the Vibe96 skin (`.v96-card`): uppercase purple category eyebrow, bold title that turns purple on hover, hairline-closed price row, and a 4px lift with a purple-tinted shadow on hover. |
+| `<x-app.marketplace.rating>` | Stars plus the numeric average, derived from approved reviews. Says "No reviews yet" when there are none. |
+| `<x-app.marketplace.install-command>` | A copyable shell command with its own Alpine scope. |
+| `<x-app.marketplace.product-status>` | A `ProductStatus` badge; label and colour both come from the enum. |
+| `<x-app.marketplace.review-card>` | One published review, public side. |
 
 Modal SFCs receive their target through props rather than reading the route,
 which is what allows one modal component to serve every row in a list:
@@ -1119,10 +1794,16 @@ are tracked rather than rediscovered.
 | # | Issue | Impact |
 | --- | --- | --- |
 | 1 | `<x-app.ui.placeholder-pattern>` defaults `id` to `uniqid()` | Two instances on a page collide; the second renders blank. Pass an explicit `id`. Currently one call site, so the footgun is theoretical. |
-| 2 | `<x-app.ui.desktop-user-menu>` and `<x-app.ui.app-logo>` are unused | Dead components left by the reorganisation. `sidenav-footer` superseded the first; the auth layout composes `flux:brand` itself and only needs the icon. Delete both when convenient — nothing references them, including tests. |
-| 3 | `<x-app.ui.desktop-user-menu>` uses `zinc-*` tokens | Off-palette against the `ink-*` system. It predates the token migration and, being unused, renders nowhere — so the fix and the deletion are the same change. |
+| 2 | ~~`<x-app.ui.desktop-user-menu>` and `<x-app.ui.app-logo>` are unused~~ **resolved** | Both deleted. `sidenav-footer` superseded the first; the auth layout composes `flux:brand` itself and only needs `<x-app.ui.app-logo-icon>`, which is kept. Nothing referenced either file, including tests. |
+| 3 | ~~`<x-app.ui.desktop-user-menu>` uses `zinc-*` tokens~~ **resolved** | Off-palette against the `ink-*` system, and it predated the token migration. The fix and the deletion were the same change. |
 | 4 | Invalid Flux icon names recurred four times | `storefront`, `book-open-text`, `folder-git-2`, `layout-grid` all threw. All fixed; a repo-wide audit is now part of the verification gate. |
 | 5 | A dynamic `<flux:icon ::name="…">` recurses forever under Blaze | Memory exhaustion, not a blank icon. Never bind the icon name to an Alpine expression — see §6. |
+| 6 | ~~`components/app/seller/payouts/index.blade.php` is orphaned **and unrenderable**~~ **resolved** | The file called `<x-app.ui.seller.payouts>` and `<x-app.ui.payouts-table>`, neither of which existed, and posted to `seller.payouts.request`, a route that did not either. It was the one thing that made `php artisan view:cache` fail — Blade compiles every view in the tree, so an orphan breaks a production build step even though no page ever reaches it. Deleted, and `view:cache` is green. Payouts stay out of scope until a payout provider or a controlled manual process exists (see [`docs/Developer Marketplace & Dig.md`](./Developer%20Marketplace%20%26%20Dig.md)). |
+| 7 | **Blade does not compile directives inside a component tag's attribute list** | `@js($panes)` written on `<x-app.ui.section x-data="labSandbox({ … })">` reached the browser as the literal text `@js($panes)`, Alpine could not parse it, and `showcase` rendered a panel with no working button and no error anywhere. The same directive on a plain HTML element compiles normally, so the bug is invisible from the source. Pass `Illuminate\Support\Js::from($value)` through the `@php` block and interpolate it with `{{ }}` instead — identical escaping, on a path the component tag leaves alone. Pinned by `tests/Browser/LabShowcaseTest.php`; a `php artisan view:cache` pass does not catch it, because the text is valid Blade. |
+| 8 | **A paginated list drops its filters unless the paginator is told to keep them** | `vendor/pagination/devfolio.blade.php` emits real `<a href>` links carrying `wire:navigate`, so moving to the next list is a navigation that rebuilds the component from the address bar rather than a Livewire round-trip that can still read the active filter off the component. A paginator built with `paginate()` writes those links from the path plus `?page=`, so `?topic=`, `?q=`, `?author=`, `?sort=`, `?lang=`, `?tab=` and `?visibility=` all disappear on the second list, under a heading that still claims the list is filtered. Every `paginate()` chain under `pages/` therefore ends with `->withQueryString()`. Pinned per-screen over HTTP by `tests/Feature/FilteredPaginationTest.php` and repo-wide by `tests/Feature/FilteredPaginationGuardTest.php`, which reads the source precisely so a new listing cannot be added without it. |
+| 9 | **PHP turns an array key of the empty string into the integer `0`** | `['' => __('Every language')] + $languages` stored the clear-all entry as key `0`, so the chip it rendered asked for `?lang=0` and could never compare equal to the empty string the filter clears to. Render a clear-all control as its own element instead of as an entry in the option map. Found in the Developer Lab run history; pinned by `tests/Feature/DevLab/HistoryFiltersTest.php`. |
+| 10 | **A plucked cast column gives back enum cases, not stored strings** | `Collection::contains('css')` over a plucked `lab_executions.language` is false for every case, because the model cast means the collection holds `LabLanguage` instances. The history screen shipped with a language filter row that was permanently empty for exactly this reason, and no test noticed because no test had ever asserted the row. Compare case to case (`$run->contains($language)`). |
+| 11 | **An empty-state sentence built from a URL-bound label crashes on a value the screen does not offer** | `/ideas/plans` looked its tab up with `$this->tabs()[$tab]` inside a guard that excluded only two known keys, so a stale bookmark naming a retired stage raised *Undefined array key*. Any label lookup keyed by a `#[Url]` property must be nullable (`activeTabLabel()`), because the address bar accepts what the control never emits. Pinned by `tests/Feature/Ideas/PlansTabsTest.php`. |
 
 On issue 4: the audit that found them is
 

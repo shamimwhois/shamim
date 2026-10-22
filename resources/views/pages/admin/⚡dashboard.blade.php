@@ -23,9 +23,24 @@ use Livewire\Component;
  * this is the landing surface, and the modules behind the other menu entries
  * (products, orders, payments) land in later phases. No card on this page
  * claims a feature that does not exist.
+ *
+ * The counts are the reason this page needs its own guard rather than relying
+ * on the route's: `recentAccounts()` hands back six named rows including email
+ * addresses, and the route middleware does not run for a component that is
+ * rendered by a Livewire update. Every other admin console on this rail
+ * re-states the requirement in `boot()`, and a landing page that reads the
+ * whole account table is the least place to be the exception.
  */
 new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class extends Component
 {
+    public function boot(): void
+    {
+        abort_unless(
+            auth()->user()?->hasPermission(AccountPermission::AccessAdminPanel) ?? false,
+            403
+        );
+    }
+
     public function mount(): void
     {
         app(Seo::class)->set([
@@ -153,13 +168,16 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     hint="Live on the public site"
                 />
 
+                {{-- Known mismatch, unchanged by the move: this tile counts pending
+                     comments across the platform, while `/admin/comments` queues only
+                     the ones on the signed-in account's own posts. --}}
                 <x-app.ui.stat
                     label="Awaiting moderation"
                     :value="$this->pendingComments"
                     icon="shield-exclamation"
                     :tone="$this->pendingComments > 0 ? 'attention' : 'primary'"
                     :hint="$this->pendingComments > 0 ? 'Needs review' : 'Queue is clear'"
-                    :href="route('dashboard.comments')"
+                    :href="route('admin.comments')"
                 />
 
                 <x-app.ui.stat

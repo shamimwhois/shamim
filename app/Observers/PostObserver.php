@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Actions\Posts\SyncTaxonomyCounts;
 use App\Models\Post;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Keeps the denormalised taxonomy counters honest.
@@ -18,6 +19,10 @@ use App\Models\Post;
  * Reconcile on save and delete so the invariant holds regardless of entry point.
  * Counts are recomputed, never incremented, so a redundant reconciliation is
  * harmless.
+ *
+ * The RSS document is cached for an hour under `feed.xml`; any write that can
+ * change which posts appear in it must evict that key too, or the feed would
+ * serve stale XML until the TTL expires.
  */
 class PostObserver
 {
@@ -29,6 +34,7 @@ class PostObserver
     public function saved(Post $post): void
     {
         $this->syncCounts->handle($post);
+        Cache::forget('feed.xml');
     }
 
     /**
@@ -37,6 +43,7 @@ class PostObserver
     public function deleted(Post $post): void
     {
         $this->syncCounts->handle($post);
+        Cache::forget('feed.xml');
     }
 
     /**
@@ -45,5 +52,6 @@ class PostObserver
     public function restored(Post $post): void
     {
         $this->syncCounts->handle($post);
+        Cache::forget('feed.xml');
     }
 }

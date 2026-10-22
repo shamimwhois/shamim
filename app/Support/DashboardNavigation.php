@@ -76,8 +76,19 @@ final class DashboardNavigation
      *     }>
      * }>
      */
-    public static function for(User $user, ?string $scope = null): array
+    public static function for(?User $user, ?string $scope = null): array
     {
+        /*
+         * A guest holds no permissions and no workspace, so their navigation
+         * is empty by definition. The nav components call this helper with
+         * `auth()->user()`, which is null on any surface reachable before
+         * sign-in (the login page in particular), so the null must resolve
+         * here rather than explode as a 500.
+         */
+        if ($user === null) {
+            return [];
+        }
+
         $pendingComments = self::pendingCommentCount($user);
 
         $sections = [];
@@ -223,6 +234,12 @@ final class DashboardNavigation
                     ],
                 ],
             ],
+            /*
+             * The writing screens live under `/admin` and are guarded by
+             * `admin:access`, so this band renders in the admin rail only. It is
+             * declared here rather than in an admin-specific map because the
+             * grouping is the same concept: one section per job to be done.
+             */
             [
                 'label' => __('Writing'),
                 'groups' => [
@@ -235,29 +252,29 @@ final class DashboardNavigation
                         'items' => [
                             [
                                 'label' => __('Posts'),
-                                'route' => 'dashboard.posts.index',
-                                'pattern' => 'dashboard.posts.*',
+                                'route' => 'admin.posts.index',
+                                'pattern' => 'admin.posts.*',
                                 'icon' => 'document-text',
                                 'description' => __('Drafts, published and archived'),
-                                'permissions' => [AccountPermission::CreatePost],
+                                'permissions' => [AccountPermission::AccessAdminPanel],
                                 'badge' => null,
                             ],
                             [
                                 'label' => __('Comments'),
-                                'route' => 'dashboard.comments',
-                                'pattern' => 'dashboard.comments',
+                                'route' => 'admin.comments',
+                                'pattern' => 'admin.comments',
                                 'icon' => 'chat-bubble-left-right',
                                 'description' => __('Moderation queue'),
-                                'permissions' => [AccountPermission::CreatePost],
+                                'permissions' => [AccountPermission::AccessAdminPanel],
                                 'badge' => self::BADGE_PENDING_COMMENTS,
                             ],
                             [
                                 'label' => __('Taxonomy'),
-                                'route' => 'dashboard.taxonomy',
-                                'pattern' => 'dashboard.taxonomy',
+                                'route' => 'admin.taxonomy',
+                                'pattern' => 'admin.taxonomy',
                                 'icon' => 'tag',
                                 'description' => __('Categories and tags'),
-                                'permissions' => [AccountPermission::ManageTaxonomy],
+                                'permissions' => [AccountPermission::AccessAdminPanel],
                                 'badge' => null,
                             ],
                         ],
@@ -282,19 +299,19 @@ final class DashboardNavigation
                         'items' => [
                             [
                                 'label' => __('Ideas'),
-                                'route' => 'ideas.index',
+                                'route' => 'ideas.dashboard',
                                 'pattern' => 'ideas.*',
                                 'icon' => 'light-bulb',
-                                'description' => __('Plans, tasks and projects'),
+                                'description' => __('Capture, file and publish'),
                                 'permissions' => [AccountPermission::UseIdeas],
                                 'badge' => null,
                             ],
                             [
                                 'label' => __('Developer Lab'),
-                                'route' => 'dev-lab.index',
+                                'route' => 'dev-lab.dashboard',
                                 'pattern' => 'dev-lab.*',
-                                'icon' => 'beaker',
-                                'description' => __('Experiments and prototypes'),
+                                'icon' => 'code-bracket',
+                                'description' => __('Sandbox and saved snippets'),
                                 'permissions' => [AccountPermission::UseDeveloperLab],
                                 'badge' => null,
                             ],
@@ -333,10 +350,28 @@ final class DashboardNavigation
                             [
                                 'label' => __('Seller dashboard'),
                                 'route' => 'seller.dashboard',
-                                'pattern' => 'seller.*',
+                                'pattern' => 'seller.dashboard',
                                 'icon' => 'building-storefront',
                                 'description' => __('Products and sales'),
                                 'permissions' => [AccountPermission::CreateProduct],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Products'),
+                                'route' => 'seller.products',
+                                'pattern' => 'seller.products*',
+                                'icon' => 'cube',
+                                'description' => __('Drafts, submissions, listings'),
+                                'permissions' => [AccountPermission::CreateProduct],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Sales'),
+                                'route' => 'seller.sales',
+                                'pattern' => 'seller.sales',
+                                'icon' => 'banknotes',
+                                'description' => __('Orders on your listings'),
+                                'permissions' => [AccountPermission::ViewOwnSales],
                                 'badge' => null,
                             ],
                         ],
@@ -360,10 +395,82 @@ final class DashboardNavigation
                             [
                                 'label' => __('Users'),
                                 'route' => 'admin.users',
-                                'pattern' => 'admin.users',
+                                'pattern' => 'admin.users*',
                                 'icon' => 'user-group',
                                 'description' => __('Accounts and roles'),
                                 'permissions' => [AccountPermission::ManageUsers],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Marketplace'),
+                                'route' => 'admin.marketplace',
+                                'pattern' => 'admin.marketplace',
+                                'icon' => 'shopping-bag',
+                                'description' => __('Listing moderation'),
+                                'permissions' => [AccountPermission::ReviewProducts],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Payment'),
+                                'route' => 'admin.payment',
+                                'pattern' => 'admin.payment',
+                                'icon' => 'credit-card',
+                                'description' => __('Gateways and credentials'),
+                                'permissions' => [AccountPermission::ConfigurePayments],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Orders'),
+                                'route' => 'admin.orders',
+                                'pattern' => 'admin.orders',
+                                'icon' => 'receipt-refund',
+                                'description' => __('Sales, payments, refunds'),
+                                'permissions' => [AccountPermission::ViewAnySales],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Payments'),
+                                'route' => 'admin.payments',
+                                'pattern' => 'admin.payments',
+                                'icon' => 'banknotes',
+                                'description' => __('Gateway ledger across accounts'),
+                                'permissions' => [AccountPermission::ViewAnySales],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('About'),
+                                'route' => 'admin.about',
+                                'pattern' => 'admin.about',
+                                'icon' => 'information-circle',
+                                'description' => __('About page content'),
+                                'permissions' => [AccountPermission::ManageAboutContent],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('AI Knowledge'),
+                                'route' => 'admin.ai-hub',
+                                'pattern' => 'admin.ai-hub',
+                                'icon' => 'sparkles',
+                                'description' => __('Hub content management'),
+                                'permissions' => [AccountPermission::ManageAiHub],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Ideas'),
+                                'route' => 'admin.ideas',
+                                'pattern' => 'admin.ideas',
+                                'icon' => 'light-bulb',
+                                'description' => __('Every captured idea'),
+                                'permissions' => [AccountPermission::AccessAdminPanel],
+                                'badge' => null,
+                            ],
+                            [
+                                'label' => __('Developer Lab'),
+                                'route' => 'admin.dev-lab',
+                                'pattern' => 'admin.dev-lab',
+                                'icon' => 'code-bracket',
+                                'description' => __('Snippets and runs'),
+                                'permissions' => [AccountPermission::AccessAdminPanel],
                                 'badge' => null,
                             ],
                         ],

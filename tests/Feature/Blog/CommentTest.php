@@ -42,7 +42,7 @@ test('a guest is redirected to sign in rather than commenting anonymously', func
     Livewire::test('pages::blog.show', ['post' => $post])
         ->set('commentBody', 'An anonymous drive-by comment.')
         ->call('postComment')
-        ->assertRedirect(route('login'));
+        ->assertRedirect(route('blog.show', ['post' => $post->slug, 'signin' => 'required']));
 
     expect(Comment::query()->count())->toBe(0);
 });

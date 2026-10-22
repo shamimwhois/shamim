@@ -26,37 +26,14 @@
             </flux:toast.group>
         @endpersist
 
+        {{-- The guest authentication dialogs. Renders nothing for a signed-in
+             account, so the public shell always carries them: a guest bounced
+             from a protected area returns here with `?signin=required` and the
+             login dialog is already open; `?signup` / `?forgot` do the same
+             for the redirected standalone auth URLs. --}}
+        <x-auth.modals />
+
         @fluxScripts
     </body>
 </html>
 
-{{--
-    Guest layout — the home page and every other public page.
-
-    The shell an unauthenticated visitor sees: the public header, the page
-    itself, the public footer. It carries no `data-sui` scope, because the
-    Soft UI tokens belong to the workspace; the public site has its own
-    editorial palette declared in the same `@theme` block. Anything rendered
-    inside this layout therefore uses `ink-*` and `signal-*`, never `sui-*`.
-
-    ## It is also the default layout
-
-    `config/livewire.php` names this view as `component_layout`, so every
-    single-file Livewire page that declares no `#[Layout]` renders here. That
-    is why there is no fourth "default" layout to keep in step with this one.
-
-    One consequence is worth stating plainly: the authenticated settings pages
-    (`pages/settings/*`) carry no `#[Layout]` attribute and therefore render
-    in this guest shell. That is deliberate — settings is the one authenticated
-    surface that does not want the workspace chrome around it, so it keeps the
-    quiet public frame. It does mean those pages use the public palette rather
-    than the dashboard's, which is why they are written with `signal-*` and
-    `ink-*` utilities throughout.
-
-    ## Naming
-
-    `layouts::guest.home` reads as "the guest's home". The workspace layouts
-    are `layouts::app.dashboard`, `layouts::seller.dashboard` and
-    `layouts::admin.dashboard`, so the audience is always the first path
-    segment and the surface the second.
---}}

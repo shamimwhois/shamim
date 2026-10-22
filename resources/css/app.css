@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import '../../vendor/livewire/flux/dist/flux.css';
+@import './feed.css';
+@import './marketplace.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -93,6 +95,41 @@
     --color-signal-800: #065f46;
     --color-signal-900: #064e3b;
     --color-signal-950: #022c22;
+
+    /* --- AI Workflow (docs/AI-WORKFLOW.md §6) --------------------------- */
+    /* A themed monitoring surface: the panel wears the page's own ink and
+       accent scales, so it reads as part of the page in either theme and
+       re-tunes with the accent picker instead of carrying a private navy
+       palette. The names are roles, never hues — the same rule the
+       `--color-sui-*` and `--color-feed-*` sets follow. Never reach for a
+       raw hex in the ai-workflow component — if the role you need is
+       missing, add it here first.
+
+       `canvas`/`panel`/`card`/`raised` are the four-step surface ladder;
+       `accent` is machine intent; `verified` is human-signed and is
+       deliberately a lime green so it never reads as the accent (which
+       can itself be green); `warning` is the only interruption; `ink*` is
+       the text ladder.
+
+       The accent is used in two roles that need opposite lightness, so
+       each theme picks the stop that clears AA in its own direction: the
+       `accent` fill carries `on-accent` ink, and `accent-soft` is the
+       accent rendered as text on the surface. Verified and accent are
+       both dark in the light theme and both light in the dark theme, so
+       one `on-accent` role serves both. */
+    --color-aw-canvas: #ffffff;               /* the panel's own ground */
+    --color-aw-panel: var(--color-ink-50);    /* inner panels, columns */
+    --color-aw-card: #ffffff;                 /* cards, node fills */
+    --color-aw-raised: var(--color-ink-100);  /* hover, selected card */
+    --color-aw-line: var(--color-ink-200);    /* hairline rules, grid, edge rails */
+    --color-aw-accent: var(--color-signal-700);      /* machine intent: active agents, in-flight edges */
+    --color-aw-accent-soft: var(--color-signal-700); /* the accent as text on the surface */
+    --color-aw-on-accent: #ffffff;            /* ink on a filled accent chip */
+    --color-aw-verified: #4d7c0f;             /* human-verified: passed gates, closed runs */
+    --color-aw-warning: #b45309;              /* blocked, rejected, degraded — the only warning hue */
+    --color-aw-ink: var(--color-ink-900);     /* primary text */
+    --color-aw-ink-muted: var(--color-ink-600);  /* secondary text, metadata */
+    --color-aw-ink-faint: var(--color-ink-500);  /* disabled, timestamps, placeholders */
 
     /* --- Semantic ------------------------------------------------------- */
     --color-success: var(--color-signal-600);
@@ -253,6 +290,40 @@
        (0.5 / 1 / 2 / 2.5 / 3 / 4 / 5), so this single named token closes
        the gap and gives `py-row` a name rather than an arbitrary value. */
     --spacing-row: 0.675rem;
+
+    /* ======================================================================
+       Feed module bridge — the /feed surface expressed as semantic role
+       names over the editorial palette (docs/themes.md §5).
+
+       These are aliases, not a third palette: every value resolves to an
+       ink / signal / info / danger token, so the feed is re-skinned by the
+       one `.dark` switch like every other public surface, and no hex is
+       baked here. Names are roles, not shades:
+         canvas / rail / card           the page, the fixed rail, the card
+         card-low / raised / well       the three recessed or raised drums
+         line / line-strong             hairline and emphasised borders
+         ink / ink-2 / ink-3            primary, secondary, muted text
+         azure                          links, focus, filters (the `info`
+                                        role, which re-scopes itself)
+         mint                           the action tone: score, solved, publish
+         error                          moderation danger (the `danger` role,
+                                        which re-scopes itself)
+       ====================================================================== */
+    --color-feed-canvas: var(--color-ink-50);
+    --color-feed-rail: var(--color-white);
+    --color-feed-card: var(--color-white);
+    --color-feed-card-low: var(--color-ink-100);
+    --color-feed-raised: var(--color-ink-100);
+    --color-feed-well: var(--color-ink-100);
+    --color-feed-line: var(--color-ink-200);
+    --color-feed-line-strong: var(--color-ink-300);
+    --color-feed-ink: var(--color-ink-900);
+    --color-feed-ink-2: var(--color-ink-600);
+    --color-feed-ink-3: var(--color-ink-500);
+    --color-feed-azure: var(--color-info);
+    --color-feed-mint: var(--color-signal-700);
+    --color-feed-error: var(--color-danger);
+
 }
 
 /* ==========================================================================
@@ -270,6 +341,40 @@
         --color-warning: #fbbf24;
         --color-danger: #f87171;
         --color-info: #60a5fa;
+
+        /* Feed module — the same role names, resolved to the editorial
+           dark drums. `info` and `danger` re-scope above, so the azure and
+           error aliases need no entry here. */
+        --color-feed-canvas: var(--color-ink-950);
+        --color-feed-rail: var(--color-ink-900);
+        --color-feed-card: var(--color-ink-900);
+        --color-feed-card-low: var(--color-ink-950);
+        --color-feed-raised: var(--color-ink-800);
+        --color-feed-well: var(--color-ink-950);
+        --color-feed-line: var(--color-ink-800);
+        --color-feed-line-strong: var(--color-ink-700);
+        --color-feed-ink: var(--color-ink-50);
+        --color-feed-ink-2: var(--color-ink-300);
+        --color-feed-ink-3: var(--color-ink-400);
+        --color-feed-mint: var(--color-signal-400);
+
+        /* AI Workflow — the same roles, resolved to the dark drums. The
+           ladder runs the other way from the light theme: the canvas is
+           the darkest step and the cards lift off it, so "raised" is
+           always the step furthest from the ground in both themes. */
+        --color-aw-canvas: var(--color-ink-950);
+        --color-aw-panel: var(--color-ink-900);
+        --color-aw-card: var(--color-ink-800);
+        --color-aw-raised: var(--color-ink-700);
+        --color-aw-line: var(--color-ink-800);
+        --color-aw-accent: var(--color-signal-400);
+        --color-aw-accent-soft: var(--color-signal-300);
+        --color-aw-on-accent: var(--color-ink-950);
+        --color-aw-verified: #a3e635;
+        --color-aw-warning: #fbbf24;
+        --color-aw-ink: var(--color-ink-50);
+        --color-aw-ink-muted: var(--color-ink-300);
+        --color-aw-ink-faint: var(--color-ink-400);
     }
 }
 
@@ -1479,7 +1584,8 @@ select:focus[data-flux-control] {
    `--color-success` is pinned back to green: it derives from signal-600
    (light) and signal-400 (dark), so without the pin an amber or rose
    accent would re-colour every success badge with the accent.
-   Dashboards are deliberately untouched — the `data-sui` scope re-tunes
+
+   Dashboards are deliberately untouched — the `data-sui` scope re-tunes
    signal to its own accessible indigo at a nearer element, and the accent
    picker is a public-site control, not a dashboard one.
    ========================================================================== */
@@ -1572,4 +1678,150 @@ html.dark[data-accent='amber'],
 html.dark[data-accent='rose'],
 html.dark[data-accent='violet'] {
     --color-success: #34d399;
+}
+/* ==========================================================================
+   Glass modal — `x-app.ui.modal variant="glass"`
+   --------------------------------------------------------------------------
+   The showcase skin for the shared modal shell. It is the same shell (same
+   focus behaviour, slots and tone signal); only the surface differs. The
+   `modal-glass` class lands on Flux's <dialog> element, which is why every
+   selector here is a descendant of the dialog itself.
+
+   Colours deliberately reuse the accent bridge (`--color-signal-*`) rather
+   than hardcoding a hue, so the skin follows the accent the visitor picked.
+   The literal fallbacks matter: this surface is dark in BOTH themes, so its
+   text colours are set explicitly instead of inheriting the page's theme.
+   ========================================================================== */
+@layer components {
+    dialog.modal-glass {
+        --glass-line: color-mix(in oklab, var(--color-signal-400, #22d3ee) 32%, transparent);
+        --glass-glow: color-mix(in oklab, var(--color-signal-400, #22d3ee) 38%, transparent);
+
+        /* The glass surface is dark in both themes, so it pins the workflow
+           roles to their dark values instead of inheriting the page's. */
+        --color-aw-canvas: #050a18;
+        --color-aw-panel: #0a1226;
+        --color-aw-card: #101b33;
+        --color-aw-raised: #17253f;
+        --color-aw-line: #1e2e4d;
+        --color-aw-accent: var(--color-signal-400, #22d3ee);
+        --color-aw-accent-soft: var(--color-signal-300, #67e8f9);
+        --color-aw-on-accent: #050a18;
+        --color-aw-verified: #a3e635;
+        --color-aw-warning: #fbbf24;
+        --color-aw-ink: #e7eefb;
+        --color-aw-ink-muted: #93a4c2;
+        --color-aw-ink-faint: #7c90b4;
+
+        background:
+            linear-gradient(180deg, color-mix(in oklab, var(--color-signal-400, #22d3ee) 7%, transparent), transparent 34%),
+            color-mix(in oklab, var(--color-aw-panel, #0a1226) 86%, transparent);
+        color: var(--color-aw-ink, #e7eefb);
+        border: 1px solid var(--glass-line);
+        border-radius: 1rem;
+        box-shadow:
+            0 0 0 1px rgb(0 0 0 / 0.35),
+            0 32px 90px -32px rgb(0 0 0 / 0.65),
+            0 0 60px -30px var(--glass-glow);
+        backdrop-filter: blur(22px) saturate(1.25);
+        -webkit-backdrop-filter: blur(22px) saturate(1.25);
+        overflow: hidden;
+    }
+
+    dialog.modal-glass::backdrop {
+        background: rgb(3 8 18 / 0.62);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+    }
+
+    /* Corner brackets: the sci-fi frame. Two pseudo-elements, four corners
+       would need a wrapper, and two is the deliberate asymmetry — frames
+       read as "frame" either way, and two costs no markup. */
+    dialog.modal-glass::before,
+    dialog.modal-glass::after {
+        content: '';
+        position: absolute;
+        z-index: 1;
+        width: 1.6rem;
+        height: 1.6rem;
+        border: 0 solid var(--color-signal-400, #22d3ee);
+        opacity: 0.75;
+        pointer-events: none;
+    }
+
+    dialog.modal-glass::before {
+        top: 0.6rem;
+        left: 0.6rem;
+        border-top-width: 2px;
+        border-left-width: 2px;
+        border-top-left-radius: 0.55rem;
+    }
+
+    dialog.modal-glass::after {
+        right: 0.6rem;
+        bottom: 0.6rem;
+        border-right-width: 2px;
+        border-bottom-width: 2px;
+        border-bottom-right-radius: 0.55rem;
+    }
+
+    /* The surface is dark in both themes, so content colours are set here
+       rather than inherited — a light-theme heading would be invisible. */
+    dialog.modal-glass :where(h1, h2, h3, h4, h5, h6) {
+        color: var(--color-aw-ink, #e7eefb);
+    }
+
+    dialog.modal-glass :where(p, small) {
+        color: var(--color-aw-ink-muted, #93a4c2);
+    }
+
+    dialog.modal-glass :where(label) {
+        color: var(--color-aw-ink-muted, #93a4c2);
+    }
+
+    dialog.modal-glass :where(input, select, textarea) {
+        background: color-mix(in oklab, var(--color-aw-canvas, #050a18) 72%, transparent);
+        border-color: color-mix(in oklab, var(--color-signal-400, #22d3ee) 24%, transparent);
+        color: var(--color-aw-ink, #e7eefb);
+    }
+
+    dialog.modal-glass :where(input, select, textarea)::placeholder {
+        color: var(--color-aw-ink-faint, #5c6e8e);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        dialog.modal-glass[open] {
+            animation: modal-glass-in 0.32s cubic-bezier(0.22, 0.7, 0.3, 1) both;
+        }
+
+        dialog.modal-glass[open]::backdrop {
+            animation: modal-glass-backdrop 0.32s ease both;
+        }
+    }
+
+    @keyframes modal-glass-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes modal-glass-backdrop {
+        from {
+            opacity: 0;
+        }
+    }
+}
+
+/* Interface sound toggle (footer): the muted state drops the wave, leaving
+   the speaker body alone — state carried by shape, not colour alone. */
+@layer components {
+    [data-sound-toggle][aria-pressed='false'] [data-sound-wave] {
+        display: none;
+    }
 }

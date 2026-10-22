@@ -52,6 +52,8 @@ enum AccountPermission: string
     case ProcessRefunds = 'refund:process';
     case ConfigurePayments = 'payment:configure';
     case ViewAuditLog = 'audit:view';
+    case ManageAboutContent = 'about:manage';
+    case ManageAiHub = 'ai-hub:manage';
 
     /**
      * Get the display label for the permission.
@@ -87,6 +89,8 @@ enum AccountPermission: string
             self::ProcessRefunds => __('Process refunds'),
             self::ConfigurePayments => __('Configure payment providers'),
             self::ViewAuditLog => __('View the audit log'),
+            self::ManageAboutContent => __('Manage the About page'),
+            self::ManageAiHub => __('Manage the AI Knowledge Hub'),
         };
     }
 
@@ -128,7 +132,9 @@ enum AccountPermission: string
             self::ViewAnySales,
             self::ProcessRefunds,
             self::ConfigurePayments,
-            self::ViewAuditLog => PermissionGroup::Administration,
+            self::ViewAuditLog,
+            self::ManageAboutContent,
+            self::ManageAiHub => PermissionGroup::Administration,
         };
     }
 

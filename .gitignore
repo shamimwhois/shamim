@@ -6,10 +6,13 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/coverage
+/storage/coverage.txt
 /vendor
 .env
 .env.backup
 .env.production
+.env.dusk.local
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -44,3 +47,4 @@ yarn-error.log
 /_diag/
 /ext/
 /.kilo/
+/.qoder/settings.local.json

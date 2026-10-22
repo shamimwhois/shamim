@@ -6,10 +6,17 @@ use Laravel\Fortify\Features;
 /**
  * Authentication layout contract.
  *
- * The auth layout is shared by seven Fortify screens, which makes it the
- * single highest-leverage view in the application — and the single easiest
- * place for a regression to hide, because a broken frame still renders a
- * usable form.
+ * Login, registration, and the forgot-password request are modal-first now —
+ * their URLs redirect to the flagged home page where the `x-auth.modals`
+ * dialogs open, and no standalone pages exist for them. The auth layout still
+ * carries the four mid-flow screens (verify email, two-factor challenge,
+ * confirm password, and the token-bearing reset form), which makes it the
+ * single highest-leverage view left in the auth journey — and the single
+ * easiest place for a regression to hide, because a broken frame still renders
+ * a usable form.
+ *
+ * The reset-password screen is the only auth screen a guest can reach
+ * directly, so it stands in for the layout in these tests.
  *
  * These tests pin down the three properties that were actually wrong before
  * the redesign, so that none of them can come back quietly:
@@ -19,7 +26,7 @@ use Laravel\Fortify\Features;
  *   3. The screens had no shared visual signature tying them to the site.
  */
 test('the auth layout does not force a colour scheme on the visitor', function () {
-    $response = $this->get(route('login'));
+    $response = $this->get(route('password.reset', ['token' => 'layout-check']));
 
     $response->assertOk();
 
@@ -31,36 +38,43 @@ test('the auth layout does not force a colour scheme on the visitor', function (
 });
 
 test('the auth layout delegates theming to the appearance controller', function () {
-    $response = $this->get(route('login'));
+    $response = $this->get(route('password.reset', ['token' => 'layout-check']));
 
     // @fluxAppearance is what reads and applies the stored preference. Without
     // it the page would render with no theme resolution at all.
     $response->assertOk();
+
+    expect($response->getContent())->toContain('flux.appearance');
 });
 
-test('every auth screen renders without framework placeholder branding', function () {
-    // Only the screens a guest can actually reach. `password.confirm` and
-    // `two-factor.login` both redirect for a guest — they are mid-flow screens
-    // that require a session — so they are asserted through their own tests.
-    $routes = [
-        'login',
-        'register',
-        'password.request',
+test('the modal-first auth urls redirect to the flagged home', function () {
+    // Login, registration, and the forgot-password request have no standalone
+    // pages: each URL lands on the public home with the matching dialog open
+    // server-side. Keeping these redirects — not 404s — is what keeps the
+    // no-JS fallbacks and the email/legacy links working.
+    $expected = [
+        'login' => ['signin' => 'required'],
+        'register' => ['signup' => 'required'],
+        'password.request' => ['forgot' => 'required'],
     ];
 
-    foreach ($routes as $route) {
-        $response = $this->get(route($route));
-
-        $response->assertOk();
-
-        // The starter kit's layout printed config('app.name', 'Laravel') as a
-        // fallback and shipped a stock quote panel. Neither belongs here.
-        expect($response->getContent())->not->toContain('Inspiring');
+    foreach ($expected as $route => $flag) {
+        $this->get(route($route))->assertRedirect(route('home', $flag));
     }
 });
 
+test('every remaining auth screen renders without framework placeholder branding', function () {
+    $response = $this->get(route('password.reset', ['token' => 'layout-check']));
+
+    $response->assertOk();
+
+    // The starter kit's layout printed config('app.name', 'Laravel') as a
+    // fallback and shipped a stock quote panel. Neither belongs here.
+    expect($response->getContent())->not->toContain('Inspiring');
+});
+
 test('the auth layout carries the site brand and a route back to it', function () {
-    $response = $this->get(route('login'));
+    $response = $this->get(route('password.reset', ['token' => 'layout-check']));
 
     $response->assertOk()
         ->assertSee(route('home'), escape: false)
@@ -68,20 +82,11 @@ test('the auth layout carries the site brand and a route back to it', function (
 });
 
 test('auth screens expose an accessible skip link to the form', function () {
-    $response = $this->get(route('login'));
+    $response = $this->get(route('password.reset', ['token' => 'layout-check']));
 
     $response->assertOk()
         ->assertSee('href="#auth-form"', escape: false)
         ->assertSee('id="auth-form"', escape: false);
-});
-
-test('the login screen states the account capabilities it unlocks', function () {
-    $response = $this->get(route('login'));
-
-    // The editorial panel is lg-only in the markup but always present in the
-    // DOM, so its content is assertable regardless of viewport.
-    $response->assertOk()
-        ->assertSee('Role-scoped dashboard', escape: false);
 });
 
 test('the two factor challenge renders both input modes in one form', function () {

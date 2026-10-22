@@ -25,6 +25,13 @@
      * queue. A bell that opens an empty "no notifications" panel every day
      * would be worse than no bell, which is why this reads the database.
      *
+     * ## Search and the bell are author-only
+     *
+     * Both point at `/admin`, so both are hidden from an account that
+     * cannot open the target. The bar keeps the drawer trigger,
+     * breadcrumb, theme toggle, and profile menu for everyone; the
+     * writing tools appear only when `admin:access` is held.
+     *
      * ## Why the profile menu is hand-built
      *
      * `flux:profile` is a fine trigger but it owns its avatar, and the
@@ -35,16 +42,25 @@
      */
     $user = auth()->user();
 
-    $pendingComments = \App\Models\Comment::query()
-        ->pending()
-        ->when(
-            ! $user->hasPermission(\App\Enums\AccountPermission::ModerateComments),
-            fn ($query) => $query->whereHas('post', fn ($postQuery) => $postQuery->where('user_id', $user->id))
-        )
-        ->with(['post', 'user'])
-        ->latest()
-        ->limit(4)
-        ->get();
+    /*
+     * Search and the bell both link into `/admin`, so they only exist for an
+     * account that can open it. Reading the queue for anyone else would be a
+     * query whose result no link can display.
+     */
+    $canAuthor = $user->hasPermission(\App\Enums\AccountPermission::AccessAdminPanel);
+
+    $pendingComments = $canAuthor
+        ? \App\Models\Comment::query()
+            ->pending()
+            ->when(
+                ! $user->hasPermission(\App\Enums\AccountPermission::ModerateComments),
+                fn ($query) => $query->whereHas('post', fn ($postQuery) => $postQuery->where('user_id', $user->id))
+            )
+            ->with(['post', 'user'])
+            ->latest()
+            ->limit(4)
+            ->get()
+        : collect();
 
     $pendingCount = $pendingComments->count();
 @endphp
@@ -78,26 +94,28 @@
         {{-- ========================================================= --
          | Search — a real query against the posts table
          --}}
-        <form
-            method="GET"
-            action="{{ route('dashboard.posts.index') }}"
-            class="relative hidden md:block"
-            role="search"
-        >
-            <label for="navbar-search" class="sr-only">{{ __('Search posts') }}</label>
+        @if ($canAuthor)
+            <form
+                method="GET"
+                action="{{ route('admin.posts.index') }}"
+                class="relative hidden md:block"
+                role="search"
+            >
+                <label for="navbar-search" class="sr-only">{{ __('Search posts') }}</label>
 
-            <svg class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
 
-            <input
-                id="navbar-search"
-                type="search"
-                name="q"
-                placeholder="{{ __('Search posts…') }}"
-                class="sui-focus w-44 rounded-md border border-sui-hairline bg-sui-well py-1.5 pl-8 pr-3 text-sm text-sui-ink shadow-soft-well transition duration-150 ease-soft placeholder:text-ink-400 focus:border-sui-border-strong lg:w-64"
-            />
-        </form>
+                <input
+                    id="navbar-search"
+                    type="search"
+                    name="q"
+                    placeholder="{{ __('Search posts…') }}"
+                    class="sui-focus w-44 rounded-md border border-sui-hairline bg-sui-well py-1.5 pl-8 pr-3 text-sm text-sui-ink shadow-soft-well transition duration-150 ease-soft placeholder:text-ink-400 focus:border-sui-border-strong lg:w-64"
+                />
+            </form>
+        @endif
 
         {{-- ========================================================= --
          | Actions
@@ -117,69 +135,71 @@
             <x-app.ui.theme-toggle />
 
             {{-- Notifications --}}
-            <flux:dropdown position="bottom" align="end">
-                <button
-                    type="button"
-                    class="sui-focus relative grid size-9 place-items-center rounded-md text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-accent-ink"
-                    aria-label="{{ __('Notifications') }}"
-                >
-                    <flux:icon name="bell" class="size-5" />
+            @if ($canAuthor)
+              <flux:dropdown position="bottom" align="end">
+                  <button
+                      type="button"
+                      class="sui-focus relative grid size-9 place-items-center rounded-md text-ink-500 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-accent-ink"
+                      aria-label="{{ __('Notifications') }}"
+                  >
+                      <flux:icon name="bell" class="size-5" />
 
-                    @if ($pendingCount > 0)
-                        <span class="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-sui-attention-badge px-1 text-2xs font-semibold tabular-nums text-sui-attention-badge-ink">
-                            {{ $pendingCount }}
-                        </span>
-                    @endif
-                </button>
+                      @if ($pendingCount > 0)
+                          <span class="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-sui-attention-badge px-1 text-2xs font-semibold tabular-nums text-sui-attention-badge-ink">
+                              {{ $pendingCount }}
+                          </span>
+                      @endif
+                  </button>
 
-                <flux:menu class="w-72 rounded-xl shadow-soft-2">
-                    <flux:menu.heading class="px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-ink-400">
-                        {{ __('Notifications') }}
-                    </flux:menu.heading>
+                  <flux:menu class="w-72 rounded-xl shadow-soft-2">
+                      <flux:menu.heading class="px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-ink-400">
+                          {{ __('Notifications') }}
+                      </flux:menu.heading>
 
-                    @forelse ($pendingComments as $comment)
-                        @php
-                            /*
-                             * Plain anchors rather than `flux:menu.item`: the item
-                             * component reserves a column for its own icon, and these
-                             * rows carry a two-line body that has no room for a
-                             * placeholder column. The keyboard and outside-click
-                             * behaviour lives on `flux:menu`, not on the items.
-                             */
-                            $tone = ['primary', 'info', 'success', 'warning', 'danger', 'secondary'][$loop->index % 6];
-                        @endphp
+                      @forelse ($pendingComments as $comment)
+                          @php
+                              /*
+                               * Plain anchors rather than `flux:menu.item`: the item
+                               * component reserves a column for its own icon, and these
+                               * rows carry a two-line body that has no room for a
+                               * placeholder column. The keyboard and outside-click
+                               * behaviour lives on `flux:menu`, not on the items.
+                               */
+                              $tone = ['primary', 'info', 'success', 'warning', 'danger', 'secondary'][$loop->index % 6];
+                          @endphp
 
-                        <a
-                            href="{{ route('dashboard.comments', ['post' => $comment->post_id]) }}"
-                            wire:navigate
-                            class="sui-focus flex items-start gap-2.5 rounded-md px-3 py-2 transition duration-150 ease-soft hover:bg-sui-hover"
-                        >
-                            <span class="grid size-8 shrink-0 place-items-center rounded-md bg-sui-pastel-{{ $tone }}-wash text-sui-pastel-{{ $tone }}-ink shadow-soft-1">
-                                <flux:icon name="chat-bubble-left-right" class="size-3.5" />
-                            </span>
+                          <a
+                              href="{{ route('admin.comments', ['post' => $comment->post_id]) }}"
+                              wire:navigate
+                              class="sui-focus flex items-start gap-2.5 rounded-md px-3 py-2 transition duration-150 ease-soft hover:bg-sui-hover"
+                          >
+                              <span class="grid size-8 shrink-0 place-items-center rounded-md bg-sui-pastel-{{ $tone }}-wash text-sui-pastel-{{ $tone }}-ink shadow-soft-1">
+                                  <flux:icon name="chat-bubble-left-right" class="size-3.5" />
+                              </span>
 
-                            <span class="min-w-0 flex-1">
-                                <span class="block truncate text-sm font-medium text-ink-900">
-                                    {{ Str::limit($comment->post?->title ?? __('(deleted post)'), 28) }}
-                                </span>
-                                <span class="mt-0.5 block truncate text-xs text-ink-500">
-                                    {{ $comment->user?->name ?? __('Former member') }} · {{ $comment->created_at->diffForHumans() }}
-                                </span>
-                            </span>
-                        </a>
-                    @empty
-                        <p class="px-3 py-6 text-center text-sm text-ink-500">
-                            {{ __('Nothing waiting.') }}
-                        </p>
-                    @endforelse
+                              <span class="min-w-0 flex-1">
+                                  <span class="block truncate text-sm font-medium text-ink-900">
+                                      {{ Str::limit($comment->post?->title ?? __('(deleted post)'), 28) }}
+                                  </span>
+                                  <span class="mt-0.5 block truncate text-xs text-ink-500">
+                                      {{ $comment->user?->name ?? __('Former member') }} · {{ $comment->created_at->diffForHumans() }}
+                                  </span>
+                              </span>
+                          </a>
+                      @empty
+                          <p class="px-3 py-6 text-center text-sm text-ink-500">
+                              {{ __('Nothing waiting.') }}
+                          </p>
+                      @endforelse
 
-                    <flux:menu.separator class="my-1" />
+                      <flux:menu.separator class="my-1" />
 
-                    <flux:menu.item :href="route('dashboard.comments')" wire:navigate class="rounded-md">
-                        {{ __('Review the queue') }}
-                    </flux:menu.item>
-                </flux:menu>
-            </flux:dropdown>
+                      <flux:menu.item :href="route('admin.comments')" wire:navigate class="rounded-md">
+                          {{ __('Review the queue') }}
+                      </flux:menu.item>
+                  </flux:menu>
+              </flux:dropdown>
+            @endif
 
             {{-- Profile --}}
             <flux:dropdown position="bottom" align="end">

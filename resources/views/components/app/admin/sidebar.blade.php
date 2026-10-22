@@ -8,8 +8,9 @@
      *
      * Composes the shared navigation in `components/app/ui/nav.blade.php`, scoped
      * to the `admin` route prefix so the rail lists only platform-administration
-     * routes — `admin.dashboard` and `admin.users` — and not the authoring,
-     * selling and workspace destinations an admin also holds permissions for.
+     * routes — `admin.dashboard`, `admin.users` and `admin.marketplace` — and not
+     * the authoring, selling and workspace destinations an admin also holds
+     * permissions for.
      * Those belong to the surfaces they live on; from the admin rail they are
      * clutter, and the `Dashboard` overview link would only bounce straight
      * back to the admin home via the `/dashboard` → `/admin/dashboard` redirect.

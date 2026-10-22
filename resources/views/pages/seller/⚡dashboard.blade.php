@@ -1,7 +1,12 @@
 <?php
 
+use App\Enums\AccountPermission;
+use App\Enums\ProductStatus;
 use App\Enums\RolePlan;
+use App\Models\MarketplaceProduct;
 use App\Support\Seo;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -11,16 +16,30 @@ use Livewire\Component;
  *
  * Answers the two questions a seller opens this page with:
  *   1. What can I sell, and on what terms? (plan entitlements)
- *   2. What products exist? (listing state)
+ *   2. Where is my own work up to? (listing state)
  *
- * The product pipeline described in `docs/Developer Marketplace & Dig.md` §10
- * is not implemented yet, so the listing area states that plainly rather than
- * rendering an empty table that looks broken. Everything shown here is read
- * from real configuration — the plan limits come from {@see RolePlan}, not from
- * hardcoded copy.
+ * The listing pipeline lives on `seller.products` and its editor; this screen
+ * counts the account's listings and points at them, and both the hero action and
+ * the counts come from the same query the console uses. Everything shown here is
+ * read from real configuration — the plan limits come from {@see RolePlan}, not
+ * from hardcoded copy.
+ *
+ * `boot()` re-states the route's `permission:product:create` because a Livewire
+ * request does not pass through that middleware. Nothing on this page reaches
+ * across accounts, so the guard is about the surface rather than the data: an
+ * account that cannot sell should not be shown a seller's dashboard, and
+ * `entitlements()` is a public method the endpoint can call.
  */
 new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class extends Component
 {
+    public function boot(): void
+    {
+        abort_unless(
+            auth()->user()?->hasPermission(AccountPermission::CreateProduct) ?? false,
+            403
+        );
+    }
+
     public function mount(): void
     {
         app(Seo::class)->set([
@@ -66,13 +85,51 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
             ],
         ];
     }
+
+    /**
+     * The account's own listings, counted per status, plus the quota behind them.
+     *
+     * `used` counts what occupies a slot — submitted or live — because a draft
+     * takes no room and an archived listing has already been given back. That is
+     * the same definition {@see MarketplaceProduct::scopeOccupyingQuota()} gives
+     * {@see \App\Actions\Marketplace\SubmitProduct()}, so the dashboard never
+     * offers room the action would refuse to use.
+     *
+     * @return array{draft: int, pending: int, published: int, archived: int, limit: int|null, used: int}
+     */
+    #[Computed]
+    public function listings(): array
+    {
+        $counts = $this->ownListings()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $read = fn (ProductStatus $status): int => (int) $counts->get($status->value, 0);
+
+        return [
+            'draft' => $read(ProductStatus::Draft),
+            'pending' => $read(ProductStatus::PendingReview),
+            'published' => $read(ProductStatus::Published),
+            'archived' => $read(ProductStatus::Archived),
+            'limit' => $this->plan()->productListingLimit(),
+            'used' => $this->ownListings()->occupyingQuota()->count(),
+        ];
+    }
+
+    /**
+     * Every listing the signed-in account authored.
+     */
+    protected function ownListings(): Builder
+    {
+        return MarketplaceProduct::query()->where('user_id', auth()->id());
+    }
 }; ?>
 
 <div>
     {{-- The hero, not `x-app.ui.header`: same reasoning as the other two
-         dashboards. The action is deliberately inert — the product pipeline
-         does not exist yet, so a live-looking button would be a promise the
-         page cannot keep. It renders as reserved, not as broken. --}}
+         dashboards. The action is the create form itself — the pipeline is live
+         on `seller.products`, so the hero promises exactly what it delivers. --}}
     <x-app.ui.welcome-card
         :level="1"
         eyebrow="Seller"
@@ -81,13 +138,12 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
         icon="building-storefront"
     >
         <x-slot:actions>
-            <span
-                class="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white/60 ring-1 ring-white/15"
-                aria-disabled="true"
-            >
-                <flux:icon name="plus" class="size-4" />
+            <flux:button :href="route('seller.products.create')" wire:navigate variant="primary" icon="plus">
                 {{ __('New product') }}
-            </span>
+            </flux:button>
+            <flux:button :href="route('seller.products')" wire:navigate variant="ghost" icon="cube">
+                {{ __('My listings') }}
+            </flux:button>
         </x-slot:actions>
     </x-app.ui.welcome-card>
 
@@ -158,25 +214,70 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
         </section>
 
         {{-- ============================================================= --
-         | Listings — honest empty state
+         | Where the listings stand
          --}}
-        {{-- The dashed boundary and the inset fill together say "reserved, not
-             yet built" — a raised card here would imply a feature that exists. --}}
-        <section
-            aria-labelledby="listings-heading"
-            class="sui-empty rounded-xl border border-dashed border-sui-border bg-sui-well"
-        >
-            <div class="mx-auto grid size-11 place-items-center rounded-md border border-sui-hairline bg-sui-surface text-ink-400">
-                <flux:icon name="cube" class="size-5" />
+        {{-- The tiles are the same four statuses the console filters by, and each
+             one opens that console pre-filtered, so nothing here duplicates a
+             screen the seller can already reach. Counts only ever describe the
+             account's own listings. --}}
+        <section aria-labelledby="listings-heading">
+            <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 id="listings-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                        {{ __('Your listings') }}
+                    </h2>
+
+                    <p class="mt-1 text-xs leading-normal text-ink-500">
+                        @if ($this->listings['limit'] === null)
+                            {{ __('Your plan lists without a cap. Drafts do not take a slot until they are submitted.') }}
+                        @else
+                            {{ __(':used of :limit listing slots are in use. Drafts do not take a slot until they are submitted.', [
+                                'used' => $this->listings['used'],
+                                'limit' => $this->listings['limit'],
+                            ]) }}
+                        @endif
+                    </p>
+                </div>
+
+                <flux:button size="sm" variant="ghost" :href="route('seller.products')" wire:navigate icon="arrow-right">
+                    {{ __('Manage products') }}
+                </flux:button>
             </div>
 
-            <h2 id="listings-heading" class="mt-4 text-sm font-semibold tracking-tight text-ink-900">
-                {{ __('Product listings are not available yet') }}
-            </h2>
-
-            <p class="mx-auto mt-2 max-w-md text-sm leading-normal text-ink-500">
-                {{ __('Your plan supports :n product listings. The product pipeline — drafts, review, versions and pricing — is the next phase of work, so there is nothing to manage here yet.', ['n' => $this->plan()->productListingLimit() === null ? __('unlimited') : $this->plan()->productListingLimit()]) }}
-            </p>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <x-app.ui.stat
+                    :label="__('Drafts')"
+                    :value="$this->listings['draft']"
+                    icon="pencil-square"
+                    tone="secondary"
+                    :hint="__('Private to you until submitted.')"
+                    :href="route('seller.products', ['status' => ProductStatus::Draft->value])"
+                />
+                <x-app.ui.stat
+                    :label="__('In review')"
+                    :value="$this->listings['pending']"
+                    icon="clock"
+                    tone="attention"
+                    :hint="__('Waiting on an operator.')"
+                    :href="route('seller.products', ['status' => ProductStatus::PendingReview->value])"
+                />
+                <x-app.ui.stat
+                    :label="__('Published')"
+                    :value="$this->listings['published']"
+                    icon="check-circle"
+                    tone="success"
+                    :hint="__('Live in the catalogue.')"
+                    :href="route('seller.products', ['status' => ProductStatus::Published->value])"
+                />
+                <x-app.ui.stat
+                    :label="__('Archived')"
+                    :value="$this->listings['archived']"
+                    icon="archive-box"
+                    tone="info"
+                    :hint="__('Withdrawn; the record is kept.')"
+                    :href="route('seller.products', ['status' => ProductStatus::Archived->value])"
+                />
+            </div>
         </section>
 </x-app.ui.body>
 </div>

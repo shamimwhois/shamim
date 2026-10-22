@@ -1,6 +1,6 @@
 # DevFolio
 
-A portfolio and technical-writing platform for a senior developer — long-form
+A portfolio and technical-writing platform for a full stack developer — long-form
 blog, role-scoped dashboards, and the platform modules those dashboards
 front — plus the documentation that describes all of it.
 
@@ -24,9 +24,13 @@ and "platform" oversells it.
 - A **role-scoped application** — three account roles (`user`, `seller`,
   `admin`) with an additive permission hierarchy, each on its own top-level
   dashboard path and sidebar.
-- **Module scaffolding** — Developer Lab, AI Knowledge Hub, Marketplace and
-  Ideas each have a real permission-guarded route and a placeholder page; the
-  URL space is claimed ahead of the modules themselves.
+- **Platform modules** — Ideas and the Developer Lab are workspaces with real
+  CRUD: capture, filing, a stage workflow, plans converted from approved ideas and
+  tasks owned through their plan; a three-pane editor with a sandboxed live preview,
+  shareable snippets and a per-day run history. The AI Hub is a curated library and
+  the Marketplace a read-only catalogue. Each is guarded by its own permission
+  (`ideas:use`, `dev-lab:use`, `ai-hub:use`, `marketplace:use`) and each has a
+  deferred half, recorded in [`docs/PRD.md`](docs/PRD.md) §4.7.
 - **Documented** — PRD, TRD, UI/UX brief, application flow, schema, ERD,
   architecture, components, routes, permissions and an API design.
 
@@ -35,11 +39,16 @@ and "platform" oversells it.
 - A multi-tenant SaaS. There is no organisation hierarchy, no tenancy and no
   per-tenant theming — accounts are flat and platform-wide. (The starter kit's
   team feature was removed outright; see [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) §1.)
-- A finished module suite. All four modules above are placeholders: the routes,
-  guards and navigation are real, the module bodies are not.
+- A code runtime. The Lab executes HTML, CSS and JavaScript in a sandboxed iframe
+  inside the visitor's own browser, so there is no server-side runner, no container,
+  and no CPU or memory quota. PHP is stored, shared and readable, never run.
+  Ideas carry no sharing, invitations, projects or revision history either.
 - A storefront. The `seller` role, its plan limits and its permissions are
-  **fully defined and enforced**, but no `Product` model exists, so there is
-  nothing to sell. This is a deliberate half-built layer — see
+  **fully defined and enforced**, and the catalogue — `MarketplaceProduct`,
+  versions, categories, reviews — exists, is seeded, is readable by a stranger and
+  is moderated from `/admin/marketplace`. What is missing is the two verbs: nobody
+  can author a listing, and there is no `Sale` model, so nothing is transacted.
+  This is a deliberate half-built layer — see
   [`docs/audit/PHASE-0-AUDIT.md`](docs/audit/PHASE-0-AUDIT.md) §10.
 - A public API. [`docs/API.md`](docs/API.md) specifies one; nothing in it is
   implemented.
@@ -154,14 +163,35 @@ All four must be green before a change is considered finished.
 
 | Gate | Command | Current state |
 | --- | --- | --- |
-| Tests | `php artisan test` | **248 passing**, 823 assertions |
+| Tests | `php artisan test` | **1,227 passing**, 4,786 assertions, 13 environmental skips |
 | Types | `vendor/bin/phpstan analyse` | **No errors** (level 7) |
 | Style | `vendor/bin/pint --dirty` | **Clean** |
 | Build | `npm run build` | **Green** |
 
-There are **no known failures**. The suite previously carried one inherited
-starter-kit defect (`TeamInvitationTest`); that test was removed along with the
-team feature it covered, so the gate is now clean end to end.
+The 13 skips are all one cause: `FeedMediaTest` needs PHP's **GD** extension to
+synthesize the images it uploads, and this development machine's `php.ini` does not
+have it enabled. Every one would throw `LogicException: GD extension is not installed`
+from `Illuminate\Http\Testing\FileFactory::generateImage()` before reaching
+application code, so the file calls `requiresGd()` — an explicit skip with a reason,
+not a deleted test. Enabling `extension=gd` makes all 13 run.
+
+Two narrower commands exist for the same suite: `composer test:security` runs only
+the boundary tests (the guard sweeps, mass assignment, markup injection, throttling
+and auth configuration, grouped in `tests/Pest.php`), and `composer test:coverage`
+writes a coverage report on demand. Coverage is never enforced from `phpunit.xml`:
+declaring a coverage block there stops the whole run on a machine without a driver.
+
+Browser tests are a separate gate because they need a running server. `composer
+test:dusk` (`php artisan dusk`) starts chromedriver itself, reseeds the SQLite file
+with `migrate:fresh --seed`, and drives `http://127.0.0.1:8000`, so start the server
+first with `php artisan serve --host=127.0.0.1 --no-reload`. Nine of its ten tests
+pass here; `ComposerPublishTest`'s attach step needs the *served* PHP to have a
+writable `upload_tmp_dir`, which this machine's does not — see the note at the top of
+that file before reading the failure as an application defect.
+
+The suite previously carried one inherited starter-kit defect
+(`TeamInvitationTest`); that test was removed along with the team feature it
+covered, so the only remaining red is environmental.
 
 ---
 
@@ -169,22 +199,39 @@ team feature it covered, so the gate is now clean end to end.
 
 ```
 app/
-├── Actions/          Single-purpose write operations, grouped by domain
-│   ├── Comments/     ApproveComment, RejectComment
-│   ├── Fortify/      CreateNewUser, ResetUserPassword
-│   └── Posts/        Create, Update, Publish, Archive, Delete, Sync…
+├── Actions/          Single-purpose write operations, grouped by domain (10 groups, 68 classes)
+│   ├── AiHub/        19: generation, curation, sort order, publication
+│   ├── Ideas/        12: SaveIdea, ConvertIdeaToPlan, SyncIdeaVisibility, task CRUD…
+│   ├── DevLab/       5: SaveLabWorkspace, SaveLabSnippet, RecordLabExecution…
+│   ├── Posts/        10: Create, Update, Publish, Archive, Delete, Sync…
+│   └── About|Comments|Communities|Feed|Fortify|Marketplace/
 ├── Concerns/         Reusable model traits (roles, slugs, reading time)
-├── Data/             Read-only DTOs: AuthorProfile, PostMetrics
-├── Enums/            AccountRole, AccountPermission, RolePlan, PostStatus…
+├── Data/             Read-only DTOs: AuthorProfile, PostMetrics, TextCorrection
+├── Enums/            30: AccountRole, AccountPermission, RolePlan, PostStatus,
+│                     IdeaStatus, PlanStatus, TaskStatus, LabLanguage, ContentVisibility…
 ├── Http/
-│   ├── Controllers/  Feed, Sitemap, Robots — the three non-Livewire responses
+│   ├── Controllers/  six non-Livewire responses: Feed, FeedAttachment, Sitemap,
+│   │                 Robots, ErrorPage, Editor/EditorAi
 │   ├── Middleware/   EnsureAccountPermission
 │   └── Responses/    Per-flow Fortify redirect responses (role-aware)
-├── Models/           User, Post, Category, Tag, Comment
-├── Policies/         PostPolicy, UserPolicy
-├── Support/          DashboardNavigation, MarkdownRenderer, Seo
+├── Models/           29: User, Post, Comment, the seven module models
+│                     (Idea, IdeaPlan, IdeaTask, IdeaCategory,
+│                      LabWorkspace, LabSnippet, LabExecution) and the hub's
+├── Policies/         10: PostPolicy, AiArticlePolicy, FeedPostPolicy and UserPolicy
+│                     for platform content, plus the six ownership-first module
+│                     policies (Idea, IdeaPlan, IdeaTask, IdeaCategory,
+│                     LabWorkspace, LabSnippet)
+├── Rules/            SlugRule, its three subclasses (IdeaSlug, PlanSlug,
+│                     SnippetSlug) and PostSlug, which implements
+│                     ValidationRule directly
+├── Support/          DashboardNavigation, SettingsNavigation, MarkdownRenderer,
+│                     Seo, FeedCorpus, FeedPersonas, HttpErrorCatalog
 └── Views/pages/      Livewire single-file components (⚡ prefix)
 ```
+
+Seven migrations sit behind the two newest modules, bringing
+`database/migrations/` to 38; `IdeaCategorySeeder` and `LabSnippetSeeder` are
+idempotent by slug and registered in `DatabaseSeeder`.
 
 The `⚡` prefix marks a **Livewire single-file component**. These are anonymous
 classes living beside their template, which is why tests address them by
@@ -194,22 +241,35 @@ The view layer mirrors the audience-first shape of the URL space:
 
 ```
 resources/views/
-├── components/app/
-│   ├── home/          guest chrome — header, footer
-│   ├── ui/            shared primitives, incl. the dashboard shell
-│   ├── icon/          glyph-only components
-│   └── user|seller|admin/   each role's three chrome components
+├── components/
+│   ├── auth/        the three guest Fortify dialogs and their bundle
+│   ├── feed/        the feed's card, composer, filters, inspector, rail, avatar
+│   ├── communities/ the community directory card
+│   └── app/         everything else, 73 files
+│       ├── home/          guest chrome — header, footer
+│       ├── ui/            shared primitives, incl. the dashboard shell (41)
+│       ├── icon/          glyph-only components
+│       ├── ideas/         card, status-badge — module-owned, so not under ui/
+│       ├── dev-lab/       code-pane, overview, capabilities, access
+│       ├── ai-hub/ marketplace/   the other two modules' pieces
+│       └── user|seller|admin/   each role's three chrome components
 ├── layouts/
 │   ├── guest/home     the default shell
 │   ├── auth/          every Fortify screen
 │   └── app|seller|admin/dashboard   the three workspace layouts
-└── pages/             Livewire single-file components (⚡ prefix)
+└── pages/             62 Blade files, 57 of them Livewire single-file
+                       components (⚡ prefix); the rest are the four mid-flow
+                       auth screens and settings/layout.blade.php
 ```
 
-Every component is namespaced under `app/` so `<x-app.ui.modal>` can never be
-shadowed by a package's `<x-modal>`, and the three workspace layouts compose one
-shell — `components/app/ui/dashboard-shell.blade.php` — rather than each
-carrying a copy of ~270 lines of sidenav, drawer and focus-trap machinery.
+Almost every component is namespaced under `app/` so `<x-app.ui.modal>` can never
+be shadowed by a package's `<x-modal>`. The eleven files outside it (`auth/`,
+`feed/`, `communities/`) are module vocabulary that predates the prefix being
+applied consistently, and are documented as the exception in
+[`docs/COMPONENTS.md`](docs/COMPONENTS.md) rather than renamed for no change in
+behaviour. The three workspace layouts compose one shell —
+`components/app/ui/dashboard-shell.blade.php` — rather than each carrying a copy
+of ~270 lines of sidenav, drawer and focus-trap machinery.
 
 Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 
@@ -228,9 +288,12 @@ Full breakdown: [`docs/COMPONENTS.md`](docs/COMPONENTS.md).
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organised and why |
 | [`docs/COMPONENTS.md`](docs/COMPONENTS.md) | Every Blade and Livewire component |
 | [`docs/SOFT-UI.md`](docs/SOFT-UI.md) | The dashboard design system — tokens, states, rules |
+| [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md) | AI Workflow — the split-view board + flow-graph specification for autonomous runs |
 | [`docs/ROUTES.md`](docs/ROUTES.md) | Every route, its middleware and its guard |
 | [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) | Roles, permissions and plans |
 | [`docs/API.md`](docs/API.md) | Intended API surface — **not implemented** |
+| [`docs/Idea.md`](docs/Idea.md) | Upstream spec for Ideas, Plans & Tasks — **partially implemented**, with a shipped-state section and a deviation table |
+| [`docs/lab.md`](docs/lab.md) | Upstream spec for the Developer Lab — **partially implemented**, and the security document for the sandbox |
 | [`docs/audit/PHASE-0-AUDIT.md`](docs/audit/PHASE-0-AUDIT.md) | Verified state before changes |
 
 ## Changelog

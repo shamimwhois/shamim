@@ -1,0 +1,585 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Interactive Diff Comparison with Line Comments</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        surface: "#0f1419",
+        "surface-dim": "#0a0f14",
+        "surface-container-lowest": "#070b0e",
+        "surface-container-low": "#11171d",
+        "surface-container": "#171e26",
+        "surface-container-high": "#1f2732",
+        "surface-container-highest": "#283240",
+        "on-surface": "#dee3ea",
+        "on-surface-variant": "#9ba3af",
+        tertiary: "#758292",
+        primary: "#38bdf8",
+        "primary-container": "#0284c7",
+        secondary: "#2dd4bf",
+        "secondary-container": "#0f766e",
+        error: "#f87171",
+        "error-container": "#7f1d1d",
+        "outline-variant": "#2a3644"
+      },
+      fontFamily: {
+        sans: ["Geist", "sans-serif"],
+        mono: ["Geist Mono", "monospace"]
+      }
+    }
+  }
+}
+</script>
+<style>
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0b0f14; }
+::-webkit-scrollbar-thumb { background: #263342; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #37475a; }
+
+.diff-line:hover .line-comment-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(-50%) scale(1) !important;
+}
+
+.diff-pane {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.diff-pane.hidden-pane {
+  display: none;
+  opacity: 0;
+  transform: translateY(4px);
+}
+.diff-pane.active-pane {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.comments-collapsed .comment-thread-row {
+  display: none !important;
+}
+</style>
+<style class="">
+@keyframes toastCountdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+#success-toast:hover div[style*="toastCountdown"] {
+  animation-play-state: paused;
+}
+</style></head>
+<body class="bg-[#080c10] text-[#dee3ea] font-sans antialiased overflow-hidden h-screen flex flex-col">
+<!-- Top Global Navbar Mock -->
+<header class="h-14 border-b border-[#212c3a] bg-[#0c1218]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 z-30">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary via-primary to-primary-container flex items-center justify-center text-[#041017] font-mono font-bold text-sm shadow-[0_0_12px_rgba(45,212,191,0.3)]">
+        &gt;_
+      </div>
+<div class="flex items-center gap-1.5">
+<span class="font-semibold tracking-tight text-white text-[15px]">DevFeed</span>
+<span class="px-1.5 py-0.5 text-[10px] font-mono uppercase bg-[#182330] text-[#38bdf8] border border-[#27384c] rounded">Beta</span>
+</div>
+</div>
+<div class="hidden md:flex items-center gap-2 text-xs text-[#758292]">
+<span class="">Questions &amp; Answers</span>
+<span class="">/</span>
+<span class="text-[#38bdf8] font-mono">Thread #4912</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="hidden sm:flex items-center gap-2 bg-[#121922] border border-[#243243] rounded-lg px-3 py-1.5 text-xs text-[#758292] w-72">
+<span class="material-symbols-outlined text-[16px]">search</span>
+<span class="">Search diffs, reviews, symbols...</span>
+<span class="ml-auto font-mono text-[10px] bg-[#1a2533] px-1.5 py-0.5 rounded border border-[#2d3e52]">⌘K</span>
+</div>
+<button class="bg-[#2dd4bf] hover:bg-[#20b8a4] text-[#062621] font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow-[0_0_12px_rgba(45,212,191,0.25)]">
+<span class="material-symbols-outlined text-[15px]">add</span>
+<span class="">New Post</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-[#1b2635] border border-[#2f4258] flex items-center justify-center text-xs font-medium text-white">
+      AV
+    </div>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden relative">
+<!-- Subtle Dimmed Background Layer -->
+<div class="absolute inset-0 bg-[#090e13] p-8 opacity-10 pointer-events-none select-none overflow-hidden font-mono text-xs">
+<p class="">struct StreamProcessor { buffer: Arc&lt;Mutex&lt;Vec&lt;u8&gt;&gt;&gt; }</p>
+<p class="">impl StreamProcessor { pub async fn ingest() { ... } }</p>
+</div>
+<!-- Main Floating Diff Modal Centerpiece -->
+<main class="relative z-10 w-full h-full p-2 sm:p-4 lg:p-6 flex flex-col justify-center items-center"><div class="absolute top-4 z-40 max-w-md w-[calc(100vw-2rem)] sm:w-auto bg-[#0d141d]/95 backdrop-blur-md border border-[#1b5e52] rounded-xl shadow-[0_16px_36px_rgba(0,0,0,0.7),0_0_20px_rgba(45,212,191,0.2)] p-3.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-white/10 relative" id="success-toast"><div class="flex items-start gap-3"><div class="w-8 h-8 rounded-lg bg-[#0c2f28] text-[#2dd4bf] flex items-center justify-center border border-[#175246] shrink-0 shadow-[0_0_10px_rgba(45,212,191,0.25)]"><span class="material-symbols-outlined text-[20px]">check_circle</span></div><div class="flex-1 min-w-0 pr-1"><div class="flex items-center gap-2"><h4 class="font-semibold text-white text-xs tracking-tight">Successfully committed 3 suggestions</h4><span class="px-1.5 py-0.2 rounded bg-[#0d342d] text-[#2dd4bf] font-mono text-[10px] font-semibold border border-[#175246]">8f2a9d1</span></div><p class="text-[#8ea0b4] text-[11px] mt-0.5 leading-relaxed">Created commit on <code class="text-[#cbd5e1] font-mono text-[10px]">main</code> across 2 files • 2 co-authors tagged</p><div class="flex items-center gap-3 mt-2"><button class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#16212e] hover:bg-[#1f2d3d] text-[#dee3ea] hover:text-white text-[11px] font-medium border border-[#2c3d52] transition shadow-sm cursor-pointer" title="Undo commit (⌘Z)"><span class="material-symbols-outlined text-[13px] text-[#f87171]">undo</span><span class="">Undo commit</span><kbd class="font-mono text-[9px] text-[#718296] bg-[#0d141d] px-1 rounded border border-[#233549] ml-0.5">⌘Z</kbd></button><a class="inline-flex items-center gap-1 text-[11px] font-medium text-[#2dd4bf] hover:underline" href="#"><span class="material-symbols-outlined text-[13px]">open_in_new</span><span class="">View Commit</span></a><span class="text-[#64768b] text-[10px]">•</span><span class="text-[11px] text-[#718499] hidden sm:inline">Diff updating in playground</span><span class="text-[#64768b] text-[10px] hidden sm:inline">•</span><span class="inline-flex items-center gap-1 text-[10px] text-[#2dd4bf] bg-[#0c2f28] px-1.5 py-0.5 rounded border border-[#175246] font-mono"><span class="material-symbols-outlined text-[11px] animate-pulse">timer</span><span class="">Auto-closing in 5s</span></span></div></div><button class="p-1 text-[#8697aa] hover:text-white rounded hover:bg-[#1a2636] transition shrink-0" onclick="document.getElementById('success-toast').remove()" title="Dismiss"><span class="material-symbols-outlined text-[16px]">close</span></button></div><div class="absolute bottom-0 left-0 right-0 h-1 w-full bg-[#0c2f28]/60 overflow-hidden"><div class="h-full bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] rounded-full" style="animation: 5s linear 0s 1 normal forwards running toastCountdown;"></div></div></div>
+<div class="w-full max-w-[1400px] h-[92vh] max-h-[920px] bg-[#0d141c] border border-[#243345] rounded-2xl shadow-2xl flex flex-col overflow-hidden ring-1 ring-white/5">
+<!-- Top Accent Line -->
+<div class="h-1 w-full bg-gradient-to-r from-[#2dd4bf] via-[#38bdf8] to-[#6366f1] shrink-0"></div>
+<!-- Modal Header -->
+<header class="px-5 py-3.5 bg-[#0f1722] border-b border-[#1f2d3d] flex flex-wrap items-center justify-between gap-3 shrink-0">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-[#162332] text-[#2dd4bf] flex items-center justify-center border border-[#273d55] shrink-0">
+<span class="material-symbols-outlined text-[18px]">difference</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-2 flex-wrap">
+<h2 class="font-semibold text-white text-sm sm:text-base tracking-tight">Solution Diff Comparison</h2>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0d342d] text-[#2dd4bf] text-[11px] font-medium border border-[#1b5e52]">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+                Accepted Solution by Matthias K.
+              </span>
+<span class="text-xs text-[#758292] font-mono">#sol-4912</span>
+</div>
+<div class="flex items-center gap-2 text-xs font-mono text-[#8a98a8] mt-0.5 truncate">
+<span class="text-[#f87171] flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">remove_circle</span>
+                src/stream_handler.rs
+              </span>
+<span class="material-symbols-outlined text-[12px] text-[#526377]">arrow_forward</span>
+<span class="text-[#2dd4bf] flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[13px]">add_circle</span>
+                src/stream_pipeline_fixed.rs
+              </span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16212e] hover:bg-[#1d2c3e] text-[#b4c1d2] hover:text-white text-xs font-medium border border-[#26374a] transition">
+<span class="material-symbols-outlined text-[15px]">content_copy</span>
+<span class="">Copy Patch</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0f766e] hover:bg-[#138e85] text-white text-xs font-semibold shadow-[0_0_12px_rgba(45,212,191,0.2)] transition">
+<span class="material-symbols-outlined text-[16px]">play_arrow</span>
+<span class="">Run Playground</span>
+</button>
+<div class="h-4 w-px bg-[#243345] mx-1"></div>
+<button class="p-1.5 rounded-lg bg-[#151f2b] hover:bg-[#202f42] text-[#8695a7] hover:text-white transition" title="Dismiss (Esc)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</header>
+<!-- Diff Toolbar / Inspection Controls -->
+<section class="px-5 py-2.5 bg-[#111924] border-b border-[#1c2937] flex flex-wrap items-center justify-between gap-y-2 gap-x-4 shrink-0 text-xs">
+<!-- Left: Split/Unified Mode Toggle & Delta Stats -->
+<div class="flex items-center gap-4 flex-wrap">
+<!-- Segmented Tab Switcher -->
+<div class="inline-flex items-center p-0.5 rounded-lg bg-[#090e14] border border-[#202d3c] text-xs select-none">
+<button class="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#192534] text-white font-medium shadow-sm transition border border-[#2a3c50]" id="toggle-split-btn">
+<span class="material-symbols-outlined text-[14px] text-[#2dd4bf]">vertical_split</span>
+<span class="">Split</span>
+<kbd class="font-mono text-[9px] text-[#718296] bg-[#0d141d] px-1 rounded ml-0.5">S</kbd>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1 rounded-md text-[#8898aa] hover:text-white font-medium transition" id="toggle-unified-btn">
+<span class="material-symbols-outlined text-[14px]">view_stream</span>
+<span class="">Unified</span>
+<kbd class="font-mono text-[9px] text-[#718296] bg-[#0d141d] px-1 rounded ml-0.5">U</kbd>
+</button>
+</div>
+<!-- Diff Delta Counters -->
+<div class="flex items-center gap-2 font-mono text-[11px]">
+<span class="px-2 py-0.5 rounded bg-[#0d342d] text-[#2dd4bf] font-semibold border border-[#175246]">+12 additions</span>
+<span class="px-2 py-0.5 rounded bg-[#3b1216] text-[#f87171] font-semibold border border-[#5d1f25]">-8 deletions</span>
+<span class="text-[#6d7e91] hidden sm:inline">6 unchanged</span>
+</div>
+<!-- Fast Jump Anchors -->
+<div class="hidden xl:flex items-center gap-1.5 text-[#738497]">
+<span class="">Jump:</span>
+<a class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#182330] hover:bg-[#202e40] text-[#f87171] border border-[#2c3d52]" href="#line-err-callout">Line 8 (E0597)</a>
+<a class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#182330] hover:bg-[#202e40] text-[#38bdf8] border border-[#2c3d52]" href="#comment-thread-line6">Line 6 (Review)</a>
+</div>
+</div>
+<!-- Right: Inline Comments Controls & Settings -->
+<div class="flex items-center gap-3 flex-wrap">
+<!-- Comments Visibility Toggle Button -->
+<button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0e2739] hover:bg-[#12334b] text-[#38bdf8] font-medium border border-[#1e4d70] transition shadow-sm" id="toggle-comments-btn" title="Toggle inline line discussions">
+<span class="material-symbols-outlined text-[15px]">chat</span>
+<span id="comments-toggle-text" class="">Show Comments</span>
+<span class="px-1.5 py-0.2 rounded-full bg-[#0284c7] text-white text-[10px] font-mono font-bold">2</span>
+</button>
+<span class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#090e14] border border-[#1c2937] text-[11px] text-[#8697aa]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#2dd4bf]"></span>
+            1 active review thread
+          </span><button class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0d342d] hover:bg-[#113a32] text-[#2dd4bf] border border-[#1b5e52] text-[11px] font-medium transition shadow-sm" id="batch-drawer-pill-toggle" title="Open Batch Review Drawer"><span class="material-symbols-outlined text-[14px]">inventory_2</span><span class="">Batch: 3 suggestions across 2 files</span><span class="w-1.5 h-1.5 rounded-full bg-[#2dd4bf] animate-pulse"></span></button>
+<div class="h-3.5 w-px bg-[#243345] hidden sm:block"></div>
+<!-- Review Helper Tip -->
+<div class="hidden lg:flex items-center gap-1.5 text-[#6c7d90] text-[11px]">
+<span class="material-symbols-outlined text-[14px] text-[#38bdf8]">lightbulb</span>
+<span class="">Hover any line gutter to leave a review comment</span>
+</div>
+</div>
+</section>
+<!-- Diff Content Wrapper -->
+<div class="flex-1 min-h-0 bg-[#0a0f15] overflow-y-auto overflow-x-hidden relative" id="diff-workspace">
+<!-- ============================================================== -->
+<!-- VIEW 1: SPLIT (SIDE-BY-SIDE) VIEW (DEFAULT ACTIVE)            -->
+<!-- ============================================================== -->
+<div class="diff-pane active-pane flex flex-col lg:flex-row h-full min-h-full" id="split-view-pane">
+<!-- LEFT PANEL: ORIGINAL (BROKEN) -->
+<div class="flex-1 flex flex-col min-w-0 border-b lg:border-b-0 lg:border-r border-[#1f2d3d] bg-[#0a0f15]">
+<div class="px-4 py-2 bg-[#0e1620] border-b border-[#1b2735] flex items-center justify-between text-xs shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#f87171]"></span>
+<span class="font-semibold text-[#f87171] uppercase tracking-wider text-[11px]">Original (Mutex Lock)</span>
+<span class="font-mono text-[#6d7e91] text-[11px]">src/stream_handler.rs</span>
+</div>
+<span class="font-mono text-[10px] text-[#f87171] bg-[#2a1317] px-1.5 py-0.5 rounded border border-[#481c22]">E0597 Error</span>
+</div>
+<div class="flex-1 font-mono text-[12px] leading-[22px] select-text">
+<!-- Code Line 1 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px] relative">
+                  1
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" onclick="openCommentComposer('split-left-1')" title="Add line comment on line 1">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8] truncate"><span class="text-[#38bdf8]">use</span> actix_web::{web, HttpResponse, Error};</div>
+</div>
+<!-- Line 2 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px] relative">
+                  2
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line 2">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8] truncate"><span class="text-[#38bdf8]">use</span> futures_util::StreamExt;</div>
+</div>
+<!-- Line 3 (Deleted std::sync) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px] relative">
+                  3
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line 3">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate"><span class="text-[#38bdf8]">use</span> <span class="bg-[#501b22] px-1 py-0.5 rounded text-white font-semibold">std::sync::{Arc, Mutex};</span></div>
+</div>
+<!-- Line 4 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">4</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8]"></div>
+</div>
+<!-- Line 5 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">5</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#cbd5e1] truncate"><span class="text-[#38bdf8]">pub async fn</span> <span class="text-[#7dd3fc]">ingest_payload</span>(<span class="text-[#38bdf8]">mut</span> payload: web::Payload) -&gt; Result&lt;HttpResponse, Error&gt; {</div>
+</div>
+<!-- Line 6 (Deleted - Lock Alloc) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px] relative">
+                  6
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line 6">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;<span class="text-[#38bdf8]">let</span> shared_buf = <span class="bg-[#501b22] px-1 py-0.5 rounded text-white font-semibold">Arc::new(Mutex::new(Vec::with_capacity(65536)))</span>;</div>
+</div>
+<!-- Line 7 (Deleted - Loop) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">7</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;<span class="text-[#38bdf8]">while let</span> Some(chunk) = payload.next().<span class="text-[#38bdf8]">await</span> {</div>
+</div>
+<!-- Line 8 (Deleted - Borrow) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">8</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;<span class="text-[#38bdf8]">let</span> bytes = chunk?;</div>
+</div>
+<!-- Line 9 (Deleted - Mutex lock) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">9</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;<span class="bg-[#501b22] px-1 py-0.5 rounded text-white">shared_buf.lock().unwrap().extend_from_slice(&amp;bytes);</span></div>
+</div>
+<!-- Line 10 (Deleted) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">10</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;<span class="text-[#38bdf8]">let</span> buf_clone = Arc::clone(&amp;shared_buf);</div>
+</div>
+<!-- Line 11 (Deleted - Spawn) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">11</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;tokio::spawn(<span class="text-[#38bdf8]">async move</span> {</div>
+</div>
+<!-- Line 12 (Deleted) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">12</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;telemetry_logger::record_chunk(&amp;buf_clone).<span class="text-[#38bdf8]">await</span>;</div>
+</div>
+<!-- Line 13 (Deleted) -->
+<div class="diff-line flex bg-[#281317]/60 hover:bg-[#33181d] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#f87171] bg-[#2d1419] font-medium shrink-0 text-[11px]">13</div>
+<div class="w-5 py-0.5 text-center text-[#f87171] font-bold select-none shrink-0">-</div>
+<div class="py-0.5 px-3 text-[#fca5a5] truncate">&nbsp;&nbsp;&nbsp;&nbsp;});</div>
+</div>
+<!-- Compiler Error Diagnostic Callout -->
+<div class="p-3 bg-[#111720] border-y border-[#29171a]" id="line-err-callout">
+<div class="rounded-xl bg-[#1b1216] border-l-4 border-[#f87171] p-3 text-xs font-sans space-y-1 shadow">
+<div class="flex items-center justify-between">
+<span class="font-mono font-bold text-[#f87171] flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]">error</span>
+                      error[E0597]: `payload` does not live long enough
+                    </span>
+<span class="font-mono text-[10px] text-[#78889b]">rustc --explain E0597</span>
+</div>
+<p class="font-mono text-[11px] text-[#93a2b4] leading-relaxed">
+                    --&gt; src/stream_handler.rs:7:29<br>
+                    &nbsp;&nbsp;&nbsp;| while let Some(chunk) = payload.next().await<br>
+                    &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="text-[#f87171]">^^^^^^^ borrowed value does not live long enough</span><br>
+                    &nbsp;&nbsp;&nbsp;= note: `payload` dropped while borrowed by task requiring `'static`
+                  </p>
+</div>
+</div>
+<!-- Line 14 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">14</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8]">&nbsp;&nbsp;}</div>
+</div>
+<!-- Line 15 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">15</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8]">&nbsp;&nbsp;Ok(HttpResponse::Ok().finish())</div>
+</div>
+<!-- Line 16 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">16</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8]">}</div>
+</div>
+</div>
+</div>
+<!-- RIGHT PANEL: ACCEPTED FIX (WITH INLINE COMMENT THREADS & DRAFT COMPOSER) -->
+<div class="flex-1 flex flex-col min-w-0 bg-[#0a0f15]">
+<div class="px-4 py-2 bg-[#0e1620] border-b border-[#1b2735] flex items-center justify-between text-xs shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#2dd4bf]"></span>
+<span class="font-semibold text-[#2dd4bf] uppercase tracking-wider text-[11px]">Accepted Solution (MPSC Channel)</span>
+<span class="font-mono text-[#6d7e91] text-[11px]">src/stream_pipeline_fixed.rs</span>
+</div>
+<span class="font-mono text-[10px] text-[#2dd4bf] bg-[#0c2f29] px-1.5 py-0.5 rounded border border-[#175246]">Zero-Lock Contention</span>
+</div>
+<div class="flex-1 font-mono text-[12px] leading-[22px] select-text">
+<!-- Right Line 1 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px] relative">
+                  1
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line +1">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8] truncate"><span class="text-[#38bdf8]">use</span> actix_web::{web, HttpResponse, Error};</div>
+</div>
+<!-- Right Line 2 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px] relative">
+                  2
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line +2">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#9ba8b8] truncate"><span class="text-[#38bdf8]">use</span> futures_util::StreamExt;</div>
+</div>
+<!-- Right Line 3 (Added tokio::sync::mpsc) -->
+<div class="diff-line flex bg-[#0c2f28]/60 hover:bg-[#113a32] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#2dd4bf] bg-[#0f342d] font-semibold shrink-0 text-[11px] relative">
+                  3
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line +3">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#2dd4bf] font-bold select-none shrink-0">+</div>
+<div class="py-0.5 px-3 text-[#a7f3d0] truncate"><span class="text-[#38bdf8]">use</span> tokio::sync::mpsc; <span class="text-[#6d8a80]">// Bounded decoupled channel</span></div>
+</div>
+<!-- Right Line 4 (Added bytes::Bytes) -->
+<div class="diff-line flex bg-[#0c2f28]/60 hover:bg-[#113a32] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#2dd4bf] bg-[#0f342d] font-semibold shrink-0 text-[11px] relative">
+                  4
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add line comment on line +4">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#2dd4bf] font-bold select-none shrink-0">+</div>
+<div class="py-0.5 px-3 text-[#a7f3d0] truncate"><span class="text-[#38bdf8]">use</span> bytes::Bytes;</div>
+</div>
+<!-- Right Line 5 -->
+<div class="diff-line flex hover:bg-[#131d28] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#516174] bg-[#0c1219] shrink-0 text-[11px]">5</div>
+<div class="w-5 py-0.5 text-center text-[#404e5f] select-none shrink-0"></div>
+<div class="py-0.5 px-3 text-[#cbd5e1] truncate"><span class="text-[#38bdf8]">pub async fn</span> <span class="text-[#7dd3fc]">ingest_payload</span>(<span class="text-[#38bdf8]">mut</span> payload: web::Payload) -&gt; Result&lt;HttpResponse, Error&gt; {</div>
+</div>
+<!-- Right Line 6 (Added channel creation) WITH ATTACHED COMMENT THREAD -->
+<div class="diff-line flex bg-[#0c2f28]/60 hover:bg-[#113a32] relative group">
+<div class="w-11 py-0.5 pr-2.5 text-right select-none text-[#2dd4bf] bg-[#0f342d] font-semibold shrink-0 text-[11px] relative">
+                  6
+                  <button class="line-comment-btn absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 pointer-events-none transform scale-90 w-4 h-4 rounded bg-[#0284c7] hover:bg-[#38bdf8] text-white flex items-center justify-center transition shadow z-20 cursor-pointer" title="Add another comment on line +6">
+<span class="material-symbols-outlined text-[11px] font-bold">add</span>
+</button>
+</div>
+<div class="w-5 py-0.5 text-center text-[#2dd4bf] font-bold select-none shrink-0">+</div>
+<div class="py-0.5 px-3 text-[#a7f3d0] truncate">&nbsp;&nbsp;<span class="text-[#38bdf8]">let</span> (tx, <span class="text-[#38bdf8]">mut</span> rx) = <span class="bg-[#124b3f] text-[#5eead4] px-1 py-0.5 rounded font-semibold">mpsc::channel::&lt;Bytes&gt;(128)</span>;</div>
+</div>
+<!-- PINNED INLINE COMMENT THREAD UNDER LINE 6 -->
+<div class="comment-thread-row bg-[#080d12] border-y border-[#1c2a38] p-3 font-sans" id="comment-thread-line6">
+<div class="rounded-xl bg-[#111923] border border-[#233549] shadow-xl overflow-hidden max-w-2xl ml-2 sm:ml-6 my-1">
+<!-- Thread Header -->
+<div class="px-3.5 py-2 bg-[#141f2d] border-b border-[#213143] flex items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px] text-[#38bdf8]">chat</span>
+<span class="font-semibold text-white text-xs">Conversation on line +6</span>
+<span class="font-mono text-[10px] text-[#8ea0b4] bg-[#0e1620] px-1.5 py-0.5 rounded border border-[#202f40] truncate max-w-[200px]">mpsc::channel::&lt;Bytes&gt;(128)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0e302a] text-[#2dd4bf] text-[10px] font-mono font-medium border border-[#195347]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#2dd4bf] animate-pulse"></span>
+                        Unresolved
+                      </span>
+</div>
+</div>
+<!-- Comment 1: Sarah Thorne (with Suggested Change widget) -->
+<div class="p-3.5 space-y-3 border-b border-[#1b2837]">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-[#0284c7] text-white flex items-center justify-center font-bold text-[10px] ring-1 ring-white/20">ST</div>
+<span class="font-semibold text-white text-xs">Sarah Thorne</span>
+<span class="font-mono text-[11px] text-[#718499]">@sarah_ts</span>
+<span class="px-1.5 py-0.2 rounded bg-[#0a283e] text-[#38bdf8] text-[10px] font-medium border border-[#154668]">Reviewer</span>
+<span class="text-[#64768b] text-[11px]">· 2h ago</span>
+</div>
+<button class="text-[#64768b] hover:text-white p-0.5"><span class="material-symbols-outlined text-[15px]">more_horiz</span></button>
+</div>
+<p class="text-[#cbd5e1] text-[12px] leading-relaxed">
+                      Using a bounded channel of <code class="px-1 py-0.5 rounded bg-[#182330] text-[#2dd4bf] font-mono text-[11px]">128</code> items is solid to prevent unbounded memory exhaustion, but under peak telemetry spikes, will <code class="px-1 py-0.5 rounded bg-[#182330] text-[#38bdf8] font-mono text-[11px]">send().await</code> introduce backpressure into the Actix HTTP worker thread? Have we benchmarked whether 256 or 512 is better suited for 10Gbps ingress?
+                    </p>
+<p class="text-[#94a3b8] text-[12px] leading-relaxed">Bump buffer capacity from 128 to 256 to handle telemetry bursts without worker backpressure.</p>
+<!-- GitHub-style Suggested Change Box -->
+<div class="rounded-lg border border-[#243447] bg-[#0c1219] overflow-hidden my-2 shadow-lg">
+<div class="px-3 py-1.5 bg-[#141f2d] border-b border-[#213143] flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px] text-[#2dd4bf]">code</span>
+<span class="text-[11px] font-semibold text-white">Suggested change</span>
+<span class="inline-flex items-center font-mono text-[10px] gap-1 px-1.5 py-0.2 rounded bg-[#080d12] border border-[#1f2d3d]">
+<span class="text-[#f87171] font-semibold">-1</span>
+<span class="text-[#2dd4bf] font-semibold">+1</span>
+</span>
+</div>
+<div class="flex items-center gap-1.5">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#0c2f28] text-[#2dd4bf] text-[11px] font-medium border border-[#175246] transition shadow-sm" title="1 suggestion in current batch"><span class="material-symbols-outlined text-[13px]">check_circle</span><span class="">In batch (3)</span></button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#0f766e] hover:bg-[#138e85] text-white text-[11px] font-semibold shadow-[0_0_10px_rgba(45,212,191,0.25)] transition">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="">Commit suggestion</span>
+</button>
+</div>
+</div>
+<div class="font-mono text-[12px] leading-[22px] py-1 select-text">
+<div class="diff-line flex bg-[#281317]/60 px-2 py-0.5 items-center gap-2">
+<span class="text-[#f87171] select-none font-bold text-center w-4 shrink-0">-</span>
+<span class="text-[#f87171] select-none w-5 text-right text-[11px] shrink-0">6</span>
+<div class="text-[#fca5a5] truncate pl-2"> <span class="text-[#38bdf8]">let</span> (tx, <span class="text-[#38bdf8]">mut</span> rx) = <span class="bg-[#501b22] px-1 py-0.5 rounded text-white font-semibold">mpsc::channel::&lt;Bytes&gt;(128)</span>;</div>
+</div>
+<div class="diff-line flex bg-[#0c2f28]/60 px-2 py-0.5 items-center gap-2">
+<span class="text-[#2dd4bf] select-none font-bold text-center w-4 shrink-0">+</span>
+<span class="text-[#2dd4bf] select-none w-5 text-right text-[11px] shrink-0">6</span>
+<div class="text-[#a7f3d0] truncate pl-2"> <span class="text-[#38bdf8]">let</span> (tx, <span class="text-[#38bdf8]">mut</span> rx) = <span class="bg-[#124b3f] text-[#5eead4] px-1 py-0.5 rounded font-semibold">mpsc::channel::&lt;Bytes&gt;(256)</span>; <span class="text-[#6d8a80]">// Tuned for 10Gbps ingress</span></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5 pt-1">
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#16212e] hover:bg-[#1e2d3e] text-[11px] text-[#93a3b5] hover:text-white border border-[#243447] transition">
+<span class="">👍</span> <span class="font-mono font-bold text-white text-[10px]">3</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#16212e] hover:bg-[#1e2d3e] text-[11px] text-[#93a3b5] hover:text-white border border-[#243447] transition">
+<span class="">🚀</span> <span class="font-mono font-bold text-white text-[10px]">1</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#16212e] hover:bg-[#1e2d3e] text-[11px] text-[#93a3b5] hover:text-white border border-[#243447] transition">
+<span class="">👀</span> <span class="font-mono font-bold text-white text-[10px]">2</span>
+</button>
+<button class="p-1 rounded-full text-[#6b7d91] hover:text-white" title="Add reaction"><span class="material-symbols-outlined text-[14px]">add_reaction</span></button>
+</div>
+</div>
+<!-- Reply: Matthias K. -->
+<div class="p-3.5 bg-[#0e1620]/70 space-y-2 border-b border-[#1b2837] pl-5 sm:pl-7 relative">
+<div class="absolute left-3 top-3.5 bottom-3.5 w-0.5 bg-[#253648] rounded-full"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-[#0d3b33] text-[#2dd4bf] flex items-center justify-center font-bold text-[10px] ring-1 ring-[#2dd4bf]/40">MK</div>
+<span class="font-semibold text-white text-xs">Matthias K.</span>
+<span class="font-mono text-[11px] text-[#718499]">@matthias_k</span>
+<span class="px-1.5 py-0.2 rounded bg-[#0d342d] text-[#2dd4bf] text-[10px] font-medium border border-[#175246]">Author</span>
+<span class="text-[#64768b] text-[11px]">· 48m ago</span>
+</div>
+<button class="text-[#64768b] hover:text-white p-0.5"><span class="material-symbols-outlined text-[15px]">more_horiz</span></button>
+</div>
+<p class="text-[#cbd5e1] text-[12px] leading-relaxed">
+                      Great point! In our staging tests, 128 buffers capped latency to 0.4ms with zero heap reallocations. We're adding an exponential backoff metric collector in <code class="px-1 py-0.5 rounded bg-[#182330] text-[#38bdf8] font-mono text-[11px]">telemetry.rs</code> before considering bumping the buffer to 256.
+                    </p>
+<div class="flex items-center gap-1.5 pt-1">
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#16212e] text-[11px] text-[#93a3b5] border border-[#243447]">
+<span class="">❤️</span> <span class="font-mono font-bold text-white text-[10px]">2</span>
+</button>
+</div>
+</div>
+<!-- Rich GitHub-Style Reply Composer -->
+<div class="bg-[#0b1219] border-t border-[#1a2736] overflow-hidden">
+<!-- Tabs & Markdown Toolbar Header -->
+<div class="px-3 pt-2 pb-1.5 bg-[#0f1722] border-b border-[#1e2d3e] flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-1">
+<!-- Write / Preview Tabs -->
+<div class="inline-flex items-center p-0.5 rounded-md bg-[#080d12] border border-[#1d2a3a] text-xs">
+<button class="px-2.5 py-0.5 rounded bg-[#192534] text-white font-medium shadow-sm transition">Write</button>
+<button class="px-2.5 py-0.5 rounded text-[#718499] hover:text-white transition">Preview</button>
+</div>
+<div class="h-3.5 w-px bg-[#26374a] mx-1.5 hidden sm:block"></div>
+<!-- Markdown Format Controls -->
+<div class="flex items-center gap-0.5 text-[#8b9dae]">
+<button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" title="Bold (Ctrl+B)">
+<span class="material-symbols-outlined text-[15px]">format_bold</span>
+</button>
+<button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" title="Italic (Ctrl+I)">
+<span class="material-symbols-outlined text-[15px]">format_italic</span>
+</button>
+<button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" title="Add a link (Ctrl+K)">
+<span class="material-symbols-outlined text-[15px]">link</span>
+</button>
+<button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" title="Inline code (Ctrl+E)">
+<span class="material-symbols-outlined text-[15px]">code</span>
+</button>
+<!-- Highlighted / Active Insert Code Suggestion Icon -->
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0c2f28] hover:bg-[#113a32] text-[#2dd4bf] text-[11px] font-mono border border-[#175246] transition ml-1 shadow-sm" title="Add a suggestion (Ctrl+G)">
+<span class="material-symbols-outlined text-[14px]">difference</span>
+<span class="font-sans font-medium text-[11px]">Insert suggestion</span>
+</button>
+</div>
+</div>
+<span class="text-[10px] font-mono text-[#5b6e82] hidden lg:inline">Markdown supported</span>
+</div>
+<!-- Composer Input Area -->
+<div class="p-3 bg-[#0a0f15]">
+<div class="flex items-start gap-2.5">
+<div class="w-6 h-6 rounded-full bg-[#202e40] text-white text-[10px] flex items-center justify-center font-mono shrink-0 mt-1 border border-[#2f4258]">You</div>
+<div class="flex-1 min-w-0">
+<textarea class="w-full bg-[#080d12] border border-[#223347] focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8]/40 rounded-lg p-2.5 font-mono text-[12px] leading-relaxed text-[#dee3ea] placeholder:text-[#526477] focus:outline-none transition resize-none select-text" placeholder="Write a reply or suggest a change..." rows="4">```suggestion
+let (tx, mut rx) = mpsc::channel::&lt;Bytes&gt;(256);</textarea></div></div></div></div></div></div></div></div></div></div><aside class="absolute bottom-4 right-4 z-30 w-[420px] max-w-[calc(100vw-2rem)] rounded-xl bg-[#0d141d]/95 backdrop-blur-md border border-[#273d55] shadow-[0_16px_36px_rgba(0,0,0,0.6),0_0_20px_rgba(45,212,191,0.12)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-white/10" id="batch-review-drawer"><!-- Drawer Header --><div class="px-3.5 py-2.5 bg-[#141f2d] border-b border-[#213143] flex items-center justify-between gap-2"><div class="flex items-center gap-2 min-w-0"><div class="w-6 h-6 rounded-md bg-[#0c2f28] text-[#2dd4bf] flex items-center justify-center border border-[#175246] shrink-0"><span class="material-symbols-outlined text-[15px]">inventory_2</span></div><div class="flex items-center gap-1.5 min-w-0"><span class="text-xs font-semibold text-white tracking-tight">Batch Review</span><span class="px-1.5 py-0.2 rounded-full bg-[#0c2f29] text-[#2dd4bf] text-[10px] font-mono font-bold border border-[#175246]">3 suggestions across 2 files</span></div></div><div class="flex items-center gap-1 text-[#8697aa]"><button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" title="Minimize batch drawer"><span class="material-symbols-outlined text-[16px]">remove</span></button><button class="p-1 rounded hover:bg-[#1a2636] hover:text-white transition" onclick="document.getElementById('batch-review-drawer').style.display='none'" title="Close batch drawer"><span class="material-symbols-outlined text-[16px]">close</span></button></div></div><!-- Batch Quick Stats Banner --><div class="px-3.5 py-1.5 bg-[#0e1620] border-b border-[#1b2837] flex items-center justify-between text-[11px] font-mono"><span class="text-[#8ea0b4] flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px] text-[#38bdf8]">rule</span><span class="">2 files changed</span></span><div class="flex items-center gap-2"><span class="text-[#2dd4bf] font-semibold">+4 additions</span><span class="text-[#64768b]">•</span><span class="text-[#f87171] font-semibold">-3 deletions</span></div></div><!-- Drawer Body / Suggestion List --><div class="p-3 space-y-2.5 bg-[#0a0f15]/90 max-h-[380px] overflow-y-auto select-text text-xs"><!-- Suggestion 1 --><div class="rounded-lg bg-[#0e1620] border border-[#233549] p-2.5 space-y-2 hover:border-[#2f4258] transition"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 min-w-0"><span class="material-symbols-outlined text-[14px] text-[#2dd4bf]">description</span><span class="font-mono text-[11px] text-[#cbd5e1] truncate font-medium">src/stream_pipeline_fixed.rs</span><span class="text-[#64768b] text-[10px] font-mono">:6</span></div><button class="p-1 text-[#718499] hover:text-[#f87171] hover:bg-[#281317]/60 rounded transition" title="Remove from batch"><span class="material-symbols-outlined text-[14px]">delete</span></button></div><div class="flex items-center gap-1.5 text-[11px] text-[#8ea0b4]"><span class="">Suggested by</span><span class="text-white font-medium">Sarah Thorne</span><span class="text-[#64768b] font-mono text-[10px]">@sarah_ts</span></div><div class="font-mono text-[11px] leading-[18px] rounded border border-[#1b2837] overflow-hidden bg-[#080d12]"><div class="flex bg-[#281317]/60 px-2 py-0.5 gap-1.5 items-center text-[#fca5a5]"><span class="text-[#f87171] select-none font-bold">-</span><span class="text-[#f87171] select-none text-[10px] w-3 text-right">6</span><span class="truncate"><span class="text-[#38bdf8]">let</span> (tx, <span class="text-[#38bdf8]">mut</span> rx) = mpsc::channel::&lt;Bytes&gt;(<span class="text-white bg-[#501b22] px-0.5 rounded">128</span>);</span></div><div class="flex bg-[#0c2f28]/60 px-2 py-0.5 gap-1.5 items-center text-[#a7f3d0]"><span class="text-[#2dd4bf] select-none font-bold">+</span><span class="text-[#2dd4bf] select-none text-[10px] w-3 text-right">6</span><span class="truncate"><span class="text-[#38bdf8]">let</span> (tx, <span class="text-[#38bdf8]">mut</span> rx) = mpsc::channel::&lt;Bytes&gt;(<span class="text-[#5eead4] bg-[#124b3f] px-0.5 rounded font-semibold">256</span>);</span></div></div></div><!-- Suggestion 2 --><div class="rounded-lg bg-[#0e1620] border border-[#233549] p-2.5 space-y-2 hover:border-[#2f4258] transition"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 min-w-0"><span class="material-symbols-outlined text-[14px] text-[#2dd4bf]">description</span><span class="font-mono text-[11px] text-[#cbd5e1] truncate font-medium">src/stream_pipeline_fixed.rs</span><span class="text-[#64768b] text-[10px] font-mono">:11-13</span></div><button class="p-1 text-[#718499] hover:text-[#f87171] hover:bg-[#281317]/60 rounded transition" title="Remove from batch"><span class="material-symbols-outlined text-[14px]">delete</span></button></div><div class="flex items-center gap-1.5 text-[11px] text-[#8ea0b4]"><span class="">Suggested by</span><span class="text-white font-medium">Alex Rivera</span><span class="text-[#64768b] font-mono text-[10px]">@arivera</span></div><div class="font-mono text-[11px] leading-[18px] rounded border border-[#1b2837] overflow-hidden bg-[#080d12]"><div class="flex bg-[#281317]/60 px-2 py-0.5 gap-1.5 items-center text-[#fca5a5]"><span class="text-[#f87171] select-none font-bold">-</span><span class="text-[#f87171] select-none text-[10px] w-3 text-right">12</span><span class="truncate">telemetry_logger::record_chunk(&amp;buf_clone).<span class="text-[#38bdf8]">await</span>;</span></div><div class="flex bg-[#0c2f28]/60 px-2 py-0.5 gap-1.5 items-center text-[#a7f3d0]"><span class="text-[#2dd4bf] select-none font-bold">+</span><span class="text-[#2dd4bf] select-none text-[10px] w-3 text-right">12</span><span class="truncate"><span class="text-[#38bdf8]">if let</span> Err(e) = telemetry::try_record(&amp;buf_clone) { log::warn!(...); }</span></div></div></div><!-- Suggestion 3 --><div class="rounded-lg bg-[#0e1620] border border-[#233549] p-2.5 space-y-2 hover:border-[#2f4258] transition"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-1.5 min-w-0"><span class="material-symbols-outlined text-[14px] text-[#38bdf8]">description</span><span class="font-mono text-[11px] text-[#cbd5e1] truncate font-medium">src/telemetry_logger.rs</span><span class="text-[#64768b] text-[10px] font-mono">:34</span></div><button class="p-1 text-[#718499] hover:text-[#f87171] hover:bg-[#281317]/60 rounded transition" title="Remove from batch"><span class="material-symbols-outlined text-[14px]">delete</span></button></div><div class="flex items-center gap-1.5 text-[11px] text-[#8ea0b4]"><span class="">Suggested by</span><span class="text-white font-medium">Matthias K.</span><span class="text-[#64768b] font-mono text-[10px]">@matthias_k</span></div><div class="font-mono text-[11px] leading-[18px] rounded border border-[#1b2837] overflow-hidden bg-[#080d12]"><div class="flex bg-[#281317]/60 px-2 py-0.5 gap-1.5 items-center text-[#fca5a5]"><span class="text-[#f87171] select-none font-bold">-</span><span class="text-[#f87171] select-none text-[10px] w-3 text-right">34</span><span class="truncate"><span class="text-[#38bdf8]">pub async fn</span> record_chunk(buf: &amp;Arc&lt;Mutex&lt;Vec&lt;u8&gt;&gt;&gt;)</span></div><div class="flex bg-[#0c2f28]/60 px-2 py-0.5 gap-1.5 items-center text-[#a7f3d0]"><span class="text-[#2dd4bf] select-none font-bold">+</span><span class="text-[#2dd4bf] select-none text-[10px] w-3 text-right">34</span><span class="truncate"><span class="text-[#38bdf8]">pub fn</span> try_record(buf: &amp;Bytes) -&gt; Result&lt;(), IngestError&gt;</span></div></div></div><!-- Commit Message Input Field --><div class="space-y-1.5 pt-1"><label class="text-[10px] font-mono text-[#78889b] uppercase tracking-wider block">Commit Summary</label><input class="w-full bg-[#080d12] border border-[#223347] focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8]/40 rounded-lg px-2.5 py-1.5 font-sans text-xs text-[#dee3ea] placeholder:text-[#526477] focus:outline-none transition" type="text" value="Apply 3 review suggestions to stream pipeline and telemetry"><textarea class="w-full bg-[#080d12] border border-[#223347] focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8]/40 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-[#8ea0b4] placeholder:text-[#526477] focus:outline-none transition resize-none select-text" rows="3">- Bump channel buffer capacity to 256
+- Non-blocking telemetry ingestion with warning fallback
+- Update record signature in telemetry_logger.rs</textarea></div></div><!-- Drawer Footer & Batch Submission --><div class="px-3.5 py-2.5 bg-[#0f1722] border-t border-[#1e2d3e] flex flex-col gap-2"><div class="flex items-center justify-between gap-2"><span class="text-[10px] text-[#718499] flex items-center gap-1 font-mono truncate"><span class="w-1.5 h-1.5 rounded-full bg-[#2dd4bf]"></span><span class="truncate">Commit author: Matthias K. (@matthias_k) • 2 co-authors will be tagged</span></span><button class="text-[11px] text-[#8695a7] hover:text-[#f87171] transition hover:underline shrink-0">Discard batch (3)</button></div><div class="flex items-center gap-2"><button class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#0c2f28] text-[#2dd4bf] text-xs font-semibold border border-[#1b5e52] shadow-[0_0_12px_rgba(45,212,191,0.2)] transition"><span class="material-symbols-outlined text-[15px]">done_all</span><span class="">✓ Committed (3 suggestions)</span></button><button class="px-3 py-2 rounded-lg bg-[#16212e] hover:bg-[#1e2d3e] text-[#b4c1d2] hover:text-white text-xs font-medium border border-[#26374a] transition shrink-0">Save as Draft PR</button></div></div></aside></div></main></div>
+
+</body></html>

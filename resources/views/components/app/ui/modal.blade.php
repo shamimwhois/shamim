@@ -4,8 +4,10 @@
     'description' => null,
     'icon' => null,
     'tone' => 'default',
+    'variant' => 'default',
     'maxWidth' => 'lg',
     'showOnError' => true,
+    'show' => null,
 ])
 
 @php
@@ -34,8 +36,22 @@
      * only changes the header's icon treatment; the button that performs the
      * action still has to declare `variant="danger"` itself, because the
      * destructive control is often not inside this component at all.
+     *
+     * `show` overrides the default open-on-validation-error behaviour when a
+     * modal also has a programmatic reason to be open — the login modal opens
+     * itself from a URL flag after a guest is bounced from a protected area.
+     * It defaults to null, which leaves every existing caller's behaviour
+     * exactly as it was.
+     *
+     * `variant="glass"` is the showcase skin: a translucent navy panel with a
+     * cyan hairline, corner brackets and a blurred backdrop. It is still this
+     * shell — same focus behaviour, same slots, same `tone` signal — only the
+     * surface differs, and the surface is styled once in `app.css` under
+     * `dialog.modal-glass`. The class lands on Flux's `<dialog>` element
+     * because Flux routes a passed `class` to the dialog, not to its wrapper.
      */
     $tone = in_array($tone, ['default', 'danger'], true) ? $tone : 'default';
+    $variant = in_array($variant, ['default', 'glass'], true) ? $variant : 'default';
     $headingId = 'modal-'.$name.'-heading';
 
     $widths = [
@@ -45,13 +61,16 @@
         'xl' => 'max-w-xl',
         '2xl' => 'max-w-2xl',
     ];
+
+    $panelClass = ($widths[$maxWidth] ?? $widths['lg'])
+        .($variant === 'glass' ? ' modal-glass' : '');
 @endphp
 
 <flux:modal
     :name="$name"
-    :show="$showOnError ? $errors->isNotEmpty() : false"
+    :show="$show ?? ($showOnError && $errors->isNotEmpty())"
     focusable
-    {{ $attributes->merge(['class' => $widths[$maxWidth] ?? $widths['lg']]) }}
+    {{ $attributes->merge(['class' => $panelClass]) }}
 >
     <div class="space-y-6">
         <div class="flex items-start gap-4">

@@ -26,7 +26,7 @@ use Livewire\Component;
  * them for the duration of the request and they are not recomputed on every
  * re-render.
  */
-new #[Title('Senior Software Engineer')] class extends Component
+new #[Title('Full Stack Developer')] class extends Component
 {
     /**
      * Declare the page's head metadata. The landing page is the canonical

@@ -10,9 +10,10 @@ beforeEach(function () {
 });
 
 test('reset password link screen can be rendered', function () {
-    $response = $this->get(route('password.request'));
-
-    $response->assertOk();
+    // The request form is modal-first: the URL bounces to the flagged home,
+    // where the dialog opens server-side. The token-bearing reset form that
+    // the emailed link opens remains a real page.
+    $this->get(route('password.request'))->assertRedirect(route('home', ['forgot' => 'required']));
 });
 
 test('reset password link can be requested', function () {

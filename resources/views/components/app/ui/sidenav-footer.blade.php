@@ -71,6 +71,7 @@
 
 <div class="mt-1 space-y-0.5">
     <x-app.ui.utility-link :href="route('home')" icon="arrow-top-right-on-square" :label="__('View site')" />
+    <x-app.ui.utility-link :href="route('purchases.index')" icon="shopping-bag" :label="__('Purchases')" />
     <x-app.ui.utility-link :href="route('profile.edit')" icon="cog-6-tooth" :label="__('Settings')" />
 
     {{ $links ?? null }}

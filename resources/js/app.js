@@ -12,7 +12,8 @@
  */
 
 /**
- * Editor AI client and the rich text editor's Alpine component.
+ * Editor AI client, the rich text editor's Alpine component, and the Developer Lab
+ * sandbox.
  *
  * Imported for their side effects: both attach themselves to `window` so the
  * Blade component can reference them by name from an `x-data` attribute without
@@ -20,6 +21,10 @@
  */
 import './editor-ai.js';
 import './rich-text-editor.js';
+import './lab-sandbox.js';
+import './sound.js';
+
+import { initInteractionSound, playAmbient } from './sound.js';
 
 /**
  * Reading progress.
@@ -157,28 +162,153 @@ function initTableOfContents() {
     // Optional slide-in: a nav element carrying data-toc-reveal stays
     // off-canvas until the first section has scrolled up past the reading
     // band, so the hero opens clean and the TOC arrives as reading starts.
+    //
+    // The rail is fixed to the viewport's right edge, so at the bottom of the
+    // page it would sit on top of the footer's link columns. Anything marked
+    // data-toc-dismiss (the site footer) pushes it back off-canvas as soon as
+    // it reaches the rail's lower edge, and it slides back in on the way up.
     if (toc.hasAttribute('data-toc-reveal')) {
+        const dismiss = document.querySelector('[data-toc-dismiss]');
+
         let revealTicking = false;
 
         const updateReveal = () => {
             const first = headings[0];
-            const past = ! first || first.getBoundingClientRect().bottom < 96;
+            const pastHero = ! first || first.getBoundingClientRect().bottom < 96;
 
-            toc.dataset.visible = past ? 'true' : 'false';
+            // The rail is vertically centred: its lower edge sits at
+            // half the viewport plus half its own height.
+            const railBottom = window.innerHeight / 2 + toc.offsetHeight / 2;
+            const atFooter = dismiss !== null
+                && dismiss.getBoundingClientRect().top <= railBottom;
+
+            toc.dataset.visible = pastHero && ! atFooter ? 'true' : 'false';
             revealTicking = false;
         };
 
-        window.addEventListener('scroll', () => {
+        const queueReveal = () => {
             if (revealTicking) {
                 return;
             }
 
             revealTicking = true;
             window.requestAnimationFrame(updateReveal);
-        }, { passive: true });
+        };
+
+        window.addEventListener('scroll', queueReveal, { passive: true });
+        window.addEventListener('resize', queueReveal, { passive: true });
 
         updateReveal();
     }
+}
+
+/**
+ * Section rail collapse.
+ *
+ * The rail rests as a narrow column of icons so it never competes with the
+ * page it indexes. Hovering it widens the rail to reveal the labels; the
+ * chevron above the column pins that choice — open, shut, or back to
+ * following the pointer — and a pin outranks the hover so a reader who has
+ * chosen a state keeps it.
+ *
+ * The pin is written to the rail as data-pinned and mirrored onto the
+ * toggle's aria-expanded, so the stylesheet owns the reveal and the script
+ * only owns the decision. Without JS the rail still previews on hover.
+ */
+function initTocToggle() {
+    const toc = document.querySelector('[data-toc]');
+    const toggle = toc?.querySelector('[data-toc-toggle]');
+
+    if (! toc || ! toggle || toc.dataset.tocToggleReady === 'true') {
+        return;
+    }
+
+    toc.dataset.tocToggleReady = 'true';
+
+    window.setTimeout(() => {
+        const live = document.querySelector('[data-toc]');
+        const label = live.querySelector('.about-toc-link__label');
+        const nav = live.querySelector('#about-toc-list') ?? live;
+
+        const measure = (tag) => {
+            const l = label.getBoundingClientRect();
+            const n = nav.getBoundingClientRect();
+            const cs = getComputedStyle(label);
+            console.log('TOCPROBE', JSON.stringify({
+                tag,
+                w: window.innerWidth,
+                navL: Math.round(n.left),
+                navW: Math.round(n.width),
+                labelW: Math.round(l.width),
+                maxWidth: cs.maxWidth,
+                cssWidth: cs.width,
+                minWidth: cs.minWidth,
+                flex: cs.flex,
+                op: cs.opacity,
+                sheetHasRule: [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => r.cssText?.includes('data-pinned')); } catch { return false; } }),
+            }));
+        };
+
+        window.scrollTo({ top: 2500, behavior: 'instant' });
+
+        window.setTimeout(() => {
+            measure('collapsed');
+
+            live.dataset.pinned = 'open';
+            window.setTimeout(() => measure('pinned-open'), 500);
+
+            live.dataset.pinned = 'shut';
+            window.setTimeout(() => measure('pinned-shut'), 500);
+
+            delete live.dataset.pinned;
+            window.setTimeout(() => measure('unpinned'), 500);
+        }, 700);
+    }, 1500);
+
+    // null means "no pin yet" — the rail follows the pointer. 'open' pins
+    // the labels open, 'shut' pins them shut.
+    let pinned = null;
+    let hovering = false;
+
+    const render = () => {
+        // The pin is only written once the reader has chosen one; until then
+        // the stylesheet's hover rule is the only rule in play.
+        if (pinned === null) {
+            delete toc.dataset.pinned;
+        } else {
+            toc.dataset.pinned = pinned;
+        }
+
+        const expanded = pinned === null ? hovering : pinned === 'open';
+
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    toc.addEventListener('pointerenter', () => {
+        hovering = true;
+        render();
+    });
+
+    toc.addEventListener('pointerleave', () => {
+        hovering = false;
+        render();
+    });
+
+    toggle.addEventListener('click', () => {
+        // Cycle the pin: shut → open → follow the pointer. The first click
+        // on a rail the pointer is already opening shuts it.
+        if (pinned === null) {
+            pinned = 'shut';
+        } else if (pinned === 'shut') {
+            pinned = 'open';
+        } else {
+            pinned = null;
+        }
+
+        render();
+    });
+
+    render();
 }
 
 /**
@@ -345,17 +475,29 @@ function initTypewriter() {
  * the sentence is visible while the rest is still noise. After a full
  * resolve it holds, then the next phrase scrambles in at its full length.
  * With JS off the server-rendered phrase stays complete.
+ *
+ * The line is written as two parts — the characters that have already
+ * locked in, and the ones still standing in for them — because a decode
+ * that renders as one undifferentiated string is not legible *as* a
+ * decode: the eye cannot tell signal from noise until the whole phrase
+ * has arrived. Two spans let the CSS mark the difference, which is also
+ * what gives the glitch sound something to point at.
  */
 const SCRAMBLE_GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#&/%*<>';
 
 const scrambleTickMs = 45;
 const scrambleHoldMs = 1750;
 
-function scramblePhrase(phrase, resolved) {
+/**
+ * The noisy tail of a phrase: every character but the spaces replaced by
+ * a random glyph, so the sentence's shape stays readable through the
+ * noise.
+ */
+function scrambleNoise(phrase) {
     return phrase
         .split('')
-        .map((char, index) => {
-            if (index < resolved || char === ' ') {
+        .map((char) => {
+            if (char === ' ') {
                 return char;
             }
 
@@ -389,20 +531,55 @@ function initCycleTypewriter() {
 
         el.dataset.cycled = 'running';
 
+        // The two halves of the line. `signal` is the text that has
+        // locked in; `noise` is the glyph standing in for the rest.
+        const signal = document.createElement('span');
+        signal.className = 'about-decode-signal';
+
+        const noise = document.createElement('span');
+        noise.className = 'about-decode-noise';
+
+        el.textContent = '';
+        el.append(signal, noise);
+
         let phraseIndex = 0;
         let resolved = 0;
+
+        // The sound is the punctuation, not the typing. One blip per
+        // character would be a drone, so the noise gets a single burst
+        // as the phrase breaks apart and a clean tone as it locks in —
+        // the two moments the eye actually registers.
+        //
+        // And it plays once, on the first phrase only. The line loops
+        // forever, so a sound on every pass is a loop, and a loop is
+        // exactly how a sound starts to grate: the reader is trying to
+        // read, and the effect keeps announcing itself. One burst as the
+        // terminal boots is a flourish; every four seconds is a nuisance.
+        let sounded = false;
 
         const tick = () => {
             const phrase = phrases[phraseIndex];
 
             if (resolved < phrase.length) {
                 resolved += 1;
-                el.textContent = scramblePhrase(phrase, resolved);
+                signal.textContent = phrase.slice(0, resolved);
+                noise.textContent = scrambleNoise(phrase.slice(resolved));
+
+                if (resolved === 1 && ! sounded) {
+                    sounded = true;
+                    playAmbient('glitch');
+                }
+
                 window.setTimeout(tick, scrambleTickMs);
                 return;
             }
 
-            el.textContent = phrase;
+            signal.textContent = phrase;
+            noise.textContent = '';
+
+            if (resolved === 1) {
+                playAmbient('lock');
+            }
 
             window.setTimeout(() => {
                 phraseIndex = (phraseIndex + 1) % phrases.length;
@@ -411,7 +588,7 @@ function initCycleTypewriter() {
             }, scrambleHoldMs);
         };
 
-        el.textContent = phrases[0];
+        signal.textContent = phrases[0];
         window.setTimeout(tick, 450);
     });
 }
@@ -700,6 +877,7 @@ function initSkillsMap() {
 function boot() {
     initReadingProgress();
     initTableOfContents();
+    initTocToggle();
     initReveal();
     initCodeCopy();
     initTypewriter();
@@ -708,6 +886,7 @@ function boot() {
     initStatCounters();
     initWritingCarousel();
     initSkillsMap();
+    initInteractionSound();
 }
 
 if (document.readyState === 'loading') {

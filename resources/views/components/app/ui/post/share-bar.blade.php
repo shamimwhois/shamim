@@ -1,5 +1,7 @@
 @props([
-    'post',
+    'post' => null,
+    'url' => null,
+    'title' => null,
 ])
 
 @php
@@ -19,9 +21,14 @@
      * Substitution happens client-side against the live `location.href` so the
      * shared URL is always the one the reader is actually looking at — which
      * matters when a post is reached via a filter or a campaign parameter.
+     *
+     * Nothing below the two lines that resolve `$url` and `$title` is blog-specific,
+     * so an idea or a snippet passes its own address and heading instead of being
+     * sent to a route it does not live on. `:post` stays the default for the article
+     * pages that have always passed it.
      */
-    $url = route('blog.show', $post);
-    $title = $post->title;
+    $url ??= $post === null ? '' : route('blog.show', $post);
+    $title ??= $post?->title;
 
     $primary = config('portfolio.sharing.primary', []);
     $secondary = config('portfolio.sharing.secondary', []);

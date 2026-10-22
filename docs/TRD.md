@@ -19,11 +19,11 @@ Versions below are the versions actually installed in this repository, verified 
 
 | Layer | Technology | Installed version | Rationale |
 | --- | --- | --- | --- |
-| Language | PHP | 8.5.11 | Constructor property promotion, readonly properties, enums, `#[Fillable]`/`#[Hidden]` attributes, first-class callable syntax. |
+| Language | PHP | 8.5.0 | Constructor property promotion, readonly properties, enums, `#[Fillable]`/`#[Hidden]` attributes, first-class callable syntax. |
 | Framework | Laravel | 13.35 | Eloquent, queues, migrations, validation, service container. Laravel 13 supplies attribute-based model configuration, which this codebase uses in preference to class properties. |
-| Reactive UI | Livewire | 4.x | Server-driven reactivity removes the need for a separate JSON API and a SPA. State lives in PHP, which is where the authorisation and validation logic already lives. |
-| UI components | Flux UI | 2.13+ | Free edition. Provides accessible primitives (modal, dropdown, field, toast, navbar) that would otherwise be reimplemented badly. |
-| Auth | Laravel Fortify | 1.37+ | Headless auth: registration, login, password reset, email verification, two-factor, passkey. Views are supplied by this application, not the package. |
+| Reactive UI | Livewire | 4.4.7 | Server-driven reactivity removes the need for a separate JSON API and a SPA. State lives in PHP, which is where the authorisation and validation logic already lives. |
+| UI components | Flux UI | 2.20.1 | Free edition. Provides accessible primitives (modal, dropdown, field, toast, navbar) that would otherwise be reimplemented badly. |
+| Auth | Laravel Fortify | 1.41.0 | Headless auth: registration, login, password reset, email verification, two-factor, passkey. Login, registration and the forgot-password request are modals on the home page; the four mid-flow screens are supplied by this application. |
 | Passkeys | `laravel/fortify` passkey support | — | WebAuthn login and registration, already wired through `PasskeyAuthenticatable`. |
 | AI | `laravel/ai` | 1.2+ | Official first-party AI SDK. Agents, structured output, provider abstraction, and a `fake()` harness for tests. See §1.5. |
 | Admin scaffolding | `laravel/chisel` | 0.1+ | Project scaffolding helper; not used at runtime by product features. |
@@ -54,7 +54,7 @@ Versions below are the versions actually installed in this repository, verified 
 
 | Package | Considered for | Why rejected |
 | --- | --- | --- |
-| `spatie/laravel-permission` | Author roles | **Revised.** Three account roles and 28 permissions now exist, but they are enum-backed behaviour, not rows. There is no `roles` table, no `permissions` table, and no pivot, because the mapping is code that deploys with the release rather than data an operator can edit at runtime. See §2.5 and [ERD §5.9](./ERD.md). Adding this package now would mean maintaining a second, competing source of truth for the same question. |
+| `spatie/laravel-permission` | Author roles | **Revised.** Three account roles and 30 permissions now exist, but they are enum-backed behaviour, not rows. There is no `roles` table, no `permissions` table, and no pivot, because the mapping is code that deploys with the release rather than data an operator can edit at runtime. See §2.5 and [ERD §5.9](./ERD.md). Adding this package now would mean maintaining a second, competing source of truth for the same question. |
 | `spatie/laravel-medialibrary` | Post cover images | No image uploads in v1 (non-goal). Adding it introduces storage config, conversions, and queue surface for zero requirement. |
 | Meilisearch / Algolia | Search | Operationally heavy for a few hundred posts. Revisit at >5 000 posts. |
 | `spatie/laravel-sluggable` | Slugs | Slug generation is ~20 lines in a model mutator and needs custom collision handling anyway. |
@@ -142,7 +142,7 @@ The application follows the layering already present in this codebase. New code 
 
 1. **Livewire component format is single-file (SFC)** in `resources/views/pages/`, with the ⚡ filename prefix. Class-based components are **not** used. An SFC opens with `<?php ... new class extends Component { ... }; ?>` followed by the Blade template. Reusable Blade components live in `resources/views/components/app/**` as anonymous components addressed with `<x-app.*>` tags. `config/livewire.php` declares the `pages::` and `layouts::` namespaces and adds `views/components` to `component_locations`, so a component placed at the top level of that directory resolves with no namespace prefix at all.
 2. **Multi-step domain operations live in Action classes** under `app/Actions/**`, invoked through a public `handle()` method, with dependencies constructor-injected and resolved by the container. See `app/Actions/Posts/UpdatePost.php`.
-3. **Authorization uses Gates/Policies**, checked with `Gate::authorize()` at the top of the action that mutates state. Two policies exist: `PostPolicy` and `UserPolicy`.
+3. **Authorization uses Gates/Policies**, checked with `Gate::authorize()` at the top of the action that mutates state. Ten policies exist, one per authorised resource; §2.5 lists them.
 4. **Models declare configuration with PHP attributes**: `#[Fillable([...])]` and `#[Hidden([...])]`, with casts in a `casts()` method. Do not add `protected $fillable` properties.
 5. **Shared behaviour is extracted into concerns** under `app/Concerns/**` (traits). Validation rule sets live there too.
 6. **Enums live in `app/Enums/`** with TitleCase keys, and are cast on the model. Enums may carry behaviour (`label()`, `permissions()`, `dashboardRoute()`); they are not bare value lists.
@@ -198,26 +198,28 @@ An account holds exactly one account role. It is the only role axis in the appli
 
 | Role | Level | Plan | Reach |
 | --- | --- | --- | --- |
-| `user` | 1 | Free | Author and edit **own** posts; moderate comments on own posts |
+| `user` | 1 | Free | Author and edit **own** posts (publishing is not among the six abilities this role holds); use the Ideas, Developer Lab and AI Hub workspaces. Comment moderation is not a user ability at any level |
 | `seller` | 2 | Seller | Everything a user can do, plus publish without review, manage taxonomy, create and sell product listings, view own sales |
 | `admin` | 3 | Platform | Every permission, including `admin:access`, `user:manage`, `role:manage`, `product:review`, `sale:view-any`, `refund:process`, `payment:configure`, `audit:view` |
 
 `Seller` **inherits** the user permission set by spreading it, rather than restating it; `Admin` is `AccountPermission::cases()` outright. Inheritance is a deliberate choice — adding a baseline permission automatically reaches both higher roles, so the matrix cannot drift out of sync. [PERMISSIONS.md](./PERMISSIONS.md) publishes the full matrix, generated by executing the enums rather than transcribing them.
 
-**The permission set, exactly.** `AccountPermission` carries **28** cases in five groups.
+**The permission set, exactly.** `AccountPermission` carries **30** cases in five groups.
 
 - **Content** — `post:create`, `post:update-own`, `post:update-any`, `post:delete-own`, `post:delete-any`, `post:publish`.
 - **Moderation** — `comment:moderate`, `taxonomy:manage`.
 - **Platform** — `dev-lab:use`, `ai-hub:use`, `ideas:use`.
 - **Selling** — `marketplace:use`, `product:create`, `product:update-own`, `product:delete-own`, `product:submit`, `sale:view-own`, `support:manage-own`.
-- **Administration** — `admin:access`, `user:manage`, `role:manage`, `product:review`, `product:manage-any`, `seller:manage`, `sale:view-any`, `refund:process`, `payment:configure`, `audit:view`.
+- **Administration** — `admin:access`, `user:manage`, `role:manage`, `product:review`, `product:manage-any`, `seller:manage`, `sale:view-any`, `refund:process`, `payment:configure`, `audit:view`, `about:manage`, `ai-hub:manage`.
 
-`AccountRole::User` holds **6** of them (`post:create`, `post:update-own`, `post:delete-own`, `dev-lab:use`, `ai-hub:use`, `ideas:use`); `AccountRole::Seller` holds **15** (the user set plus `post:publish`, `taxonomy:manage`, `marketplace:use`, `product:create`, `product:update-own`, `product:delete-own`, `product:submit`, `sale:view-own`, `support:manage-own`); `AccountRole::Admin` holds all **28**.
+`AccountRole::User` holds **6** of them (`post:create`, `post:update-own`, `post:delete-own`, `dev-lab:use`, `ai-hub:use`, `ideas:use`); `AccountRole::Seller` holds **15** (the user set plus `post:publish`, `taxonomy:manage`, `marketplace:use`, `product:create`, `product:update-own`, `product:delete-own`, `product:submit`, `sale:view-own`, `support:manage-own`); `AccountRole::Admin` holds all **30**.
 
-**Policies remain the enforcement point.** Two exist:
+**Policies remain the enforcement point.** Ten exist, one per authorised resource:
 
-- `PostPolicy` — `view` (published or owner), `create`, `update`, `delete`, `publish`, `unpublish`. Ownership checks route through `User::canActOn($owner)`, the single rule expressing "the owner, or any admin". Stating it once is what stops the "admins can do anything" clause from being remembered in one policy and forgotten in another.
+- `PostPolicy` — `viewAny`, `viewPublic`, `view` (published or owner), `create`, `update`, `delete`, `restore`, `forceDelete`, `publish`. There is no `unpublish` ability: unpublishing is `update` writing a status the model already accepts, which is why the transition needs no second gate. Ownership checks route through `User::canActOn($owner)`, the single rule expressing "the owner, or any admin". Stating it once is what stops the "admins can do anything" clause from being remembered in one policy and forgotten in another.
 - `UserPolicy` — account management: `viewAny`, `view`, `update`, `updateRole`, `delete`. Contains **no role names at all**; every ability reduces to an account-level permission, so adding a fourth role later is a change to `AccountRole` and nothing in the policy. `delete` carries the escalation guard — an account may never delete itself through this path (self-deletion is a separate, confirmed flow), and `$account->accountRole()->isAtLeast($user->accountRole())` refuses any target at or above the actor's own level. That single line is why an admin cannot remove another admin.
+- `FeedPostPolicy` and `AiArticlePolicy` — the platform-content shape. An AI article is authorised by permission alone: a holder of `ai-hub:manage` may act on any row, because the hub is a curated library and curation is the job. A feed post is ownership *and* the narrower ability (`post:update-own`), with an admin clause ahead of it, because an author's post is theirs until somebody with `admin:access` says otherwise.
+- `IdeaPolicy`, `IdeaPlanPolicy`, `IdeaCategoryPolicy`, `LabWorkspacePolicy`, `LabSnippetPolicy` and `IdeaTaskPolicy` — ownership-first, and the opposite shape on purpose. `viewAny` and `create` are the module permission; `update` is ownership with **no admin clause**; `delete` adds `admin:access`, so an operator may take work down without rewriting it. `IdeaTaskPolicy` has no `user_id` to consult and resolves every method through the parent plan, which is what makes it structurally impossible for a task to belong to somebody other than its plan's author.
 
 Per-target role rules are split for a reason worth naming: `updateRole` answers the blanket "may this account edit roles at all", while "may **this** account edit **that** account" depends on the target and lives in the component. Both checks run. Collapsing them into one ability would make the policy answer a question it cannot see the inputs for.
 
@@ -226,7 +228,7 @@ Per-target role rules are split for a reason worth naming: `updateRole` answers 
 - Every Livewire mutation calls `Gate::authorize()` before touching the database, mirroring the HTTP layer.
 - Draft visibility is enforced in the **query**, not only in the policy, so a policy bypass cannot leak drafts into a listing.
 - **Permission middleware composes with OR by default** (`permission:product:create,product:review` grants access if *either* holds). To require **all**, prefix the list with `all:` — `permission:all:product:create,seller:manage`. This is a real trap: a route that reads as "needs both" but omits `all:` silently admits anyone holding one.
-- **Guests are redirected, not refused.** `EnsureAccountPermission` sends an unauthenticated request to the login page rather than returning 403, because the account may well hold the permission once it authenticates. A 403 there would be a dead end.
+- **Guests are redirected, not refused.** `EnsureAccountPermission` sends an unauthenticated request to the home page with `?signin` on it, where the login modal opens, rather than returning 403, because the account may well hold the permission once it authenticates. A 403 there would be a dead end. There is no `/login` page to send them to: login, registration and the forgot-password request are modal-first, and their GET routes redirect to that same flagged home page.
 - **An unresolvable permission alias is a 500, not an allow.** A typo like `permission:prodcut:create` fails loudly at the route rather than silently granting access to everyone — the failure mode that matters.
 
 **How an account becomes an admin.** Not through the UI. `AccountRole::assignableBy($actor)` excludes `Admin` from its result *even for an admin actor*, and no policy exposes a promote-to-admin path. Granting admin is a deliberate out-of-band act — currently a seeder or a manual database write. This is recorded as an open finding in [the Phase 0 audit §10](./audit/PHASE-0-AUDIT.md), because a deployment with no documented promotion path is one that cannot be operated. The intended resolution is a documented artisan command, not a UI affordance.
@@ -255,7 +257,7 @@ The rendered HTML is produced from a sanitised pipeline and treated as trusted *
 | `seller` | `/seller/dashboard` | `seller.dashboard` | `auth`, `verified`, `permission:product:create` | `pages/seller/⚡dashboard` |
 | `admin` | `/admin/dashboard` | `admin.dashboard` | `auth`, `verified`, `permission:admin:access` | `pages/admin/⚡dashboard` |
 
-The shared author workspace stays on `/dashboard` for every authenticated account — a seller and an admin both write posts — through `dashboard.posts.index`, `dashboard.posts.create`, `dashboard.posts.edit`, `dashboard.comments`, and `dashboard.taxonomy`. Admin has one further surface, `/admin/users` (`admin.users`). `AccountRole::dashboardRoute()` returns the route name for a role's home, and every Fortify response calls it; nothing hardcodes `/dashboard`.
+The authoring screens — `admin.posts.index`, `admin.posts.create`, `admin.posts.edit`, `admin.comments`, `admin.taxonomy` — sit under `/admin` and are guarded by `permission:admin:access`, so a seller or a plain account no longer reaches them. `/dashboard` is a read-only overview, and the old `/dashboard/*` paths 301 to their new locations. Inside those screens the data is still author-scoped: a post list shows the signed-in admin's own posts, because the move changed the address, not the query. An admin-only `/admin/users` (`admin.users`) completes the surface. `AccountRole::dashboardRoute()` returns the route name for a role's home, and every Fortify response calls it; nothing hardcodes `/dashboard`.
 
 **The sidebar is data.** `App\Support\DashboardNavigation::for($user)` returns sections of items, each already filtered to what the account may reach and carrying a resolved badge count. Four properties matter:
 
@@ -264,7 +266,22 @@ The shared author workspace stays on `/dashboard` for every authenticated accoun
 3. **Badges are resolved in the support class, not the view.** The definition declares *which* badge it wants (`pending-comments`); `for()` fills in the number. The definition therefore carries no live data and can be reasoned about statically.
 4. **The pending-comment badge is scoped to the viewer.** It counts comments on the account's own posts unless the account holds `comment:moderate`, so the badge means "work waiting for *you*", not "work waiting for somebody".
 
-**Sections, in order.** `Overview`, `Content`, `Moderation`, `Modules`, `Selling`, `Administration`. The **Modules** section sits between Content and Selling and holds **Ideas**, **Developer Lab**, **AI Hub**, and **Marketplace** — each a separate top-level URL space gated by its own permission. A plain user sees Ideas, Developer Lab, and AI Hub (they hold `dev-lab:use`, `ai-hub:use`, and `ideas:use`) and never Marketplace, which requires `marketplace:use`; the section heading is dropped for anyone who would see none of its items. The role homes appear as "Seller dashboard" in Selling and "Admin dashboard" in Administration.
+**Sections, in order.** `Home`, `Writing`, `Workspaces`, `Manage`, each holding one or
+more labelled **groups**: `Overview`; `Content`; `Modules`; `Selling` and
+`Administration`. Only the leaf item carries a permission, so filtering is per item
+and then a group that emptied out is dropped and then a section that emptied out is
+dropped. The **Modules** group sits between Writing and Manage and holds **Ideas**,
+**Developer Lab**, **AI Hub**, and **Marketplace** — each a separate top-level URL
+space gated by its own permission. A plain user sees Ideas, Developer Lab, and AI Hub
+(they hold `dev-lab:use`, `ai-hub:use`, and `ideas:use`) and never Marketplace, which
+requires `marketplace:use`; the group heading is dropped for anyone who would see none
+of its items. The Writing group — Posts, Comments, Taxonomy — is `admin:access` only,
+because those screens live under `/admin`. The Administration group is the same rule,
+and it now includes the Ideas and Developer Lab consoles, which is why an ordinary
+account's rail cannot contain them: the user and seller sidebars render the same
+filtered map with no extra scope, so the permission on the leaf is the only thing
+keeping an admin destination off a reader's screen. The role homes appear as "Seller
+dashboard" in Selling and "Admin dashboard" in Administration.
 
 **Plans are derived from roles, not stored alongside them.** `AccountRole::plan()` maps `user → Free`, `seller → Seller`, `admin → Platform`. `RolePlan` carries the commercial shape — tagline, feature bullets, `productListingLimit()`, `commissionPercent()`, `canSell()` — separately from the authority that `AccountRole` carries. Today the plan is a pure function of the role; when entitlements become per-account data they move onto the `users` table and the enum becomes the fallback default. The reason the split exists now rather than later is that plan limits should be read *through* the account (`$user->plan()->productListingLimit()`), never inlined as a conditional at a call site.
 
@@ -433,39 +450,127 @@ The tree below is the **actual** repository layout. `(existing)` marks what came
 ```
 app/
 ├── Actions/
+│   ├── About/                         item and section writes
+│   ├── AiHub/                         19 classes: article, topic, path and resource
+│   │                                  writes, publication and shelf ordering
 │   ├── Comments/                      ApproveComment, RejectComment
+│   ├── Communities/                   membership and community writes
+│   ├── DevLab/                        SaveLabWorkspace, DeleteLabWorkspace,
+│   │                                  SaveLabSnippet, DeleteLabSnippet,
+│   │                                  RecordLabExecution, SyncLabSnippetTopics,
+│   │                                  CloneSnippetToWorkspace
+│   ├── Feed/                          post and attachment writes
 │   ├── Fortify/                       (existing) CreateNewUser, ResetUserPassword, …
-│   └── Posts/                         CreatePost, UpdatePost, PublishPost,
-│                                      UnpublishPost, DeletePost, SyncPostTags
+│   ├── Ideas/                         SaveIdea, DeleteIdea, ToggleIdeaPin,
+│   │                                  SyncIdeaVisibility, ConvertIdeaToPlan,
+│   │                                  SaveIdeaCategory, DeleteIdeaCategory,
+│   │                                  SaveIdeaPlan, DeleteIdeaPlan,
+│   │                                  SaveIdeaTask, DeleteIdeaTask,
+│   │                                  ReorderIdeaTasks, SyncIdeaTopics
+│   ├── Marketplace/                   product, version and review writes
+│   └── Posts/                         CreatePost, UpdatePost, DeletePost, ArchivePost,
+│                                      PublishPost, UnpublishPost, SyncPostTags,
+│                                      HydratePostContent, ResolveRelatedPosts,
+│                                      SyncTaxonomyCounts
 ├── Concerns/                          HasAccountRole, HasReadingTime, HasSlug,
-│                                      PasswordValidationRules, ProfileValidationRules
+│                                      ResolvesUniqueSlug, PasswordValidationRules,
+│                                      ProfileValidationRules
 ├── Console/                           (existing)
-├── Data/                              AuthorProfile, PostMetrics
-├── Enums/                             AccountPermission, AccountRole, CommentStatus,
-│                                      PermissionGroup, PostStatus, RolePlan
+├── Data/                              AuthorProfile, PostMetrics, TextCorrection
+├── Enums/                             thirty enum files. The authorisation
+│                                      set (AccountPermission with 30 cases,
+│                                      AccountRole, PermissionGroup, RolePlan) plus
+│                                      the content set (PostStatus, CommentStatus);
+│                                      the module set
+│                                      (IdeaStatus, PlanStatus, TaskStatus, WorkPriority,
+│                                      IdeaPotential, ContentVisibility, LabLanguage);
+│                                      the feed, hub, marketplace, about and community
+│                                      sets; and the editor's vocabulary
+│                                      (ContentCategory, ContentTone, CorrectionType)
+├── Ai/Agents/                         ContentWriterAgent, CopyEditorAgent,
+│                                      ImagePromptAgent (the AI SDK's structured agents,
+│                                      used by the editor and the hub, never by a route
+│                                      that trusts a browser-supplied prompt)
 ├── Http/
 │   ├── Controllers/                   (existing) Controller
-│   │                                  FeedController, RobotsController, SitemapController
+│   │                                  FeedController, RobotsController, SitemapController,
+│   │                                  ErrorPageController, FeedAttachmentController,
+│   │                                  Editor/
 │   ├── Middleware/                    (existing) EnsureAccountPermission
-│   ├── Requests/
+│   ├── Requests/                      Editor/ (CorrectionRequest, GenerationRequest,
+│   │                                  ImageGenerationRequest, ImagePromptRequest,
+│   │                                  PreviewRequest)
 │   └── Responses/                     (existing) LoginResponse, RegisterResponse,
 │                                      TwoFactorLoginResponse, PasskeyLoginResponse,
 │                                      VerifyEmailResponse
+├── Livewire/Actions/                  Logout
+├── Observers/                         PostObserver (keeps derived post counts in step
+│                                      with the rows, so a screen never computes them)
 ├── Models/                            (existing) User
-│                                      Category, Comment, Post, PostTag, Tag
-├── Policies/                          PostPolicy, UserPolicy
+│                                      Category, Comment, Post, PostTag, Tag,
+│                                      FeedPost, FeedAttachment, Community,
+│                                      CommunityMembership, AboutItem, AboutSection,
+│                                      AiArticle, AiArticleLink, AiTopic, AiResource,
+│                                      AiLearningPath, AiLearningPathItem,
+│                                      MarketplaceCategory, MarketplaceProduct,
+│                                      MarketplaceProductVersion, MarketplaceReview,
+│                                      Idea, IdeaPlan, IdeaTask, IdeaCategory,
+│                                      LabWorkspace, LabSnippet, LabExecution,
+│                                      Topic (the platform taxonomy the two public
+│                                      galleries facet on — flat, unlike AiTopic,
+│                                      which is the hub's own hierarchical tree)
+├── Policies/                          PostPolicy, UserPolicy, FeedPostPolicy,
+│                                      AiArticlePolicy, IdeaPolicy, IdeaPlanPolicy,
+│                                      IdeaTaskPolicy, IdeaCategoryPolicy,
+│                                      LabWorkspacePolicy, LabSnippetPolicy
 ├── Providers/                         (existing)
-├── Rules/                             (existing)
-└── Support/                           DashboardNavigation, MarkdownRenderer, Seo
+├── Rules/                             SlugRule (the shared constraints), PostSlug,
+│                                      IdeaSlug, PlanSlug, SnippetSlug
+├── Services/                          AboutContent and AiHubContent (the copy the two
+│                                      consoles read when their tables are empty),
+│                                      EditorAiService and EditorAiException (the AI
+│                                      endpoints' only path to an agent),
+│                                      PublicTaxonomy (the count gate every public
+│                                      facet, chip and `/topics` card reads, so a
+│                                      screen can never advertise a subject whose
+│                                      rows the published() scope would hide)
+└── Support/                           DashboardNavigation, SettingsNavigation,
+                                       MarkdownRenderer, Seo, HttpErrorCatalog,
+                                       FeedCorpus, FeedPersonas
 
 database/
 ├── factories/                         (existing) UserFactory
 │                                      ★ CategoryFactory, CommentFactory, PostFactory, TagFactory
+│                                      and the per-module factories for every model above,
+│                                      including IdeaFactory and LabSnippetFactory, both of
+│                                      which carry an `unpublishedPublic()` state — the flag
+│                                      without the timestamp — because that combination is
+│                                      the one a reader would otherwise never see,
+│                                      and TopicFactory for the taxonomy parent — the
+│                                      two families attach topics through their sync
+│                                      action rather than a factory state, so a test
+│                                      proves the same path the screen uses
 ├── migrations/                        (existing) 3 baseline + passkeys + 2FA
 │                                      ★ categories, tags, posts, post_tag, comments,
-│                                        add_role_to_users_table
+│                                        add_role_to_users_table, and the per-module sets
+│                                        through 2026_10_20_100009: seven tables for Ideas
+│                                        and the Developer Lab (idea_categories, ideas,
+│                                        idea_plans, idea_tasks, lab_workspaces,
+│                                        lab_snippets, lab_executions) plus the taxonomy
+│                                        three (topics, idea_topic, lab_snippet_topic —
+│                                        the platform-owned parent and its two pivots).
+│                                        41 in total.
 └── seeders/                           ★ UserSeeder first, then CategorySeeder,
-                                         TagSeeder, PostSeeder, CommentSeeder
+                                         TagSeeder, PostSeeder, CommentSeeder, and the
+                                         module seeders. TopicsSeeder sits before
+                                         IdeaCategorySeeder and LabSnippetSeeder so the
+                                         two can file their rows by slug. IdeaCategorySeeder,
+                                         TopicsSeeder and LabSnippetSeeder are idempotent —
+                                         they resolve by slug and hand the existing model to
+                                         the write action rather than inserting a second row
+                                         — because a re-run of `db:seed` must not
+                                         duplicate the starter content a fresh account is
+                                         pointed at.
 
 resources/
 ├── css/
@@ -481,28 +586,55 @@ resources/
     │       │                          auth/*, post/*, editor/rich-text,
     │       │                          dashboard-shell, sidenav-footer, topbar, …
     │       ├── icon/                  logo-mark, share
+    │       ├── ideas/                 card, status-badge
+    │       ├── dev-lab/               overview, capabilities, capability, status,
+    │       │                          access, code-pane, snippet-card (the one row
+    │       │                          shape, shared by the gallery, the landing's
+    │       │                          featured strip and a topic page), showcase
+    │       │                          (the landing's live sandbox pane, driven only
+    │       │                          by the bundled example)
+    │       ├── ai-hub/                article-card, path-card, topic-card,
+    │       │                          resource-card, pill
+    │       ├── marketplace/           product-card, rating, install-command,
+    │       │                          product-status, review-card
     │       └── user|seller|admin/     each role's header, footer, sidebar
     ├── layouts/                       guest/home (the default), auth + auth/split,
     │                                  app/dashboard, seller/dashboard,
     │                                  admin/dashboard
     ├── pages/
-    │   ├── auth/                      login, register, forgot-password,
-    │   │                              reset-password, confirm-password,
-    │   │                              two-factor-challenge, verify-email
+    │   ├── auth/                      reset-password, confirm-password,
+    │   │                              two-factor-challenge, verify-email — the four
+    │   │                              mid-flow screens. Login, register and
+    │   │                              forgot-password are modals on the home page,
+    │   │                              and their GET routes redirect there
     │   ├── blog/                      ⚡index, ⚡show
-    │   ├── dashboard/                 ⚡index, ⚡comments, ⚡taxonomy, posts/(⚡index, ⚡edit)    │   ├── admin/                     ⚡dashboard, ⚡users
+    │   ├── dashboard/                 ⚡index
+    │   ├── admin/                     ⚡dashboard, ⚡users, ⚡comments, ⚡taxonomy,
+    │   │                              ⚡about, ⚡feed, ⚡ai-hub, ⚡marketplace,
+    │   │                              ⚡ideas, ⚡dev-lab, posts/(⚡index, ⚡edit)
     │   ├── seller/                    ⚡dashboard
-    │   ├── dev-lab/                   ⚡index (placeholder)
-    │   ├── ai-hub/                    ⚡index (placeholder)
-    │   ├── marketplace/               ⚡index (placeholder)
-    │   ├── ideas/                     ⚡index (placeholder)
+    │   ├── ideas/                     ⚡index, ⚡show, ⚡dashboard, ⚡edit,
+    │   │                              ⚡categories, ⚡plans, ⚡plan, ⚡plan-edit
+    │   ├── dev-lab/                   ⚡index, ⚡gallery, ⚡snippet-show, ⚡dashboard,
+    │   │                              ⚡sandbox, ⚡snippets, ⚡snippet, ⚡history
+    │   ├── ai-hub/                    ⚡index, ⚡articles, ⚡article, ⚡topics,
+    │   │                              ⚡topic, ⚡paths, ⚡path, ⚡resources,
+    │   │                              ⚡ideas and ⚡dev-lab (the hub's two shelves,
+    │   │                              still placeholders: they want a curation model)
+    │   ├── marketplace/               ⚡index, ⚡show
+    │   ├── communities/               ⚡index
+    │   ├── feed/                      ⚡show, ⚡composer-modal
     │   ├── settings/                  layout.blade.php, two-factor/,
     │   │                              ⚡profile, ⚡security, ⚡appearance,
     │   │                              ⚡delete-user-form, ⚡delete-user-modal,
     │   │                              ⚡two-factor-setup-modal
     │   ├── ⚡about.blade.php
-    │   └── ⚡home.blade.php
-    └── partials/                      head
+    │   ├── ⚡feed.blade.php           the signed-in feed surface, at `/feed`
+    │   ├── ⚡home.blade.php
+    │   ├── ⚡topics.blade.php         the platform taxonomy, every count-gated subject
+    │   │                              with both families' published counts on it
+    │   └── ⚡topic.blade.php          one subject: its ideas, then its snippets
+    └── partials/                      head, theme-boot
 
 routes/
 ├── console.php                        (existing)
@@ -510,17 +642,51 @@ routes/
 └── web.php                            public + role dashboards + modules + redirects
 
 tests/
+├── Browser/                           Dusk: ComposerPublishTest, FeedReducedMotionTest,
+│                                      IdeasReadingTest, LabShowcaseTest, Pages/, plus
+│                                      DuskTestCase at the top level
 ├── Feature/
-│   ├── Auth/                          AuthLayoutTest
-│   ├── Blog/                          index, detail, filter, comment, sharing
-│   ├── Dashboard/                     post management, moderation, taxonomy
-│   ├── Editor/                        AI endpoints, correction placement
+│   ├── Admin/                         IdeasConsoleTest, DevLabConsoleTest
+│   ├── AiHub/                         admin console, public render, seeding,
+│   │                                  curated shelves, mock delegation
+│   ├── Auth/                          layout, authentication, registration,
+│   │                                  password reset and confirmation, verification,
+│   │                                  two-factor challenge, the login modal
+│   ├── Blog/                          IndexTest, ShowTest, CommentTest, SharingTest
+│   ├── Dashboard/                     Composition, Navigation, Shell,
+│   │                                  PostManagement, Moderation, Taxonomy
+│   ├── DevLab/                        SandboxPage, SandboxShowcase, SnippetCard,
+│   │                                  SnippetCrud, Workspace, GalleryFacets,
+│   │                                  CloneSnippet, LabSnippetSeeder, DevLabMock
+│   ├── Editor/                        EditorAiTest, TextCorrectionTest
 │   ├── Enums/                         PermissionModelTest
-│   └── Routing/                       RoutingStructureTest
-└── Unit/                              Support/*
+│   ├── Errors/                        ErrorPagesTest
+│   ├── Ideas/                         IdeaCrud, IdeaVisibility, StatusWorkflow,
+│   │                                  IdeaConversion, PlanTask, Category,
+│   │                                  IndexFacets, IdeaTopics, IdeaShowReading,
+│   │                                  IdeasMock
+│   ├── Marketplace/                   catalogue, listing page, filters, admin,
+│   │                                  review submission, seeding, schema, mock
+│   ├── Routing/                       RoutingStructureTest
+│   ├── Settings/                      ProfileUpdateTest, SecurityTest
+│   ├── Theme/                         ThemeSystemTest
+│   ├── About*                         eight files, one per section of `/about`
+│   ├── Feed*                          FeedTest, FeedShowTest, FeedModelTest,
+│   │                                  FeedPublishingTest, FeedMediaTest
+│   ├── AdminFeedTest.php              the moderation queue
+│   ├── DashboardTest.php              the read-only user overview
+│   ├── DevLabLandingTest.php          the public `/dev-lab` landing
+│   ├── ExampleTest.php                the home page responds
+│   ├── PublicTaxonomyTest.php         the count gate every public facet reads
+│   ├── StructuredDataTest.php         the JSON-LD graph and its escaping
+│   └── TopicsPagesTest.php            /topics and /topics/{subject}
+└── Unit/                              IdeaTest, LabLanguageTest,
+                                       FeedPostVisibilityTest, Marketplace/*
 ```
 
-**Two notes a reader will otherwise trip over.** First, there is no `app/Livewire/` directory — Livewire components are SFCs under `resources/views`, and the framework locates them through `config/livewire.php`, not by convention. Second, `resources/views/pages/dashboard/` holds the shared author workspace (`⚡index`, `⚡comments`, `⚡taxonomy`, `posts/`) filtered by permission, while the seller and admin homes live in their own top-level directories (`pages/seller/`, `pages/admin/`) matching their URL spaces.
+**Two notes a reader will otherwise trip over.** First, `app/Livewire/` holds one class and it is not a component: `app/Livewire/Actions/Logout.php`. Livewire components are SFCs under `resources/views`, and the framework locates them through `config/livewire.php`, not by convention. Second, `resources/views/pages/dashboard/` holds the user role's read-only overview (`⚡index`), while every screen under `/admin` lives in `pages/admin/` — `⚡dashboard`, `⚡comments`, `⚡taxonomy`, `⚡feed`, `⚡about`, `⚡ai-hub`, `⚡marketplace`, `⚡users`, the two module consoles `⚡ideas` and `⚡dev-lab`, and the post screens in `posts/` (`⚡index`, `⚡edit`) — matching their URL space; the seller home sits in `pages/seller/`. A third thing to trip over is naming: `pages/ai-hub/⚡ideas.blade.php` and `pages/ai-hub/⚡dev-lab.blade.php` are the hub's **curated shelves** at `/ai-hub/ideas` and `/ai-hub/dev-lab` (routes `ai-hub.ideas.index` and
+`ai-hub.dev-lab.index`, both behind `auth`, `verified` and `ai-hub:manage`), not the
+modules, which live in `pages/ideas/` and `pages/dev-lab/` under their own URL spaces. The shelves remain placeholders because a shelf needs a hub-side curation object that decides which Ideas and Lab rows the hub recommends, and that model is separate from either module's content.
 
 ### 4.2 Naming conventions
 
@@ -533,7 +699,7 @@ tests/
 | Action | verb + noun, `handle()` entry point | `App\Actions\Posts\PublishPost` |
 | Enum | singular noun, TitleCase cases, behaviour on the enum | `App\Enums\PostStatus::Published` |
 | Support class | noun describing the computation | `App\Support\MarkdownRenderer` |
-| Route name | dot-namespaced | `blog.index`, `dashboard.posts.edit`, `admin.users` |
+| Route name | dot-namespaced | `blog.index`, `admin.posts.edit`, `admin.users` |
 | Migration | anonymous class, snake_case filename | `2026_10_12_080204_create_posts_table.php` |
 | Test | mirrors the namespace it covers | `tests/Feature/Enums/PermissionModelTest.php` |
 
@@ -542,7 +708,7 @@ tests/
 ### 4.3 Data flow for the primary write path (saving a post)
 
 ```
-Editor (Livewire SFC: pages/dashboard/⚡post-editor)
+Editor (Livewire SFC: pages/admin/posts/⚡edit, `pages::admin.posts.edit`)
   │  wire:model.live.debounce.800ms on body
   │  wire:submit / autosave tick
   ▼
@@ -635,11 +801,11 @@ Framework: **Pest 5**, database-resetting feature tests by default (`tests/Pest.
 
 | Layer | What is tested | Example |
 | --- | --- | --- |
-| Feature (HTTP) | Public pages render, drafts 404, SEO tags present | `tests/Feature/Blog/BlogIndexTest.php` |
-| Feature (Livewire) | Filtering, search, pagination, autosave, authorisation | `tests/Feature/Blog/BlogFilterTest.php` |
+| Feature (HTTP) | Public pages render, drafts 404, SEO tags present | `tests/Feature/Blog/IndexTest.php`, `tests/Feature/Blog/ShowTest.php` |
+| Feature (Livewire) | Filtering, search, pagination, autosave, authorisation | `tests/Feature/Blog/IndexTest.php`, `tests/Feature/Dashboard/PostManagementTest.php` |
 | Feature (Livewire) | Post CRUD, status transitions, delete confirmation | `tests/Feature/Dashboard/PostManagementTest.php` |
 | Feature (Livewire) | Comment submission, moderation gate, validation | `tests/Feature/Blog/CommentTest.php` |
-| Unit | Reading time, slug generation, markdown sanitisation | `tests/Unit/Support/MarkdownRendererTest.php` |
+| Unit | Reading time, slug generation, markdown sanitisation | Reading time is asserted in `tests/Feature/AiHub/AiHubSeedingTest.php`, slug derivation and collision handling in the Ideas, Marketplace and About suites. `app\Support\MarkdownRenderer` — the sanitiser that stands between authored markdown and `{!! !!}` — has **no test of its own**: it is exercised only as a side effect of the render suites. Recorded as a gap rather than claimed as coverage |
 
 Rules applied: use factories (never hand-built models); assert observable behaviour rather than implementation detail; cover each authorisation branch; leave framework behaviour to the framework.
 
@@ -719,16 +885,21 @@ Every PRD requirement mapped to the code that realises it and the test that pins
 
 | PRD requirement | Technical realisation | Test surface |
 | --- | --- | --- |
-| FR-1.x | `resources/views/pages/⚡home.blade.php` + `AuthorProfile` data object | `tests/Feature/HomeTest.php` |
-| FR-2.1–2.9 | `pages/blog/⚡index.blade.php`, `Post::scopePublished`, `scopeSearch` | `tests/Feature/Blog/BlogIndexTest.php`, `BlogFilterTest.php` |
-| FR-3.1–3.10 | `MarkdownRenderer`, `pages/blog/⚡show.blade.php`, related-post query | `tests/Feature/Blog/PostDetailTest.php` |
-| FR-4.x | Fortify + `pages/dashboard/*`, `Actions/Posts/*`, `PostPolicy` | `tests/Feature/Dashboard/*` |
+| FR-1.x | `resources/views/pages/⚡home.blade.php` + `AuthorProfile` data object | `tests/Feature/ExampleTest.php` (the page responds), `tests/Feature/Theme/ThemeSystemTest.php` |
+| FR-2.1–2.9 | `pages/blog/⚡index.blade.php`, `Post::scopePublished`, `scopeSearch` | `tests/Feature/Blog/IndexTest.php` |
+| FR-3.1–3.10 | `MarkdownRenderer`, `pages/blog/⚡show.blade.php`, related-post query | `tests/Feature/Blog/ShowTest.php` |
+| FR-4.x | Fortify + `pages/admin/posts/*`, `pages/dashboard/⚡index`, `Actions/Posts/*`, `PostPolicy` | `tests/Feature/Dashboard/*` |
 | FR-4.1a / 4.1b | `AccountRole`, `AccountPermission`, `HasAccountRole`, `UserPolicy` | `tests/Feature/Enums/PermissionModelTest.php` |
 | FR-4.2a–4.2c | `layout('layouts::{app,seller,admin}.dashboard')`, `DashboardNavigation`, `components/app/ui/dashboard-shell.blade.php`, role-scoped sidebars | `PermissionModelTest`, `ShellTest`, dashboard feature tests |
 | FR-4.4a | `AccountRole::dashboardRoute()` consumed by every Fortify response | `tests/Feature/Auth/*` |
 | FR-4.11a | `EnsureAccountPermission` route middleware + declared nav permissions | `PermissionModelTest` (composition, not size) |
 | FR-5.x | `components/app/ui/post/share-bar.blade.php`, `Support\Seo` | `tests/Feature/Blog/SharingTest.php` |
 | FR-6.x | `resources/css/app.css` tokens, `layouts/guest/home.blade.php` | Manual audit + Lighthouse |
+| FR-7.1 | `pages/ideas/*` (eight screens), `Actions/Ideas/*` (thirteen), `IdeaPolicy` / `IdeaPlanPolicy` / `IdeaTaskPolicy` / `IdeaCategoryPolicy`, `IdeaSlug` / `PlanSlug` | `tests/Feature/Ideas/*` (ten files), `tests/Unit/IdeaTest.php`, `tests/Feature/Admin/IdeasConsoleTest.php` |
+| FR-7.2 | `pages/dev-lab/*`, `Actions/DevLab/*` (seven), `LabLanguage::isBrowserRunnable()`, `LabWorkspacePolicy` / `LabSnippetPolicy`, `SnippetSlug` | `tests/Feature/DevLab/*` (nine files), `tests/Unit/LabLanguageTest.php`, `tests/Feature/Admin/DevLabConsoleTest.php`, `tests/Feature/DevLabLandingTest.php` |
+| FR-7.1 + FR-7.2, the surface a stranger reads | `Models/Topic` and its two pivots, `Services/PublicTaxonomy` (the count gate), `pages/⚡topics` + `⚡topic`, `app/dev-lab/snippet-card`, `app/ui/post/share-bar`, `Support\Seo::$jsonLd`, `partials/head.blade.php` | `PublicTaxonomyTest`, `TopicsPagesTest`, `Ideas/IndexFacetsTest`, `DevLab/GalleryFacetsTest`, `Ideas/IdeaTopicsTest`, `Ideas/IdeaShowReadingTest`, `DevLab/SnippetCardTest`, `DevLab/SandboxShowcaseTest`, `DevLab/CloneSnippetTest`, `StructuredDataTest`, plus `Browser/IdeasReadingTest` and `Browser/LabShowcaseTest` for the listeners and the frame only a browser can reach |
+| FR-7.3 | `pages/ai-hub/*` (ten screens), `Actions/AiHub/*` (nineteen), `AiArticlePolicy` | `tests/Feature/AiHub/*`, including `AiHubCuratedShelvesTest.php` for the two shelves that remain placeholders |
+| FR-7.4 | `MarketplaceProduct` and its three companions, `pages/marketplace/*`, `Actions/Marketplace/*`, `pages/admin/⚡marketplace` | `tests/Feature/Marketplace/*` |
 | NFR-4 | Semantic landmarks, focus management, contrast tokens | axe-core manual run |
 | NFR-7 | Portable Eloquent; no raw SQL | Code review |
 | NFR-11 | Auth layout token-driven, no forced scheme | `tests/Feature/Auth/AuthLayoutTest.php` |
@@ -745,17 +916,32 @@ A traceability matrix that only lists successes is a marketing document. These a
 | No permission covers deleting **own** comment (`comment:delete-own` does not exist) | A reader cannot withdraw their own comment | Open |
 | No profile-level ability | Profile editing is authorised by ownership only | Accepted — ownership is the correct rule here |
 | Nothing promotes an account to `admin` | A fresh deployment has no administrator and no documented path to one | **Release blocker**; resolvable by a documented artisan command |
-| Product, sales, and refund permissions exist in the enum but no module implements them | `seller` and `admin` hold permissions with no surface behind them | Expected — the modules are deferred (§7.2). The permissions are declared now so the matrix is complete rather than grown ad hoc |
+| Five selling abilities have no surface (`sale:view-own`, `sale:view-any`, `refund:process`, `payment:configure`, `support:manage-own`) | `seller` and `admin` hold permissions with nothing behind them | Expected — the sales ledger is deferred (§7.2). The listings half of the enum is implemented: `product:*` abilities guard the marketplace, its seller screens and its moderation console |
 
 ### 7.2 Deferred by decision, not by omission
 
-The following four product modules are specified in their own documents and are **not** part of the delivered system. Each has a real route rendering a permission-guarded placeholder page (via `resources/views/components/app/ui/module-placeholder.blade.php`, which states the module is not yet available and lists what is planned), its own `AccountPermission`, and its own `DashboardNavigation` entry. They are deferred rather than omitted because their routes, permissions, and navigation were designed once, coherently, instead of being grown one feature at a time.
+All four product modules named in the first draft of this document are now part of
+the delivered system: the AI Knowledge Hub and the Developer Marketplace were built
+ahead of this pass, and the Ideas workspace and the Developer Lab were built in it.
+Each has real tables, real screens behind its `AccountPermission`, and its own
+`DashboardNavigation` entry. What is deferred is no longer a module; it is a
+capability *inside* a module, and each one is listed with the reason it was withheld
+rather than half-built.
 
-| Module | Path | Route name | Permission | Spec | Deferred because |
-| --- | --- | --- | --- | --- | --- |
-| Developer Lab | `/dev-lab` | `dev-lab.index` | `dev-lab:use` | [lab.md](./lab.md) | Needs the substrate this pass built |
-| Ideas, Plans, Tasks, Projects & Collaboration | `/ideas` | `ideas.index` | `ideas:use` | [Idea.md](./Idea.md) | Same |
-| AI Knowledge Hub & Package | `/ai-hub` | `ai-hub.index` | `ai-hub:use` | [AI Knowledge Hub & Package.md](./AI%20Knowledge%20Hub%20%26%20Package.md) | Same |
-| Developer Marketplace & Digital Product Ecosystem | `/marketplace` | `marketplace.index` | `marketplace:use` | [Developer Marketplace & Dig.md](./Developer%20Marketplace%20%26%20Dig.md) | Needs payments, which needs the plan entitlements in `RolePlan` |
+| Deferred | Module | Why it is a decision |
+| --- | --- | --- |
+| Server-side execution of any language | Developer Lab | The sandbox runs HTML/CSS/JS in the visitor's own browser with an opaque origin. A real PHP runner needs a container, a CPU and memory quota, and a queue — none of which this pass was authorised to add. `LabLanguage::isBrowserRunnable()` is the single method that encodes the boundary, and it is checked server-side as well as in the UI. |
+| Challenges, submissions, grading | Developer Lab | Grading in the browser is advisory. Shipping it would promise a judge that does not exist. |
+| Syntax highlighting and step-through debugging in the editor | Developer Lab | Highlighting a `<textarea>` needs an overlay, and colouring tokens in a rendered view needs a parser; either is a dependency, and none was approved. The application ships no highlighter at all, so the published snippet view is escaped monospace rather than colourised markup. Debugging is a debugger, not a phase. |
+| Sharing, invitations, per-item comments, activity log, revision history | Ideas | Each needs new permissions and a second ACL — a design discussion, not a screen. `AccountPermission` was deliberately left at thirty cases. |
+| Projects, milestones, the `projects` table | Ideas | A project is a delivery object with its own specification. `idea_plans` is a document, not a plan of record. |
+| Idea tags and cover images | Ideas | Uploads need a disk, a signer and a prune command. Half-wiring them is worse than waiting. |
+| Sales, refunds, payment configuration, support tickets | Marketplace | There is no `Sale` or `SupportTicket` model. The five abilities above are granted and never checked until it exists. |
+| The hub's curated Ideas and Developer Lab shelves | AI Knowledge Hub | They need a hub-side curation model — an object that says which rows the hub chose and in what order. That is a different thing from the Ideas bank or the Lab's own gallery, so the two shelf pages stay honest placeholders. |
 
-Declaring a route and permission before its module exists is a deliberate choice — it claims the top-level URL space now and gives each module a landing spot to be built into rather than requiring a routing change later. `UseDeveloperLab`, `UseAiHub`, and `UseIdeas` group under `PermissionGroup::Platform`; `UseMarketplace` groups under `PermissionGroup::Selling`.
+Declaring a route and permission before its module exists was a deliberate choice, and
+the choice is now tested: claiming the top-level URL space early meant Ideas and the
+Lab could be built without a routing change, without a permission migration, and
+without touching `PermissionModelTest`, which pins the exact per-role sets.
+`UseDeveloperLab`, `UseAiHub`, and `UseIdeas` group under `PermissionGroup::Platform`;
+`UseMarketplace` groups under `PermissionGroup::Selling`.

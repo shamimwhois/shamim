@@ -8,40 +8,42 @@ use App\Models\User;
 use Livewire\Livewire;
 
 test('the taxonomy screen requires authentication', function () {
-    $this->get(route('dashboard.taxonomy'))->assertRedirect(route('login'));
+    $this->get(route('admin.taxonomy'))->assertRedirect(route('home', ['signin' => 'required']));
 });
 
-test('the taxonomy screen requires the manage taxonomy permission', function () {
+test('the taxonomy screen is an admin screen', function () {
+    // What gates the page is `admin:access`, not `taxonomy:manage`: the seller
+    // role still holds the taxonomy permission, and still cannot open this.
     $this->actingAs(User::factory()->create())
-        ->get(route('dashboard.taxonomy'))
+        ->get(route('admin.taxonomy'))
         ->assertForbidden();
 
     $this->actingAs(User::factory()->seller()->create())
-        ->get(route('dashboard.taxonomy'))
-        ->assertOk();
+        ->get(route('admin.taxonomy'))
+        ->assertForbidden();
 
     $this->actingAs(User::factory()->admin()->create())
-        ->get(route('dashboard.taxonomy'))
+        ->get(route('admin.taxonomy'))
         ->assertOk();
 });
 
-test('the taxonomy permission is rechecked on Livewire updates', function () {
-    $seller = User::factory()->seller()->create();
+test('the admin permission is rechecked on Livewire updates', function () {
+    $admin = User::factory()->admin()->create();
 
-    $component = Livewire::actingAs($seller)->test('pages::dashboard.taxonomy');
+    $component = Livewire::actingAs($admin)->test('pages::admin.taxonomy');
 
-    $seller->forceFill(['role' => AccountRole::User])->save();
+    $admin->forceFill(['role' => AccountRole::User])->save();
 
     $component->call('resetCategoryForm')->assertForbidden();
 });
 
 test('the taxonomy screen lists categories and tags', function () {
-    $author = User::factory()->seller()->create();
+    $author = User::factory()->admin()->create();
     Category::factory()->create(['name' => 'Performance', 'slug' => 'performance']);
     Tag::factory()->create(['name' => 'Caching', 'slug' => 'caching']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.taxonomy'))
+        ->get(route('admin.taxonomy'))
         ->assertOk()
         ->assertSee('Performance')
         ->assertSee('Caching');
@@ -99,4 +101,11 @@ test('a category with no published posts is absent from the sitemap', function (
     expect($body)
         ->toContain('used-category')
         ->not->toContain('empty-category');
+});
+
+test('the taxonomy console disables commit buttons while requests run', function () {
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.taxonomy'))
+        ->assertOk()
+        ->assertSee('wire:loading.attr="disabled"', escape: false);
 });

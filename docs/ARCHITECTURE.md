@@ -120,14 +120,53 @@ class is that operation with a name.
 through the `HasSlug` concern, wraps the write in a transaction alongside tag
 syncing, and fires no events. A caller cannot half-create a post.
 
+The two module directories follow the same rule at the same size:
+
+```
+Actions/Ideas/
+  SaveIdea.php            Create or update an idea; resolves the slug, never trusts it
+  DeleteIdea.php          The one writer of removal: the row is gone, there is no trash
+  SyncIdeaVisibility.php  The only writer of visibility + published_at
+  ConvertIdeaToPlan.php   Idea → plan, in one transaction, once
+  ToggleIdeaPin.php       A reading order, not a status: a boolean, never a sixth IdeaStatus case
+  SaveIdeaCategory.php / DeleteIdeaCategory.php   A folder is metadata: deleting nulls, never cascades
+  SaveIdeaPlan.php / DeleteIdeaPlan.php
+  SaveIdeaTask.php / DeleteIdeaTask.php / ReorderIdeaTasks.php
+
+Actions/DevLab/
+  SaveLabWorkspace.php    Upsert the sandbox's current trio of panes
+  SaveLabSnippet.php      Create or update a snippet, including the publish pair
+  RecordLabExecution.php  One row per run, guarded by the language and the daily limit
+  DeleteLabWorkspace.php / DeleteLabSnippet.php
+```
+
+`SyncIdeaVisibility` and `SaveLabSnippet` exist because a publication pair is an
+invariant, and an invariant survives in one writer or it survives nowhere.
+`RecordLabExecution` exists because the Run button is a UI, not a permission: the
+refusal of a non-runnable language and of the hundred-and-first run of the day
+has to happen server-side, in the one place a crafted request must pass through.
+`ConvertIdeaToPlan` exists because conversion is three rules at once — only an
+`Approved` idea, only once, and the thinking copied forward — and a button on a
+screen would re-implement each of them slightly differently. Its work happens
+inside a transaction, and "only once" is also a UNIQUE index on
+`idea_plans.idea_id`, so the rule survives a request that never reaches the class.
+
+`app/Rules/` gained `SlugRule` (the shared base: reserved-name list, collision
+check, format) with `IdeaSlug`, `PlanSlug` and `SnippetSlug` as its three
+module-specific subclasses. Each one refuses a slug that would shadow a screen in
+its own URL space, which is the write-side half of the route-ordering defence
+described in §4.
+
 ### `app/Enums/`
 
-Six enums carry the application's closed sets.
+Thirty enums carry the application's closed sets. The table lists the ones whose
+case names are load-bearing elsewhere in these documents, grouped by the domain
+that owns them.
 
 | Enum | Cases | Purpose |
 | --- | --- | --- |
 | `AccountRole` | 3 | `user`, `seller`, `admin` — the account's role |
-| `AccountPermission` | 28 | Every grantable ability, in 5 groups |
+| `AccountPermission` | 30 | Every grantable ability, in 5 groups |
 | `PermissionGroup` | 5 | `content`, `moderation`, `selling`, `platform`, `administration` |
 | `RolePlan` | 3 | `free`, `seller`, `platform` — commercial entitlements |
 | `PostStatus` | 3 | `draft`, `published`, `archived` |
@@ -135,8 +174,31 @@ Six enums carry the application's closed sets.
 | `ContentCategory` | 8 | What the editor's generator can produce |
 | `ContentTone` | 6 | The register it writes in |
 | `CorrectionType` | 6 | The kinds of correction the copy editor suggests |
+| `FeedPostStatus` / `FeedPostAudience` | 3 / 3 | The feed's publishing state and its visibility rule |
+| `CommunityKind` / `CommunityRole` | — | The audience a feed post can be limited to |
+| `ProductStatus` / `ProductLicense` / `ReviewStatus` | — | The marketplace catalogue |
+| `AiPublicationStatus` / `AiArticleFormat` / `AiDifficulty` / `AiLinkKind` / `AiResourceKind` | — | The AI Hub's reading surfaces |
+| `AboutItemType` / `AboutSectionType` | — | The about page's content blocks |
+| `IdeaStatus` | 5 | `inbox`, `draft`, `under_review`, `approved`, `archived` — carries `allowedTransitions()` |
+| `PlanStatus` | 7 | the plan workflow; `completed` is terminal, and that enum owns the transitions too |
+| `TaskStatus` | 4 | `todo`, `in_progress`, `blocked`, `done` |
+| `IdeaPotential` | 3 | `low`, `medium`, `high` — three honest steps instead of a score |
+| `WorkPriority` | 4 | `low`, `medium`, `high`, `urgent` — shared by ideas, plans **and** tasks |
+| `ContentVisibility` | 2 | `private`, `public` — deliberately carries **no** `published` case |
+| `LabLanguage` | 4 | `html`, `css`, `javascript`, `php` — `isBrowserRunnable()` is the execution policy |
 
-The last three are the editor's vocabulary. Each carries its own `label()`,
+The Ideas and Developer Lab rows are the reason the last two paragraphs of this
+section matter. `WorkPriority` is shared across three tables because a priority
+means the same thing in each, and "unset" is a null column rather than a fifth
+case that means nothing. `ContentVisibility` stops at two cases because
+publication is `visibility === public` **and** a non-null `published_at`, and an
+enum case called `Published` would invite a read path that tests one half of the
+pair. `LabLanguage` carries `Php` even though nothing runs it, because refusing to
+store somebody's PHP is a worse answer than storing it and saying plainly that no
+runner exists.
+
+The last three of the original nine are the editor's vocabulary. Each carries its
+own `label()`,
 `icon()` and `toArray()`, and its own prompt fragment —
 `ContentCategory::instruction()`, `CorrectionType::guidance()`. Keeping the
 prompt copy on the enum is what stops the agent's instructions from listing a
@@ -324,15 +386,26 @@ components/app/
 ├── ui/            shared primitives: header, body, section, stat, nav, modal,
 │                  post/*, editor/*, auth/*, and the dashboard-shell itself
 ├── icon/          components whose whole body is a glyph
-├── user/          the author workspace's chrome: header, footer, sidebar
+├── user/          the reader workspace's chrome: header, footer, sidebar
 ├── seller/        the selling workspace's chrome
-└── admin/         the administration workspace's chrome
+├── admin/         the administration workspace's chrome
+├── ideas/         the Ideas module's own pieces: card, status-badge
+├── dev-lab/       the Developer Lab's: overview, capabilities, capability,
+│                  status, access, code-pane
+├── ai-hub/        the hub's reading surfaces
+└── marketplace/   the storefront's catalogue card
 ```
 
 The prefix is a namespace, not decoration: `<x-app.ui.modal>` can never be
 shadowed by a package's anonymous `<x-modal>`. The directory rule is the
 important part — **a component goes in `ui/` unless a role owns it**, and `ui/`
-may not branch on role.
+may not branch on role. The same rule holds a second level down: a module-owned
+component lives in `app/ideas/` or `app/dev-lab/` and never in `ui/`, because
+`ui/` is where a thing goes only if it is role-agnostic *and* module-agnostic.
+`x-app.ideas.status-badge` renders an `IdeaStatus`, which is a module's vocabulary,
+and `x-app.dev-lab.code-pane` is a labelled monospace textarea sized for the
+sandbox — neither belongs in the shared vocabulary, and neither is allowed to
+pull `ideas:use` or `dev-lab:use` into `ui/`.
 
 The load-bearing consequence is the shell. There are three workspace layouts and
 one implementation: `components/app/ui/dashboard-shell.blade.php` holds the
@@ -361,29 +434,66 @@ nested inside another's.
 The seller and admin guards name a **permission**, not a role. A role check
 would drift from the permission matrix; a permission check cannot.
 
-The shared author workspace stays on `/dashboard` for *every* authenticated
-account, because a seller and an admin both still write posts:
-`dashboard.posts.index`, `dashboard.posts.create`, `dashboard.posts.edit`,
-`dashboard.comments`, `dashboard.taxonomy`. Admin-only `/admin/users` →
-`admin.users` sits alongside the admin dashboard.
+Authoring is a staff act on this platform, so the writing screens live in the
+admin space: `admin.posts.index`, `admin.posts.create`, `admin.posts.edit`,
+`admin.comments`, `admin.taxonomy`, all behind the group's
+`permission:admin:access`. Their old `/dashboard/*` paths 301 to the new ones.
+Two things limit those pages, and they are different things: `admin:access`
+decides who may open the screen, ownership decides which rows they see — every
+query is still scoped to the signed-in account. Because a Livewire mutation
+posts to `/livewire/update` and never passes through the route group, each of
+those four components also re-checks the permission in its own `boot()`.
+
+`/dashboard` itself is now a read-only overview of the account's own content,
+and `/admin/users` → `admin.users` sits alongside the admin dashboard.
 
 ### Platform module routes
 
 Four modules each claim a top-level URL space, guarded by their own permission.
-They are not built yet, so each renders a placeholder page via the shared
-`resources/views/components/app/ui/module-placeholder.blade.php` — the routes
-are real and the navigation points at them, so each has a landing spot to be
-built into rather than needing a routing change later.
+Two are built end to end — Ideas and the Developer Lab — the AI Hub is built as a
+reading surface and the Marketplace as a catalogue.
 
-| Module | Path | Route name | Permission |
+| Module | Path | Permission | State |
 | --- | --- | --- | --- |
-| Developer Lab | `/dev-lab` | `dev-lab.index` | `dev-lab:use` |
-| AI Knowledge Hub | `/ai-hub` | `ai-hub.index` | `ai-hub:use` |
-| Marketplace | `/marketplace` | `marketplace.index` | `marketplace:use` |
-| Ideas | `/ideas` | `ideas.index` | `ideas:use` |
+| Developer Lab | `/dev-lab` | `dev-lab:use` | public landing, gallery and snippet pages; five workspace screens; `/admin/dev-lab` console |
+| Ideas | `/ideas` | `ideas:use` | public landing and idea pages; six workspace screens; `/admin/ideas` console |
+| AI Knowledge Hub | `/ai-hub` | `ai-hub:use` | reading surfaces built; its two curated shelves still render the shared `x-app.ui.module-placeholder` |
+| Marketplace | `/marketplace` | `marketplace:use` | storefront built over the `marketplace_*` tables; commerce permissions behind it are not |
 
-The URL spaces are claimed now on purpose: these are top-level names that must
-not be taken by anything else.
+Each built module follows the same three-layer shape, and the shape is the
+architecture rather than a coincidence of when things were written:
+
+- **Public read** — the landing page and the published detail pages carry no
+  auth guard. A stranger may read what an account chose to publish, and nothing
+  else; `Idea::isVisibleTo()` and `LabSnippet::isVisibleTo()` are the single
+  predicate every one of those paths passes through, and they answer 404 rather
+  than 403 so an unpublished row does not advertise that it exists.
+- **Permission-gated workspace** — one route group per module, `prefix` and
+  `name` declared once, guarded by `auth`, `verified` and the module's `use`
+  permission. Every list is scoped to `authoredBy(auth()->user())`, so the
+  workspace is the same software for an admin and for a new account; being an
+  admin changes what the *console* shows, never what the workspace does.
+- **Platform console** — `/admin/ideas` and `/admin/dev-lab` sit in the admin
+  group behind `admin:access` alone. They read across accounts and, for snippets,
+  may delete. Neither holds an editor. Somebody's idea and somebody's code are
+  theirs; an operator key buys oversight, not authorship.
+
+Because a Livewire mutation posts to `/livewire/update` and never passes through
+the route group, **every one of those screens re-checks its permission in its own
+`boot()`**. That re-check, not the middleware, is the actual defence, and it is
+the reason an ownership test that passes over HTTP can still be worthless: the
+test that matters is a `POST /livewire/update` from an account that does not hold
+the permission, and the assertion is 403.
+
+The two module landing pages and their workspaces are assembled from
+module-owned components (`resources/views/components/app/ideas/`,
+`app/dev-lab/`) plus the shared `x-app.ui.*` primitives. Nothing module-specific
+was added to `ui/`, which is the rule `COMPONENTS.md` states: a component belongs
+in `ui/` only if it is role-agnostic.
+
+The URL spaces stay claimed by the unbuilt surfaces too — `/ai-hub` and
+`/marketplace` were declared before their modules existed precisely so that
+building one would never require a routing change or cost a top-level name.
 
 A small set of **301 redirects** keeps old bookmarks working after the move from
 nested paths: `dashboard/seller` → `/seller/dashboard`,
@@ -432,7 +542,15 @@ User → role (enum) → permissions (derived)
 | --- | --- | --- |
 | `user` | 1 | 6 |
 | `seller` | 2 | 15 (includes all of `user`) |
-| `admin` | 3 | 26 (all cases) |
+| `admin` | 3 | 30 (all cases) |
+
+`user`'s six are `post:create`, `post:update-own`, `post:delete-own` and the
+three platform `use` permissions — `dev-lab:use`, `ai-hub:use`, `ideas:use`.
+That is what makes the Ideas and Developer Lab workspaces available to every
+account on the platform while their `/admin` consoles stay behind `admin:access`:
+the *entry* to a module is a `use` permission everybody holds, and the
+*oversight* of one is an administration permission nobody without the panel key
+can reach.
 
 Seller inherits by **spread** — `...self::User->permissions()` — so adding a
 user permission automatically reaches sellers. Admin returns
@@ -469,8 +587,32 @@ Two failure modes are handled loudly rather than silently:
 
 ### Policies
 
-`PostPolicy` and `UserPolicy` handle resource-scoped questions the middleware
-cannot answer — "may this account edit **this** post".
+Ten policies exist: `PostPolicy`, `UserPolicy`, `FeedPostPolicy`,
+`AiArticlePolicy`, and the six the modules added — `IdeaPolicy`,
+`IdeaPlanPolicy`, `IdeaTaskPolicy`, `IdeaCategoryPolicy`, `LabWorkspacePolicy`,
+`LabSnippetPolicy`. They handle the resource-scoped questions the middleware
+cannot answer — "may this account edit **this** post", "**this** idea",
+"**this** snippet".
+
+Two shapes recur across them, and both are deliberate:
+
+- **A module row is public, private to its author, or visible to the panel.**
+  `IdeaPolicy::view()` and `LabSnippetPolicy::view()` delegate to the model's own
+  `isVisibleTo()`, so the policy and the public page cannot disagree. That
+  predicate has exactly three answers: published means anybody, unpublished means
+  the author, and `admin:access` means the operator running the console. There is
+  no fourth door — a stranger holding `ideas:use` sees nothing that was not
+  published.
+- **Oversight is not authorship.** `update()` is ownership-only in every module
+  policy, including for an admin, while `delete()` also admits `admin:access`.
+  Writing into somebody's inbox is not what the panel key buys; taking down an
+  obvious abuse is. `LabSnippetPolicy` keeps that split for the sharper reason a
+  snippet is code: a published snippet can be harmful, so the console may remove
+  one, but the sandbox stays the only place code changes.
+
+`IdeaTaskPolicy` resolves through the parent plan rather than the task, because a
+task carries no `user_id` of its own; the ownership question is always about the
+plan it belongs to.
 
 `UserPolicy` contains the escalation guard. Role assignment is checked twice:
 the policy authorizes the action, and `AccountRole::assignableBy()` filters
@@ -483,7 +625,9 @@ Full matrix: [`PERMISSIONS.md`](PERMISSIONS.md).
 
 ## 6. Data layer
 
-Six application migrations plus the framework defaults.
+Every table hangs off `users`; nothing module-scoped is shared with anything
+else. The diagram is the shape, `SCHEMA.md` §10 and the module sections are the
+detail.
 
 ```
 users
@@ -491,6 +635,18 @@ users
   ├─ posts ───── post_tag ──── tags
   │   │
   │   └─ comments
+  │
+  ├─ feed_posts ─── feed_attachments
+  ├─ communities ─── community_memberships
+  ├─ marketplace_products ─── marketplace_product_versions / marketplace_reviews
+  ├─ ai_articles ─── ai_article_links / ai_topics / ai_learning_paths / ai_resources
+  │
+  ├─ idea_categories ─┐
+  ├─ ideas ───────────┼─ idea_plans ─── idea_tasks
+  │                   │      (one idea yields at most one plan: idea_id is UNIQUE)
+  ├─ lab_workspaces
+  ├─ lab_snippets
+  └─ lab_executions        (references nothing — language and label are recorded, not joined)
   │
   └─ role (AccountRole)
 ```
@@ -581,7 +737,8 @@ Full design language: [`UI-UX-BRIEF.md`](UI-UX-BRIEF.md).
 
 ## 8. Testing strategy
 
-Pest 5, 255 passing tests, 903 assertions.
+Pest 5, 893 tests and 3,290 assertions, of which 13 fail on a machine without PHP's
+GD extension (the `FeedMediaTest` image fixtures) and pass where GD is present.
 
 | Suite | Covers |
 | --- | --- |

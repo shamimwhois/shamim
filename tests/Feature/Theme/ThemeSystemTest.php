@@ -2,6 +2,7 @@
 
 use App\Enums\AccountRole;
 use App\Models\User;
+use Database\Seeders\FeedPostSeeder;
 
 /**
  * The theme system contract.
@@ -25,10 +26,18 @@ function themedAccount(AccountRole $role): User
 }
 
 test('the theme controller boots dark-first on every surface', function () {
+    $this->seed(FeedPostSeeder::class);
+
     $surfaces = [
-        'auth' => $this->get(route('login')),
+        // The token-bearing reset screen stands in for the auth layout: login,
+        // register and forgot-password are modal-first redirects now.
+        'auth' => $this->get(route('password.reset', ['token' => 'theme-check'])),
         'public' => $this->get(route('home')),
         'dashboard' => $this->actingAs(themedAccount(AccountRole::User))->get(route('dashboard.index')),
+        // The feed shell composes the same partials.head, so it boots through
+        // the same controller — index for the shell, show for the thread page.
+        'feed' => $this->get(route('feed.index')),
+        'feed thread' => $this->get(route('feed.show', ['slug' => 'rust-async-stream-processing'])),
     ];
 
     foreach ($surfaces as $surface => $response) {
@@ -44,10 +53,14 @@ test('the theme controller boots dark-first on every surface', function () {
 });
 
 test('no surface renders a server-applied dark class', function () {
+    $this->seed(FeedPostSeeder::class);
+
     $surfaces = [
-        'auth' => $this->get(route('login')),
+        'auth' => $this->get(route('password.reset', ['token' => 'theme-check'])),
         'public' => $this->get(route('home')),
         'dashboard' => $this->actingAs(themedAccount(AccountRole::User))->get(route('dashboard.index')),
+        'feed' => $this->get(route('feed.index')),
+        'feed thread' => $this->get(route('feed.show', ['slug' => 'rust-async-stream-processing'])),
     ];
 
     foreach ($surfaces as $surface => $response) {
@@ -58,7 +71,7 @@ test('no surface renders a server-applied dark class', function () {
 });
 
 test('the boot script runs after the appearance controller it amends', function () {
-    $html = $this->get(route('login'))->getContent();
+    $html = $this->get(route('password.reset', ['token' => 'theme-check']))->getContent();
 
     $controller = mb_strpos($html, 'applyAppearance');
     $boot = mb_strpos($html, 'DevFolioTheme');
@@ -84,10 +97,14 @@ test('every workspace exposes the theme toggle', function () {
     }
 });
 
-test('the public site and the auth screens expose the theme toggle', function () {
+test('the public site, the auth screens, and the feed expose the theme toggle', function () {
+    $this->seed(FeedPostSeeder::class);
+
     expect($this->get(route('home'))->getContent())
         ->toContain('data-test="theme-toggle"')
-        ->and($this->get(route('login'))->getContent())
+        ->and($this->get(route('password.reset', ['token' => 'theme-check']))->getContent())
+        ->toContain('data-test="theme-toggle"')
+        ->and($this->get(route('feed.index'))->getContent())
         ->toContain('data-test="theme-toggle"');
 });
 

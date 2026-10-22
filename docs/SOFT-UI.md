@@ -28,6 +28,12 @@ taxonomy, comments, users, plans and settings. The public site is governed by
 `docs/UI-UX-BRIEF.md` and shares nothing but the empty state and the
 pagination component.
 
+One *pattern* is shared as well, and no code: the public facet rows obey `§5.8`'s rules
+in the editorial palette. That belongs in this document rather than the public brief
+because a filter that lies about its own contents is the same defect in either register,
+and a dashboard filter designed to disagree with a public one is a bug nobody noticed.
+See `§5.8.1`.
+
 ### 1.2 The mechanism
 
 One attribute does the work. The three workspace layouts —
@@ -662,6 +668,54 @@ separate chip.
 | Loading | `wire:loading` marks the pending filter; the label never disappears |
 | Error | Not applicable — filters do not error, the list behind them does |
 
+#### 5.8.1 The scrollable facet row
+
+**Where it exists.** `resources/views/pages/ideas/⚡index.blade.php` and
+`resources/views/pages/dev-lab/⚡gallery.blade.php`, on the model the hub's article index
+(`resources/views/pages/ai-hub/⚡articles.blade.php`) already followed. All three render
+in the public shell, so the utilities are `ink-*` and `signal-*` rather than the `sui-*`
+names above; the rules are this section's, unchanged. The article index supplied the chip
+row, the URL bindings and the removable chips; the shaped skeleton and the two-character
+search floor are what the two module landings add, and are the two things a new public
+list should copy rather than re-invent.
+
+**The pattern, element by element.**
+
+- A `snap-x` row that scrolls sideways instead of wrapping, every chip `shrink-0`. A
+  filter row that breaks onto three lines on a phone is a wall with buttons in it.
+- A live count in each chip, printed only when it is above zero, and a chip that is
+  simply absent at zero. The gallery's language row and the two subject rows all obey
+  this; a zero is not a choice, it is a dead end.
+- One `#[Url]`-bound property per facet — `?topic=`, `?author=`, `?sort=`, and the
+  gallery's extra `?lang=` — each with an `except:` default so a clean URL stays clean
+  and a link someone shares is short. A facet written into the URL even when untouched
+  makes every shared link look filtered.
+- `updating()` resets the page for every facet change, and says which properties it is
+  watching. A facet that keeps the reader on page seven of a list they just narrowed is
+  the oldest defect in this kind of screen.
+- One removable chip per non-default parameter, each with an `aria-label` naming the
+  filter it clears, plus a reset that clears them together. The chosen chip in the row
+  carries `aria-pressed`, so the state is not carried by the fill alone.
+- A matched-term echo: the active subject's or author's name becomes the heading over the
+  list it filtered, escaped and printed as text. The page names the state it is in rather
+  than leaving the reader to infer it from which pill is dark.
+- A `wire:loading` skeleton shaped like the grid it replaces — six cards, hairline bars
+  where the title, the excerpt and the badges will sit — instead of a spinner. What the
+  reader is waiting for is the list, so the wait takes the list's shape. The wrapper
+  carries the directive and the grid lives inside it, because `wire:loading` hides by
+  writing `display: none` inline.
+- A two-character minimum before a search term filters anything, and the sentence
+  "Type at least two characters" while below it — with everything still listed underneath.
+  One keystroke matched against half the corpus is noise presented as a result, and a
+  silently empty list reads as a broken page rather than as an unfinished query.
+
+**Why the counts and the lists cannot disagree.** Both come from
+`App\Services\PublicTaxonomy`, which counts through the `published()` scope on the pivot
+relation. A chip therefore cannot advertise a row the page will not open, and the same
+number is what `/topics` prints on the card that links here. This is the public twin of
+the rule in `§5.9`: the figure beside a filter is derived from the query beneath it,
+never typed in next to it.
+
 ### 5.9 Chips and badges
 
 **Primitives:** `sui-chip` (shape only), then `sui-chip-accent`, `sui-chip-warning`, `sui-chip-neutral`, `sui-chip-success`, and the six `sui-type-*` legend utilities.
@@ -680,6 +734,45 @@ use.
 | `sui-chip-success` | Live, published, enabled |
 | `sui-chip-warning` | Pending, scheduled, needs attention |
 | `sui-type-*` (six) | The correction legend in the editor review panel — spelling, grammar, punctuation, style, clarity, tone |
+
+**There is a second family, and the same rule binds it.** The chips above appear
+in six files. Statuses across the application render as `<flux:badge>`, and their
+colour comes from neither list: it comes from a `badgeColor()` method on the enum
+being displayed. Thirteen enums expose one — `AccountRole`, `PostStatus`,
+`CommentStatus`, `ProductStatus`, `ReviewStatus`, `AiPublicationStatus`,
+`IdeaStatus`, `PlanStatus`, `TaskStatus`, `WorkPriority`, `IdeaPotential`,
+`LabLanguage`, `ContentVisibility` — and 30 badge call sites read
+`:color="$model->status->badgeColor()"`. **The rule is not "use `sui-chip-*`", it
+is "never pick the tint where the badge is written"**, and `badgeColor()` is the
+enum-side twin of the `app.css`-side variant list.
+
+Six badge call sites still carry a literal. Each is a state no enum models, not
+an oversight:
+
+| Where | Literal | Why it is not derived |
+| --- | --- | --- |
+| `pages/admin/⚡ai-hub.blade.php:1709,1746` | `zinc` | "Retired" marks `is_active === false`. A boolean has no `badgeColor()` |
+| `pages/admin/⚡ai-hub.blade.php:1908` | `amber` | "Featured" marks `is_featured === true`, shown next to the path's real status badge |
+| `pages/admin/⚡dev-lab.blade.php:370` | `amber` / `gray` | "Public, not published": the visibility flag and `published_at` disagree, and that third state belongs to the pair, not to either member |
+| `components/app/dev-lab/snippet-card.blade.php:51` | `gray` | "stored" — the marker for a language with no Run button. It names an absence, and it now lives in the public card rather than in the landing that used to draw the row itself |
+| `pages/dev-lab/⚡dashboard.blade.php:222` | `zinc` | "N panes" — a count, which is metadata |
+
+Five sites that used to be drift are not: the Public and Private badges on
+`pages/dev-lab/⚡snippets.blade.php`, the Public badge on
+`pages/dev-lab/⚡dashboard.blade.php`, and the Public badges in both module
+consoles now read `visibility->badgeColor()`. Two of the five became one. The
+snippets list rendered `isPublished() ? green "Public" : gray "Private"`, which
+mislabelled a row flagged public but not yet published as Private; it now prints
+`visibility->label()` inside `visibility->badgeColor()`, one state read from one
+source, and the "flag disagrees with the timestamp" case is left to the console
+that exists to moderate it.
+
+**The `sui-chip-*` and `sui-type-*` utilities remain the only place a tint is
+written out as CSS.** A badge that needs a colour no enum models belongs in a
+component that carries the tint, the way
+`components/app/ideas/status-badge.blade.php` wraps `flux:badge` so a screen never
+types the token for a state that *does* have an enum. The five literals above are
+the residue of that rule, not an exception to it: none of them is a status.
 
 The six `sui-type-*` colours are a **legend, not a status scale**: each badge
 carries its own text label, so the colour only has to separate one category from

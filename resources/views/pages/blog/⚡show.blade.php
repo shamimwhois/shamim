@@ -130,9 +130,12 @@ new #[Title('Post')] class extends Component
         $user = auth()->user();
 
         if ($user === null) {
-            // Signed-out readers are redirected to sign in rather than being
-            // allowed to post anonymously — a named thread is a calmer thread.
-            $this->redirectRoute('login', navigate: true);
+            // Same contract as the feed's membership toggle: keep the reader
+            // on the article with the login dialog open rather than walking
+            // them to a separate screen. The extra `signin` entry is not a
+            // route parameter, so it is appended as the query flag the dialog
+            // reads; `navigate: true` reloads this page with it.
+            $this->redirectRoute('blog.show', ['post' => $this->post->slug, 'signin' => 'required'], navigate: true);
 
             return;
         }
@@ -290,14 +293,19 @@ new #[Title('Post')] class extends Component
                         @endif
 
                         @can('update', $post)
-                            <span aria-hidden="true">·</span>
-                            <a
-                                href="{{ route('dashboard.posts.edit', $post) }}"
-                                wire:navigate
-                                class="text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
-                            >
-                                Edit post
-                            </a>
+                            @if (auth()->user()?->hasPermission(\App\Enums\AccountPermission::AccessAdminPanel))
+                                {{-- Ownership alone does not open the editor: `/admin/posts` is
+                                     guarded by `admin:access`, so an author who owns the post but
+                                     cannot reach that workspace gets no link at all. --}}
+                                <span aria-hidden="true">·</span>
+                                <a
+                                    href="{{ route('admin.posts.edit', $post) }}"
+                                    wire:navigate
+                                    class="text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400 dark:hover:text-signal-300"
+                                >
+                                    Edit post
+                                </a>
+                            @endif
                         @endcan
                     </div>
 
@@ -439,7 +447,7 @@ new #[Title('Post')] class extends Component
 
                         @guest
                             <p class="rounded-md border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-500 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-400">
-                                <a href="{{ route('login') }}" wire:navigate class="font-medium text-signal-700 underline decoration-signal-400 underline-offset-2 dark:text-signal-400">
+                                <a href="{{ route('login') }}" x-on:click="$flux.modal('login').show(); $event.preventDefault()" class="font-medium text-signal-700 underline decoration-signal-400 underline-offset-2 dark:text-signal-400">
                                     Sign in
                                 </a>
                                 to join the discussion. Comments are published under your name.

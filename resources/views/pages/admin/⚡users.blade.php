@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Users\DeleteUser;
 use App\Enums\AccountPermission;
 use App\Enums\AccountRole;
 use App\Models\User;
@@ -11,6 +12,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * Admin account management.
@@ -29,6 +31,8 @@ use Livewire\Component;
  */
 new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Component
 {
+    use WithPagination;
+
     /** Search term, reflected in the URL so a filtered list is shareable. */
     #[Url(as: 'q', except: '')]
     public string $search = '';
@@ -126,7 +130,8 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
             )
             ->orderByRaw("case role when 'admin' then 0 when 'seller' then 1 else 2 end")
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
     }
 
     /**
@@ -182,6 +187,30 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
             variant: 'success',
         );
     }
+
+    /**
+     * Permanently delete an account.
+     *
+     * Authorisation is re-checked here rather than trusted from the rendered
+     * button, because a Livewire update POST bypasses route middleware. The
+     * policy blocks self-deletion and deleting a peer or superior; everything
+     * the account authored cascades with it, which is why the UI asks twice.
+     */
+    public function delete(int $userId, DeleteUser $deleteUser): void
+    {
+        $target = User::query()->findOrFail($userId);
+
+        Gate::authorize('delete', $target);
+
+        $deleteUser->handle($target);
+
+        unset($this->accounts, $this->roleCounts);
+
+        Flux::toast(
+            text: __(':name was deleted.', ['name' => $target->name]),
+            variant: 'success',
+        );
+    }
 }; ?>
 
 <div>
@@ -190,7 +219,13 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
         title="Users"
         description="Every registered account, and the role that governs what it can reach."
         :breadcrumbs="[['label' => __('Administration')], ['label' => __('Users')]]"
-    />
+    >
+        <x-slot:actions>
+            <flux:button variant="primary" :href="route('admin.users.create')" icon="plus" wire:navigate>
+                {{ __('New user') }}
+            </flux:button>
+        </x-slot:actions>
+    </x-app.ui.header>
 
     <x-app.ui.body>
         {{-- ============================================================= --
@@ -279,6 +314,9 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                             <th scope="col" class="px-5 py-3 text-right sui-table-head">
                                 {{ __('Role') }}
                             </th>
+                            <th scope="col" class="px-5 py-3 text-right sui-table-head">
+                                {{ __('Actions') }}
+                            </th>
                         </tr>
                     </thead>
 
@@ -288,9 +326,15 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                                 $isSelf = $account->is(auth()->user());
                                 $canEdit = ! $isSelf
                                     && ! $account->accountRole()->isAtLeast(auth()->user()->accountRole());
+                                $canUpdate = ! $isSelf && Gate::allows('update', $account);
+                                $canDelete = Gate::allows('delete', $account);
                             @endphp
 
-                            <tr wire:key="account-{{ $account->id }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
+                            <tr
+                                wire:key="account-{{ $account->id }}"
+                                x-data="{ confirmingDelete: false }"
+                                class="transition duration-150 ease-soft hover:bg-sui-hover"
+                            >
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center gap-3">
                                         <div class="grid size-8 shrink-0 place-items-center rounded-md border border-sui-hairline bg-sui-well text-xs font-semibold text-ink-500">
@@ -320,6 +364,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                                         <select
                                             wire:change="updateRole({{ $account->id }}, $event.target.value)"
                                             class="sui-control w-auto !py-1.5 text-xs"
+                                            data-test="role-select-{{ $account->id }}"
                                             :aria-label="__('Role for :name', ['name' => $account->name])"
                                         >
                                             @foreach ($this->assignableRoles as $option)
@@ -336,6 +381,40 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                                             {{ $account->accountRole()->label() }}
                                         </flux:badge>
                                     @endif
+                                </td>
+
+                                <td class="px-5 py-3.5 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if ($canUpdate)
+                                            <flux:button variant="ghost" size="xs" :href="route('admin.users.edit', $account)" wire:navigate icon="pencil-square" data-test="edit-account-{{ $account->id }}">
+                                                {{ __('Edit') }}
+                                            </flux:button>
+                                        @endif
+
+                                        @if ($canDelete)
+                                            <template x-if="! confirmingDelete">
+                                                <flux:button variant="ghost" size="xs" x-on:click="confirmingDelete = true" icon="trash" class="!text-sui-danger">
+                                                    {{ __('Delete') }}
+                                                </flux:button>
+                                            </template>
+
+                                            <template x-if="confirmingDelete">
+                                                <span class="inline-flex items-center gap-1.5">
+                                                    <span class="text-2xs text-sui-danger">{{ __('Delete permanently?') }}</span>
+                                                    <flux:button variant="danger" size="xs" wire:click="delete({{ $account->id }})" wire:loading.attr="disabled" data-test="confirm-delete-{{ $account->id }}">
+                                                        {{ __('Yes') }}
+                                                    </flux:button>
+                                                    <flux:button variant="ghost" size="xs" x-on:click="confirmingDelete = false">
+                                                        {{ __('No') }}
+                                                    </flux:button>
+                                                </span>
+                                            </template>
+                                        @endif
+
+                                        @if (! $canUpdate && ! $canDelete)
+                                            <span class="text-2xs text-ink-400">&mdash;</span>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

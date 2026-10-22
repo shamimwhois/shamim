@@ -21,19 +21,19 @@ return [
         */
         'short_name' => env('PORTFOLIO_AUTHOR_SHORT_NAME', 'shamim'),
 
-        'role' => env('PORTFOLIO_AUTHOR_ROLE', 'Senior Software Engineer'),
+        'role' => env('PORTFOLIO_AUTHOR_ROLE', 'Full Stack Developer'),
 
-        'tagline' => 'I design and build backends that stay fast, understandable, and cheap to change — and I write about how.',
+        'tagline' => 'I design and build web applications end to end — backends that stay fast and interfaces that stay clear — and I write about how.',
 
         'location' => env('PORTFOLIO_AUTHOR_LOCATION', 'Dhaka, Bangladesh'),
 
-        'availability' => env('PORTFOLIO_AUTHOR_AVAILABILITY', 'Open to senior platform and backend roles'),
+        'availability' => env('PORTFOLIO_AUTHOR_AVAILABILITY', 'Open to full stack developer roles'),
 
         'years_of_experience' => (int) env('PORTFOLIO_AUTHOR_YEARS', 15),
 
-        'bio' => 'Senior engineer specialising in Laravel, distributed systems, and developer tooling. I care about the boring parts: migrations that are reversible, queries that scale, and interfaces a new teammate can understand on their first day.',
+        'bio' => 'Full stack developer specialising in Laravel, Livewire, and developer tooling. I care about the boring parts: migrations that are reversible, queries that scale, and interfaces a new teammate can understand on their first day.',
 
-        'long_bio' => 'I have spent the last nine years building and scaling web platforms, mostly in the Laravel and PHP ecosystem, with detours into TypeScript, Go, and whatever the problem actually needed. Most of my work has been on the unglamorous middle layer — the part that sits between a product idea and a database that has to hold up under load for the next three years.
+        'long_bio' => 'I have spent the last nine years building and scaling web platforms end to end, mostly in the Laravel and PHP ecosystem with Livewire, Alpine, and Tailwind interfaces on top, and detours into TypeScript, Go, and whatever the problem actually needed. Most of my work has been on the unglamorous middle layer — the part that sits between a product idea and a database that has to hold up under load for the next three years — but I am just as comfortable owning the screen the user actually touches.
 
 I write here because writing is how I find out whether I actually understand something. The posts are the long version of arguments I have had with myself about indexing strategy, queue design, and why the obvious solution is often the wrong one.',
 
@@ -100,36 +100,343 @@ I write here because writing is how I find out whether I actually understand som
         'projects' => [
             [
                 'name' => 'Atlas Ledger',
+                'slug' => 'atlas-ledger',
                 'role' => 'Lead engineer',
                 'summary' => 'Double-entry accounting engine handling multi-currency settlement for a payments platform.',
                 'outcome' => 'Cut month-end reconciliation from 6 hours to 11 minutes by replacing a cron-driven batch with an event-sourced projection built on database-backed queues.',
                 'stack' => ['Laravel', 'PostgreSQL', 'Redis', 'Horizon'],
                 'url' => 'https://github.com/example/atlas-ledger',
+                'docs' => [
+                    [
+                        'slug' => 'overview',
+                        'title' => 'Overview',
+                        'summary' => 'What the ledger is, the batch it replaced, and the constraints that shaped it.',
+                        'body' => <<<'MD'
+                            ## The problem
+
+                            Settlement ran as one nightly batch. Every currency pair was reconciled by walking a month of transactions in memory, so the job grew with the calendar and failed in the hours nobody was watching. A failed run meant a day of books that could not be closed.
+
+                            ## What it is
+
+                            An append-only double-entry ledger with a projection layer. Transfers write balanced entries to a journal, and projections fold those entries into the balances and statements the finance team reads.
+
+                            ## Constraints
+
+                            - An entry is never edited or deleted. A correction is a new compensating entry.
+                            - Every write is idempotent, keyed by the transfer's external reference.
+                            - The read model must be rebuildable from the journal without the source systems.
+                            - Reconciliation has to finish before the finance team starts its day.
+
+                            ## Outcome
+
+                            Month-end reconciliation fell from six hours to eleven minutes, and a failed projection is replayed rather than investigated at 2am.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'architecture',
+                        'title' => 'Architecture',
+                        'summary' => 'Journal, projections, queue ownership and the invariants that keep the books balanced.',
+                        'body' => <<<'MD'
+                            ## Write path
+
+                            A transfer is validated, converted to a pair of journal entries, and committed in one database transaction. The external reference is unique, so a retried request returns the original transfer instead of writing a second one.
+
+                            ## Read model
+
+                            Projections are ordinary tables with a checkpoint per stream. Each projection handler receives ordered journal events, applies them, and persists its checkpoint in the same transaction as the change. Replaying a stream from zero is therefore safe and repeatable.
+
+                            ## Queues
+
+                            Projection work runs on database-backed queues. The queue is a delivery mechanism, not the source of truth: a lost job is replayed from the journal, and duplicate delivery is absorbed by the handler's checkpoint.
+
+                            ## Invariants
+
+                            - Debits equal credits for every transfer.
+                            - A projection never reads the current journal; it folds events in order.
+                            - No handler writes outside its own projection and checkpoint.
+                            - Balance reads are served from projections, never recomputed per request.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'operations',
+                        'title' => 'Operations',
+                        'summary' => 'Lag, replays, and the month-end runbook the finance team follows.',
+                        'body' => <<<'MD'
+                            ## Health signals
+
+                            Two numbers matter: journal lag (entries written but not yet projected) and checkpoint age. Both are exported as gauges, and an alert fires when lag exceeds fifteen minutes or a checkpoint has not moved during a settlement window.
+
+                            ## Replaying a projection
+
+                            1. Pause the projection's queue consumer.
+                            2. Truncate the projection and reset its checkpoint to zero.
+                            3. Resume the consumer and watch checkpoint age fall.
+
+                            Replays are idempotent by construction, so the operator does not need to know how far the projection got before it stopped.
+
+                            ## Month-end
+
+                            Close the period by freezing new transfers for the window, waiting for journal lag to reach zero, then running the reconciliation report. A non-zero difference is an incident, not a rounding problem: the journal is the source of truth and the report is a projection of it.
+                            MD,
+                    ],
+                ],
             ],
             [
                 'name' => 'Meridian API',
+                'slug' => 'meridian-api',
                 'role' => 'Architect',
                 'summary' => 'Public REST API serving 40M requests a month across three product teams.',
                 'outcome' => 'Reduced p95 latency from 840ms to 190ms and eliminated a recurring incident class by introducing a query-budget layer that fails builds, not requests.',
                 'stack' => ['Laravel', 'MySQL', 'OpenTelemetry', 'Kubernetes'],
                 'url' => 'https://github.com/example/meridian-api',
+                'docs' => [
+                    [
+                        'slug' => 'overview',
+                        'title' => 'Overview',
+                        'summary' => 'A public API with three internal consumers and one contract to keep honest.',
+                        'body' => <<<'MD'
+                            ## The surface
+
+                            Meridian is the public REST API behind three product teams. It serves roughly forty million requests a month, with each team owning endpoints inside one shared contract: versioning, pagination, error shapes and rate limits are platform decisions, not per-team ones.
+
+                            ## The problem
+
+                            Latency crept up one endpoint at a time. A feature would add an eager load, a serialiser would add a relationship, and the p95 moved without anybody deciding it should. The recurring incident was always the same: a heavy query shipping during a peak window.
+
+                            ## What changed
+
+                            The API now declares a query budget per endpoint: a maximum number of queries and a maximum estimated row count. The budget is checked in CI against seeded data, so a regression fails the pull request rather than the pager.
+
+                            ## Outcome
+
+                            p95 fell from 840ms to 190ms over two quarters, and the timeout incident class stopped recurring.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'query-budget',
+                        'title' => 'The query budget',
+                        'summary' => 'How budgets are declared, measured and enforced before a request reaches production.',
+                        'body' => <<<'MD'
+                            ## Declaring a budget
+
+                            Every endpoint names the number of queries it may run and the largest result set it may materialise. The numbers are deliberately small: a list endpoint gets one query for the page and one for its relationships, not one per row.
+
+                            ## Measuring
+
+                            The test suite enables the query log, calls the endpoint with a representative fixture, and fails when either budget is exceeded. The failure message prints the queries that ran, so the fix is visible without reproducing the test locally.
+
+                            ## Enforcing in production
+
+                            The same budget is registered as a request listener. A breach is logged with the endpoint and the query count, and the response is still served: the budget is a design guard, not a runtime kill switch. The alert is what makes the next regression visible.
+
+                            ## Why not a query cache
+
+                            Caching would have hidden the problem rather than fixing it. A cache turns a slow query into a stale answer and makes the next engineer debug two systems instead of one.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'operations',
+                        'title' => 'Operations',
+                        'summary' => 'SLOs, tracing and the on-call path for a shared public contract.',
+                        'body' => <<<'MD'
+                            ## Service levels
+
+                            Availability is measured per endpoint group, not per pod. The error budget is consumed by 5xx responses and by requests that exceed the latency target, because a request that takes eight seconds has failed even when it eventually succeeds.
+
+                            ## Tracing
+
+                            Every request carries a trace id through the HTTP layer, the query listener and the queue jobs it dispatches. The trace is the first artefact in an incident review: it answers which query was slow, not just which endpoint was.
+
+                            ## Changing the contract
+
+                            Additive changes ship behind a version. A field is never repurposed, and a removal is announced for one release before it is enforced. Three consumers means a breaking change is a coordinated release, not a deploy.
+
+                            ## On-call
+
+                            The runbook starts with the endpoint's budget report, then the slow-query log, then the database's own plan for the offending statement. Restarting pods is the last step, not the first.
+                            MD,
+                    ],
+                ],
             ],
             [
                 'name' => 'Forge CLI',
+                'slug' => 'forge-cli',
                 'role' => 'Author',
                 'summary' => 'Internal developer CLI that scaffolds services with migrations, CI, and observability pre-wired.',
                 'outcome' => 'Brought new-service bootstrap time from two weeks of copy-paste to under an hour, and made the platform team\'s conventions the path of least resistance.',
                 'stack' => ['PHP', 'Symfony Console', 'Docker', 'GitHub Actions'],
                 'url' => 'https://github.com/example/forge-cli',
+                'docs' => [
+                    [
+                        'slug' => 'overview',
+                        'title' => 'Overview',
+                        'summary' => 'A scaffold that ships the platform conventions instead of documenting them.',
+                        'body' => <<<'MD'
+                            ## The problem
+
+                            A new service used to start as a copy of the last new service. Whatever that repository had drifted into — an old CI action, a missing health endpoint, a Dockerfile with a root user — became the starting point for the next one.
+
+                            ## What it is
+
+                            Forge is an internal CLI that generates a service from a template the platform team owns. The generated repository already has migrations, a test pipeline, structured logging, a health endpoint, a Dockerfile and an environment manifest.
+
+                            ## Design rule
+
+                            If a convention matters, it is in the template. A document that says "remember to add the health check" is a convention that will be forgotten; a template that already has one is a convention that cannot be skipped.
+
+                            ## Outcome
+
+                            Bootstrap time went from two weeks of copy-paste and review to under an hour, and platform review now starts from a known shape.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'commands',
+                        'title' => 'Commands',
+                        'summary' => 'The four verbs Forge exposes and what each one touches.',
+                        'body' => <<<'MD'
+                            ## `forge new`
+
+                            Creates a service from the platform template. It asks for a name and an owner, renders the template, initialises the repository, and prints the first three steps a developer needs.
+
+                            ## `forge add`
+
+                            Adds an optional capability — a queue worker, a scheduled command, an S3 disk — by applying the same patch the platform team uses in its reference service. It refuses to run when the target file has local changes.
+
+                            ## `forge check`
+
+                            Compares a repository against the template and reports drift: missing health checks, an outdated CI action, a Dockerfile that runs as root. The report is advisory; fixing is a separate, reviewable pull request.
+
+                            ## `forge upgrade`
+
+                            Applies a template upgrade to an existing service, one commit per capability, so a reviewer can accept the queue change and reject the logging change independently.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'maintenance',
+                        'title' => 'Maintenance',
+                        'summary' => 'How the template is versioned and rolled out without breaking existing services.',
+                        'body' => <<<'MD'
+                            ## Versioning
+
+                            The template is versioned like a library. A change that requires every service to act is a major version; a new optional capability is a minor one. `forge new` always uses the latest version, and an existing service records the version it was generated from.
+
+                            ## Rollout
+
+                            A template change is proved on the platform team's own service first. It reaches other services only through `forge upgrade`, which is a pull request, never a push.
+
+                            ## Deprecations
+
+                            A removed convention gets one release of `forge check` warnings before it disappears from the template. The warning names the replacement, so the upgrade path is in the output rather than in a wiki page.
+
+                            ## Ownership
+
+                            The platform team owns the template; product teams own their generated services. A bug in generated code is fixed in the template and rolled forward, not patched into each repository.
+                            MD,
+                    ],
+                ],
             ],
             [
                 'name' => 'QueueLens',
+                'slug' => 'queuelens',
                 'role' => 'Maintainer',
                 'summary' => 'Open-source metrics exporter that turns Horizon queue telemetry into Prometheus dashboards.',
                 'outcome' => 'Gave platform teams a queue-depth SLO out of the box; adopted by four internal teams in its first quarter and now shipped with the default platform image.',
                 'stack' => ['PHP', 'Prometheus', 'Redis Streams', 'Grafana'],
                 'url' => 'https://github.com/example/queuelens',
+                'docs' => [
+                    [
+                        'slug' => 'overview',
+                        'title' => 'Overview',
+                        'summary' => 'Queue depth, wait time and failure rate as first-class Prometheus metrics.',
+                        'body' => <<<'MD'
+                            ## The problem
+
+                            Horizon tells you how many jobs are waiting. It does not tell Prometheus, so a platform team either scrapes Redis itself or finds out about a queue backlog when a customer does.
+
+                            ## What it is
+
+                            QueueLens is a small exporter that reads Horizon's Redis structures and publishes queue depth, oldest-job age, throughput and failure counts as Prometheus metrics. A bundled Grafana dashboard turns those into a queue-depth SLO.
+
+                            ## Design rule
+
+                            Every metric names its queue and its connection. An aggregate that hides which queue is backed up is a dashboard that looks healthy while one worker starves.
+
+                            ## Outcome
+
+                            Four internal teams adopted it in the first quarter, and it now ships with the default platform image, so a new service gets queue visibility without adding an exporter.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'metrics',
+                        'title' => 'Metrics',
+                        'summary' => 'The four series the exporter publishes and how to read them together.',
+                        'body' => <<<'MD'
+                            ## `queuelens_depth`
+
+                            Jobs waiting per queue. Useful on its own only when paired with throughput: a depth of 500 is normal for a queue draining 2,000 jobs a minute and an incident for one draining 20.
+
+                            ## `queuelens_oldest_job_seconds`
+
+                            Age of the oldest waiting job. This is the metric that catches a stalled worker: depth grows slowly, but the oldest job's age grows without bound.
+
+                            ## `queuelens_processed_total`
+
+                            A counter of completed jobs by queue and status. Rate it to get throughput and failure ratio; the raw counter is only useful for restart detection.
+
+                            ## `queuelens_failed_total`
+
+                            A counter of failed attempts. A failure ratio above one percent is the alert, not an absolute number, because traffic differs by an order of magnitude between queues.
+                            MD,
+                    ],
+                    [
+                        'slug' => 'operations',
+                        'title' => 'Operations',
+                        'summary' => 'Scrape configuration, cardinality limits and the runbook for a backed-up queue.',
+                        'body' => <<<'MD'
+                            ## Scraping
+
+                            The exporter listens on its own port and is scraped like any other target. It reads Redis with a dedicated connection and never writes to the queue; a failed scrape must not affect job processing.
+
+                            ## Cardinality
+
+                            Queue and connection names are low-cardinality by design. The exporter refuses to label by job class by default, because a label with thousands of values is a metrics bill disguised as observability.
+
+                            ## A backed-up queue
+
+                            1. Check `queuelens_oldest_job_seconds` to distinguish a stall from a burst.
+                            2. If the oldest job is ageing, inspect the worker's last heartbeat and restart the supervisor.
+                            3. If depth is rising but the oldest job is young, the queue is simply under-provisioned; scale workers before changing the code.
+
+                            ## Compatibility
+
+                            The exporter supports Horizon's Redis schema for the current major version. A schema change is detected at boot and reported as an exporter error rather than as silently missing metrics.
+                            MD,
+                    ],
+                ],
             ],
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | The site's own project
+        |----------------------------------------------------------------------
+        |
+        | Appended to Selected work by ProjectCatalog rather than stored in the
+        | projects list: its documentation is this repository's docs folder, and it
+        | should stay reachable even when an operator replaces the work rows in the
+        | database. `docs_source` is the switch that sends the detail page to
+        | `docs/*.md` instead of the configured pages above.
+        */
+
+        'site_project' => [
+            'name' => 'DevFolio',
+            'slug' => 'devfolio',
+            'role' => 'Design & build',
+            'summary' => 'The site you are reading: an editorial portfolio, blog, community feed, marketplace, Developer Lab and Ideas platform in one Laravel application.',
+            'outcome' => 'One codebase carrying six public products, a Livewire-first architecture, and a test suite that treats the interface as the contract — documented from the route map down to the last component.',
+            'stack' => ['Laravel 13', 'Livewire 4', 'Tailwind 4', 'Flux UI', 'Pest'],
+            'url' => null,
+            'docs_source' => 'repository',
         ],
 
         /*
@@ -150,7 +457,7 @@ I write here because writing is how I find out whether I actually understand som
                 'period' => 'Jun 2025 – Present',
                 'roles' => [
                     [
-                        'title' => 'Senior Software Engineer',
+                        'title' => 'Full Stack Developer',
                         'period' => 'Jun 2025 – Present',
                         'highlights' => [
                             [

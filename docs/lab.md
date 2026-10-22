@@ -1,14 +1,19 @@
 # shamim.it Developer Lab — Master PRD & Implementation Prompt
 
-> **Status: UPSTREAM PRODUCT SPEC — NOT IMPLEMENTED.**
+> **Status: UPSTREAM PRODUCT SPEC — PARTIALLY IMPLEMENTED.**
 >
-> This document is an **input**, not a description of the shipped system. It
-> specifies a browser-based coding and practice environment ("Developer Lab")
-> and predates the current architecture. No part of Developer Lab exists in the
-> codebase today — not the editor, not the runner, not the challenge system.
+> This document is an **input** that has since been partly built. It specifies a
+> browser-based coding and practice environment ("Developer Lab") and predates the
+> current architecture. The editor, the sandboxed preview, the snippet library and
+> the execution history exist in the codebase; the server-side runner, the challenge
+> system and the debugger do not.
 >
-> Read it as: *what the module should become, once it is built.* Do not read it
-> as: *what the application currently does.*
+> Read §1–§9 as: *what the module was specified to become.* Read
+> [§ What is shipped](#what-is-shipped) below as: *what the application currently
+> does.* Where the two disagree, this document defers — the shipped system is
+> described in [ROUTES](./ROUTES.md), [SCHEMA](./SCHEMA.md),
+> [ARCHITECTURE](./ARCHITECTURE.md) and [COMPONENTS](./COMPONENTS.md), and those are
+> the files kept in step with the code.
 >
 > **Where the rest of the system is documented instead:**
 > [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
@@ -17,22 +22,265 @@
 > [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
 > [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md)
 >
-> **Already built and reusable by this module:** the account-role and permission
-> substrate ([PERMISSIONS.md](./PERMISSIONS.md)), the dashboard shell with
-> permission-driven navigation, the shared modal system
-> ([COMPONENTS.md](./COMPONENTS.md)), and the `seller` role's product
-> permissions. See [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission)
-> for the deferral rationale.
+> **Reused from the substrate rather than rebuilt:** the account-role and permission
+> model ([PERMISSIONS.md](./PERMISSIONS.md)) — the module gates on the pre-existing
+> `dev-lab:use` and `admin:access` cases and **adds no new permission**; the
+> dashboard shell and its permission-driven navigation; the shared modal, badge and
+> form components ([COMPONENTS.md](./COMPONENTS.md)); the Soft UI token set
+> ([SOFT-UI.md](./SOFT-UI.md)); and the module layering the AI Hub established
+> (enum → migration → model → action → policy → single-file Livewire screen).
 >
-> **A caution specific to this spec.** "Run arbitrary user code in a browser"
-> is the part that needs re-planning rather than porting: it implies a sandbox
-> boundary, a resource limit, and an abuse story that a Livewire monolith on
-> SQLite does not currently provide. Treat §"run supported programs" as an open
-> design question, not a settled requirement.
+> **The caution in this spec turned out to be the design.** "Run arbitrary user code
+> in a browser" does imply a sandbox boundary, a resource limit and an abuse story.
+> The answer this module shipped is: the code runs in the visitor's own browser,
+> inside a frame with no origin of its own, and the application never executes it.
+> That choice buys the isolation and costs the guarantee — see
+> [§ The sandbox boundary](#the-sandbox-boundary), which is the security document
+> for this feature.
 >
 > **Naming note.** This spec addresses `https://shamim.it`. In-repository
 > documentation calls the application **DevFolio**; they refer to the same
 > product.
+
+## What is shipped
+
+Nine routes beneath `/dev-lab`, one operator console at `/admin/dev-lab`, three
+module tables plus the platform's shared `topics` list and its `lab_snippet_topic`
+pivot, the `LabLanguage` enum plus the shared `ContentVisibility` case, seven
+actions, two policies, eight workspace and public screens,
+one admin screen, and one Alpine runtime.
+
+| Surface | Path | Who reaches it |
+| --- | --- | --- |
+| Landing | `/dev-lab` | public |
+| Gallery | `/dev-lab/gallery` | public, published snippets only |
+| Snippet page | `/dev-lab/snippets/{snippet:slug}` | public when published; otherwise author or `admin:access` |
+| Workspace home | `/dev-lab/dashboard` | `auth`, `verified`, `dev-lab:use` |
+| Sandbox | `/dev-lab/sandbox` | same |
+| Own snippets | `/dev-lab/snippets` | same |
+| Snippet form | `/dev-lab/snippets/create`, `/dev-lab/snippets/{snippet:slug}/edit` | same |
+| Run history | `/dev-lab/history` | same |
+| Operator console | `/admin/dev-lab` | `admin:access` |
+
+The three tables are `lab_workspaces` (the scratch buffer: one row is the HTML, CSS
+and JS trio a preview needs), `lab_snippets` (the publishable object, with a slug, a
+language, a visibility pair and a view count) and `lab_executions` (one row per press
+of Run, and nothing else). `LabSnippet` and `LabWorkspace` are owned by an account and
+every list is scoped through an `authoredBy()` scope; a foreign id resolves to a 404
+rather than a 403, because confirming that somebody else's row exists is information
+the module does not hand out.
+
+Publication is the conjunction the hub and the marketplace already use: `visibility`
+is `ContentVisibility::Public` **and** `published_at` is set. `SaveLabSnippet` is the
+only writer of the pair and refuses to publish empty code, so the half-state that
+means "decided, not yet shown" stays invisible rather than leaking onto the gallery.
+
+### Subjects, and what the gallery's URL can hold
+
+A snippet files into the same platform-owned `App\Models\Topic` list an idea does,
+through the `lab_snippet_topic` pivot, synced by
+`App\Actions\DevLab\SyncLabSnippetTopics` inside the transaction
+`SaveLabSnippet` already opens. `LabLanguage` is what the code is written in and a
+topic is what it is for, so the two are separate axes and the gallery narrows through
+both without either one changing the other's counts. The cap and the failure mode are
+the Ideas module's, because they are the same class: `Topic::MAX_PER_ROW` is eight
+topics to a snippet, and an id that is not an integer, does not exist or has been
+switched off by an operator is dropped by `Topic::syncRows()` rather than failing the
+save. Somebody filing a snippet from the sandbox should not lose the code they pasted
+because a subject checkbox arrived malformed. Nothing here is public until a
+**published** snippet carries it: the gate is `App\Services\PublicTaxonomy`, the same
+one the ideas landing and `/topics` read, which is why a chip on the gallery never
+opens an empty list.
+
+The gallery therefore takes `?topic=`, `?author=` and `?sort=` beside the `?q=`,
+`?lang=` and `?page=` it already had. They are `#[Url]`-bound properties with their
+defaults hidden, and a value that fails the shared gate is ignored rather than
+answered with a 404. The parameter table lives in [API](./API.md) §7.1.
+
+### What a published snippet tells a machine
+
+A published snippet carries `SoftwareSourceCode` structured data plus a
+`BreadcrumbList`, emitted through `App\Support\Seo::$jsonLd` from
+`resources/views/pages/dev-lab/⚡snippet-show.blade.php`. `codeLanguage` and
+`programmingLanguage` are both `LabLanguage::label()`, `codeText` is the raw source
+that is already the visible content of the page, and `lines` comes from
+`lineCount()`. `runtime` is `Browser`, and **only** when
+`LabLanguage::isBrowserRunnable()` is true: a PHP snippet claims no runtime it does
+not have, and there is no invented `license` field either. A private snippet read by
+its author or an operator sets `noindex` and emits nothing, because neither is a page
+worth announcing.
+
+### The landing runs the site's own example
+
+`/dev-lab` now offers a built-in example in a frame rather than a screenshot of one.
+The three panes live in `config('dev_lab.showcase')` — configuration and not template
+markup because the frame is composed by JavaScript from a JSON literal — and are
+rendered by `resources/views/components/app/dev-lab/showcase.blade.php`, which
+executes nothing until the reader presses Run.
+
+This relaxes no rule in [§ The sandbox boundary](#the-sandbox-boundary). The frame is
+still `sandbox="allow-scripts"` with nothing else and no `allow-same-origin`, there is
+still no CSRF token inside it, PHP still has no Run button anywhere on the site, and
+the postMessage source check in `resources/js/lab-sandbox.js` is unchanged — the
+parent still only accepts a message whose `event.source` is that frame's own window.
+The code being ours is not a reason to build a second, weaker boundary.
+
+### Open in your sandbox
+
+"Open in your sandbox" on a published snippet page copies it into the reader's own
+buffer through `App\Actions\DevLab\CloneSnippetToWorkspace`, which force-fills the
+html/css/js trio into a `LabWorkspace` named `From {title}` — the snippet's code in
+the pane its language names and the other two emptied, so what runs is the snippet and
+not a remix of it with whatever was already there. The buffer is looked up through
+`authoredBy()` by that derived name, so a second press updates the same workspace
+instead of piling up duplicates, and the write itself is delegated to
+`App\Actions\DevLab\SaveLabWorkspace` because that class is still the only writer of a
+workspace and cloning is not exempt from the byte ceiling. A PHP snippet offers no such
+button, because there is no PHP pane to open it into, and the action refuses the
+request as well — the template is a suggestion and the request is not.
+
+The guard is `dev-lab:use` checked inside the Livewire action rather than on the route,
+for the reason this module already states: the mutation posts to `/livewire/update`,
+where the route middleware never runs.
+
+### Deviations from the spec, and why
+
+| The spec asks for | Shipped instead | Reason |
+| --- | --- | --- |
+| A multi-language editor that runs supported programs | HTML, CSS and JavaScript run in the visitor's browser. PHP is stored, listed, escaped and copyable, and has **no Run button** | Executing untrusted code needs a container, a CPU quota and a memory limit. §2 of this document forbids running untrusted code in the main application process, and this monolith has no second place to run it. A language with a button that cannot be honoured is worse than a language with no button |
+| Resource limits on the runner | `config/dev_lab.daily_run_limit` (default 100) presses per account per day, enforced by `RecordLabExecution` on the server; `config/dev_lab.max_code_bytes` (default 30000) per pane | Those are the limits this design can actually enforce. There is no CPU or memory ceiling, because the runtime is the visitor's tab. Stated plainly on the landing page rather than implied |
+| Syntax highlighting | Not built, in the editor or anywhere else. The editor is a monospace `<textarea>` with Tab handling and a byte counter; the published snippet page prints the code escaped and monospace in a `<pre><code>` with a copy button. Neither colours tokens | Highlighting a `<textarea>` needs an overlay, and colouring tokens in the rendered view needs a parser — either way a dependency, and no new dependencies were approved for this module. The application has no syntax highlighter installed, so saying otherwise here would be a claim the code cannot support |
+| Autopairing, indentation, editor shortcuts | Tab inserts spaces; nothing else is emulated | Same reason. The editor is a text field with a label, and says so |
+| Line numbers, find and replace, theme selection, error markers, file tabs | Not built | All five are properties of an editor library. §6 of this spec says to implement them through one, and to avoid custom implementations of what a library already provides; picking no library for a new dependency means picking none of those five. The three panes are labelled, counted in bytes, and collapsed behind their own headings instead |
+| Copy and download code, reset to a starter template | Copy exists (a copy button on the published snippet page, and a copy of the console transcript in the sandbox), and a published runnable snippet can be copied into the reader's own buffer by `CloneSnippetToWorkspace` — which is the saved-work shape of a download. Downloading a file and starter-template reset do not | Download is a `Blob` and an object URL, which is nothing a server needs, but it is also nothing the module was asked to guarantee; the saved workspace is the "starter template" story that shipped, since a row can be re-opened and re-edited instead of re-seeded |
+| Step through the failure | The console pane reports `console.log`/`info`/`warn`/`error`, `window.onerror` and `unhandledrejection`, with the message and nothing else | A debugger is a different product. An error line with a message is what most readers of this lab came for |
+| Practice challenges, submissions, grading | Not built | Grading in the browser is advisory — the visitor controls the page being graded — and shipping it would promise a secure judge that does not exist |
+| Learning paths (§14) | Not built. The AI Hub already owns the structured-learning object: `AiLearningPath` with ordered items, its own screens and its own status | Two curriculum tables in one application would have to agree about which one a reader follows. §14 asks for something "lightweight in the MVP", and the honest lightweight answer was to not add a second one |
+| Optional AI coding assistant (§15) | Not built, and §15 marks it optional | The application does have an AI surface (`app/Ai/Agents`, the editor's assist endpoints), but it writes prose for the blog, not code into a sandbox pane. Wiring it to the Lab would be a new product decision, not a screen |
+| Share a workspace, pair programming ("autopairing") | Not built. Sharing means publishing a snippet | A second ACL needs new permissions. The module was built without touching `AccountPermission`, deliberately |
+| Saved work | `LabWorkspace` rows: named, re-openable through `?workspace={id}`, owned by the author, never public | Route-bound by id, because a scratch buffer has no business having a slug |
+| Execution history | `lab_executions`: language, a denormalised label, and a timestamp | It answers "what have I run" and "how much may I still run today", which is what §"execution limits" of this spec asks of a log. The **output** is not stored: it lives in the frame, and archiving a stranger's `console.log` turns a history into a dump. No retention policy is defined either — there is no prune command for this table, so a row lives until a human decides how long it should |
+
+## The sandbox boundary
+
+This is the security document for the feature. There is no `docs/SECURITY.md`; a
+module that executes user code in a page is where a reader looks for the boundary, and
+the boundary is described here in full, including what it does not cover.
+
+### What the frame is
+
+```blade
+<iframe :srcdoc="frame" sandbox="allow-scripts" x-ref="preview"></iframe>
+```
+
+`sandbox="allow-scripts"`, and nothing else. The absence of `allow-same-origin` is the
+mechanism: a sandboxed document without it gets an **opaque origin**, so it is not this
+site with a warning label — it is a document that belongs nowhere. Concretely, code in
+the frame cannot read this application's cookies, `localStorage`, `sessionStorage` or
+indexedDB, cannot touch the parent DOM, and cannot call a Livewire endpoint with the
+visitor's session attached. `allow-forms`, `allow-popups`,
+`allow-top-navigation`, `allow-downloads` and `allow-modals` are all withheld as well,
+so a snippet cannot navigate the top-level tab, open a window, submit a form, hand a
+file to the disk, or block the visitor's browser with a modal.
+
+Alpine composes the document in `resources/js/lab-sandbox.js`: doctype, `meta charset`,
+the CSS in a `<style>`, the HTML, then the JS. Exactly one thing is injected into it —
+a console shim — and two things are never injected: the page's `csrf-token` meta, and
+any fetch the parent might make on the frame's behalf.
+
+Two mechanics in that composition are load-bearing and easy to break. The shim is a
+real top-level function that is serialised with `Function.prototype.toString()` and
+wrapped in parentheses, so what executes inside the frame is the same source the parent
+owns rather than a string copy that can drift; unwrapping the parentheses turns the
+declaration into the expression `(4000)`, which is legal and calls nothing, and the
+console goes silent. And every run increments a `nonce` written into an HTML comment,
+because reassigning `srcdoc` to a byte-identical string is not a navigation: without it,
+pressing Run twice on unchanged code would appear to do nothing.
+
+### The message protocol, and what authenticates it
+
+The shim overrides `log`, `info`, `warn` and `error`, hooks `window.onerror` and
+`unhandledrejection`, replaces `alert`/`confirm`/`prompt` with a logged warning (a
+blocked modal would otherwise read as a broken feature), and posts each line to the
+parent:
+
+```js
+parent.postMessage({ __lab: 1, level, text }, '*');
+```
+
+The parent accepts a message only when **both** conditions hold:
+
+1. `event.source === preview.contentWindow` — the message came from this frame, not
+   from any other window or from another script on the page.
+2. The payload is an object whose `__lab` is exactly `1`, and its `level` and `text`
+   are coerced before use.
+
+`event.origin` is compared against nothing, because for an opaque origin it is the
+literal string `"null"` — comparing it would be cargo-cult security that appears to
+check something and cannot fail usefully. Source identity is the real authentication
+here.
+
+Received text is truncated twice: once in the shim before it posts, and once in the
+parent before it stores, at `config/dev_lab.max_log_line_chars`. The second clamp is not
+decoration — code inside the frame can skip the shim and post the message shape itself,
+so a line that never passed through `console.log` would otherwise arrive uncapped. It
+reaches the DOM
+through `x-text` / `textContent`, never `innerHTML`, so a snippet that logs the string
+`<img onerror=…>` shows those characters.
+
+### What is stored, and how it is escaped
+
+`code`, `html`, `css` and `js` columns hold text. Every surface prints it through Blade
+escaping (`{{ $snippet->code }}` inside `<pre><code>`); there is no `{!! !!}` anywhere
+near user content in this module. The only place stored markup becomes executable is
+the frame a visitor explicitly asks for, and it executes under an opaque origin.
+
+`</script>` inside a stored snippet is not an escape hatch: the composed document is
+assigned to the frame's `srcdoc` as a data value, and the snippet's tag terminates its
+own element inside the frame's document, which is the frame's problem and the frame's
+only.
+
+### What the boundary does not cover, stated plainly
+
+- **An infinite loop hangs the visitor's tab.** There is no timeout, because a browser
+  does not give the page one to enforce. Three things limit the damage rather than
+  prevent it: the preview never rebuilds on keystroke, only on an explicit Run;
+  reassigning `srcdoc` destroys the previous document, so the **Stop** button — which
+  sets the frame's document to the empty string — or a second Run replaces a looping
+  frame; and the daily allowance limits how often the button may be pressed. The panel
+  under the preview states this to the visitor rather than leaving it to be discovered.
+- **The frame can make outbound requests.** An opaque origin does not forbid network
+  access; it forbids *reading cross-origin responses*. So a snippet can load
+  `https://evil.example/?data=…` as an image and get a request out, which may carry
+  that third party's cookies. The mitigation is that there is nothing here worth
+  exfiltrating: the frame holds no token, no storage, and no data this site would give
+  a stranger. Previewing somebody else's work is labelled as such, in the panel, next
+  to the Run button.
+- **No server-side runner means no CPU or memory quota.** The `RecordLabExecution`
+  count is the only resource limit in the module. A real runner is a container, and a
+  container is a deployment decision, not a screen.
+- **This application sends no site-wide Content-Security-Policy.** The only CSP header
+  in the app is the `default-src 'none'; sandbox` that
+  {@see \App\Http\Controllers\FeedAttachmentController::headers()} puts on an
+  attachment response, and it does not cover these pages. The frame's isolation is the
+  mechanism the sandbox relies on; a `sandbox` and `frame-src` CSP would be
+  defence-in-depth on top of it. Adding a CSP changes every page in the site, so it is
+  not a change to make from inside a feature branch, and it is recorded here rather
+  than silently assumed.
+
+### Where each rule is enforced
+
+| Rule | Enforced in | Why there |
+| --- | --- | --- |
+| Only `dev-lab:use` accounts write | route middleware *and* each screen's `boot()` | A Livewire mutation is a POST to `/livewire/update` and never passes through the route's middleware, so `boot()` is the guard that actually holds. The public snippet page cannot use it — a guest must be able to read the page — so its one mutating action checks the permission on the verb instead |
+| A foreign row is not readable, editable or deletable | `authoredBy()` scopes and the policies | Ownership is resolved from the row, not from the list that rendered the button |
+| A snippet with no code is not publishable | `SaveLabSnippet::assertWorthPublishing()` | The action is the only writer of the visibility pair, so the rule has one home |
+| PHP cannot be run | `LabLanguage::isBrowserRunnable()` *and* `RecordLabExecution` | The UI hides the button; the action re-checks the flag, so a hand-crafted request cannot mint a fake run entry |
+| A PHP snippet cannot be opened in a reader's sandbox | `CloneSnippetToWorkspace::panes()` | There is no PHP pane, so there is no workspace it could become, and the refusal sits next to the other one rather than only in the template that hides the button |
+| The landing's example is isolated like anybody else's code | `resources/views/components/app/dev-lab/showcase.blade.php` | Same frame, same `sandbox="allow-scripts"` and nothing else, same postMessage source check. Being the application's own code is not a reason to build a second, weaker boundary |
+| A day's runs are capped | `RecordLabExecution` | The write is the only thing Run does, so refusing the write is refusing the run |
+| A pane over the byte ceiling is not stored | `SaveLabWorkspace` / `SaveLabSnippet`, plus a field rule on the form | As a rule it lands next to the pane the reader was typing in; as an exception it lands in a toast they may not connect to the pane |
+
 
 ## 1. Project Overview
 

@@ -347,7 +347,16 @@ class MarkdownRenderer
                 continue;
             }
 
-            $value = trim($match[2], '"\'');
+            /*
+             * The value arrives from a document that has already been escaped
+             * once, so it is decoded before it is inspected and re-encoded on
+             * the way out. Two reasons, both load-bearing: the scheme check has
+             * to see the scheme the browser will see (`&#106;avascript:` is the
+             * same attack wearing an entity), and encoding an already-encoded
+             * `&amp;` yields `&amp;amp;`, which makes every link with a query
+             * string point at a URL containing a literal ampersand entity.
+             */
+            $value = html_entity_decode(trim($match[2], '"\''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
             if (in_array($name, ['href', 'src'], true) && $this->isUnsafeUrl($value)) {
                 continue;

@@ -46,12 +46,33 @@ class UserPolicy
     }
 
     /**
+     * Determine whether the user can create accounts.
+     */
+    public function create(User $user): bool
+    {
+        return $user->hasPermission(AccountPermission::ManageUsers);
+    }
+
+    /**
      * Determine whether the user can update an account.
+     *
+     * Self-edits stay allowed (the profile settings screens authorise through
+     * Fortify, but the ability should not contradict them). Admins editing
+     * others follow the same peer rule as {@see self::delete()} — one admin
+     * cannot rewrite another admin's email or handle, which is how account
+     * takeover would start.
      */
     public function update(User $user, User $account): bool
     {
-        return $user->is($account)
-            || $user->hasPermission(AccountPermission::ManageUsers);
+        if ($user->is($account)) {
+            return true;
+        }
+
+        if ($account->accountRole()->isAtLeast($user->accountRole())) {
+            return false;
+        }
+
+        return $user->hasPermission(AccountPermission::ManageUsers);
     }
 
     /**
