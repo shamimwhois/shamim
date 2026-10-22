@@ -342,7 +342,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                                         </div>
 
                                         <div class="min-w-0">
-                                            <p class="truncate text-sm font-medium text-ink-900">
+                                            <p class="truncate text-sm font-medium text-sui-ink">
                                                 {{ $account->name }}
                                                 @if ($isSelf)
                                                     <span class="ml-1 text-2xs text-ink-400">({{ __('you') }})</span>

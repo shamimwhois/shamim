@@ -222,7 +222,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Plans')] class extends Componen
                                 <a
                                     href="{{ route('ideas.plan', ['plan' => $plan->slug]) }}"
                                     wire:navigate
-                                    class="text-sm font-semibold tracking-tight text-ink-900 transition-colors hover:text-sui-accent"
+                                    class="text-sm font-semibold tracking-tight text-sui-ink transition-colors hover:text-sui-accent"
                                 >
                                     {{ $plan->title }}
                                 </a>
@@ -269,7 +269,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Plans')] class extends Componen
                                 <p class="font-mono text-2xs uppercase tracking-widest text-ink-400">
                                     {{ __('Tasks') }}
                                 </p>
-                                <p class="mt-1 text-sm font-semibold text-ink-900">
+                                <p class="mt-1 text-sm font-semibold text-sui-ink">
                                     {{ $plan->tasks_done_count }}/{{ $plan->tasks_count }}
                                 </p>
                                 <div

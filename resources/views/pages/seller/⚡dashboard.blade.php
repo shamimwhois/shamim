@@ -163,7 +163,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
                         <x-app.ui.role-badge size="md" />
                     </div>
 
-                    <p class="mt-4 text-2xl font-semibold tracking-tightest text-ink-900">
+                    <p class="mt-4 text-2xl font-semibold tracking-tightest text-sui-ink">
                         {{ $this->plan()->label() }}
                     </p>
 
@@ -174,7 +174,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
 
                 <div class="sui-card xl:col-span-2">
                     <div class="border-b border-sui-hairline px-5 py-4">
-                        <h3 class="text-sm font-semibold tracking-tight text-ink-900">
+                        <h3 class="text-sm font-semibold tracking-tight text-sui-ink">
                             {{ __('Entitlements') }}
                         </h3>
                     </div>
@@ -183,7 +183,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
                         @foreach ($this->entitlements() as $entitlement)
                             <div class="flex items-center justify-between gap-4 px-5 py-3">
                                 <dt class="text-sm text-ink-600">{{ $entitlement['label'] }}</dt>
-                                <dd class="text-sm font-semibold tabular-nums text-ink-900">
+                                <dd class="text-sm font-semibold tabular-nums text-sui-ink">
                                     {{ $entitlement['value'] }}
                                 </dd>
                             </div>
@@ -198,7 +198,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
          --}}
         <x-app.ui.section :padded="false">
             <div class="border-b border-sui-hairline px-5 py-4">
-                <h2 id="features-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="features-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('What your plan includes') }}
                 </h2>
             </div>
@@ -223,7 +223,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Seller dashboard')] class ex
         <section aria-labelledby="listings-heading">
             <div class="flex flex-wrap items-end justify-between gap-4">
                 <div class="min-w-0">
-                    <h2 id="listings-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                    <h2 id="listings-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                         {{ __('Your listings') }}
                     </h2>
 

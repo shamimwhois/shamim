@@ -110,7 +110,7 @@
 <section class="sui-card p-5 sm:p-6" aria-label="{{ $title }}">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
-            <h3 class="text-sm font-semibold text-ink-900">{{ $title }}</h3>
+            <h3 class="text-sm font-semibold text-sui-ink">{{ $title }}</h3>
 
             @if ($description)
                 <p class="mt-1 text-xs leading-normal text-ink-500">{{ $description }}</p>

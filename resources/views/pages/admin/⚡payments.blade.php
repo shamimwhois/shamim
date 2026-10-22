@@ -352,9 +352,9 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Payments')] class extends Com
                     <tbody class="divide-y divide-sui-hairline">
                         @foreach ($this->valueByCurrency as $currency => $value)
                             <tr wire:key="currency-{{ $currency }}">
-                                <th scope="row" class="px-5 py-3 text-left font-mono text-xs font-medium text-ink-900">{{ $currency }}</th>
+                                <th scope="row" class="px-5 py-3 text-left font-mono text-xs font-medium text-sui-ink">{{ $currency }}</th>
 
-                                <td class="px-5 py-3 text-right tabular-nums text-ink-900">
+                                <td class="px-5 py-3 text-right tabular-nums text-sui-ink">
                                     {{ \App\Models\MarketplaceProduct::symbolFor($currency).number_format($value['captured_cents'] / 100, 2) }}
                                 </td>
 
@@ -471,7 +471,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Payments')] class extends Com
                             @foreach ($this->rows as $row)
                                 <tr wire:key="ledger-{{ $tab }}-{{ $row['id'] }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
                                     <td class="px-5 py-3.5 whitespace-nowrap">
-                                        <p class="text-sm text-ink-900">{{ $row['date']->format('j M Y') }}</p>
+                                        <p class="text-sm text-sui-ink">{{ $row['date']->format('j M Y') }}</p>
                                         <p class="mt-0.5 font-mono text-2xs text-ink-400">{{ $row['date']->format('H:i') }}</p>
                                     </td>
 
@@ -514,7 +514,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Payments')] class extends Com
                                         <flux:badge :color="$row['badge']" size="sm">{{ $row['status'] }}</flux:badge>
                                     </td>
 
-                                    <td class="px-5 py-3.5 text-right text-sm whitespace-nowrap tabular-nums text-ink-900">
+                                    <td class="px-5 py-3.5 text-right text-sm whitespace-nowrap tabular-nums text-sui-ink">
                                         {{ $row['amount'] }}
                                     </td>
                                 </tr>

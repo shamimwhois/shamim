@@ -1385,7 +1385,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('AI Knowledge Hub')] class ext
                     {{-- Form pane --}}
                     <div class="lg:col-span-5">
                         <div class="sui-card rounded-xl border border-sui-hairline p-5">
-                            <h2 class="text-sm font-semibold tracking-tight text-ink-900">
+                            <h2 class="text-sm font-semibold tracking-tight text-sui-ink">
                                 {{ $editingArticleId ? __('Edit article') : __('New article') }}
                             </h2>
                             <p class="mt-0.5 text-xs text-ink-500">{{ __('Markdown body. Saving never publishes — use the row buttons.)') }}</p>
@@ -1631,7 +1631,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('AI Knowledge Hub')] class ext
                 <div class="grid gap-6 p-5 lg:grid-cols-12">
                     <div class="lg:col-span-5">
                         <div class="sui-card rounded-xl border border-sui-hairline p-5">
-                            <h2 class="text-sm font-semibold tracking-tight text-ink-900">
+                            <h2 class="text-sm font-semibold tracking-tight text-sui-ink">
                                 {{ $editingTopicId ? __('Edit topic') : __('New topic') }}
                             </h2>
                             <p class="mt-0.5 text-xs text-ink-500">{{ __('Topics are the taxonomy readers browse. Retire one to hide it without deleting filings.)') }}</p>
@@ -1782,7 +1782,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('AI Knowledge Hub')] class ext
                 <div class="grid gap-6 p-5 lg:grid-cols-12">
                     <div class="lg:col-span-5">
                         <div class="sui-card rounded-xl border border-sui-hairline p-5">
-                            <h2 class="text-sm font-semibold tracking-tight text-ink-900">
+                            <h2 class="text-sm font-semibold tracking-tight text-sui-ink">
                                 {{ $editingPathId ? __('Edit path') : __('New learning path') }}
                             </h2>
                             <p class="mt-0.5 text-xs text-ink-500">{{ __('A path publishes only once every lesson is published.)') }}</p>
@@ -1958,7 +1958,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('AI Knowledge Hub')] class ext
                 <div class="grid gap-6 p-5 lg:grid-cols-12">
                     <div class="lg:col-span-5">
                         <div class="sui-card rounded-xl border border-sui-hairline p-5">
-                            <h2 class="text-sm font-semibold tracking-tight text-ink-900">
+                            <h2 class="text-sm font-semibold tracking-tight text-sui-ink">
                                 {{ $editingResourceId ? __('Edit resource') : __('New resource') }}
                             </h2>
                             <p class="mt-0.5 text-xs text-ink-500">{{ __('Outbound links readers trust. A full https:// link is required.)') }}</p>

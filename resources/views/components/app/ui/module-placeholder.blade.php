@@ -47,7 +47,7 @@
 
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold tracking-tight text-ink-900">
+                        <h2 class="text-lg font-semibold tracking-tight text-sui-ink">
                             {{ $title }}
                         </h2>
                         <span class="sui-chip-warning">

@@ -313,7 +313,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Products')] class extends Co
                         @foreach ($this->products as $product)
                             <tr wire:key="listing-{{ $product->id }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
                                 <td class="px-5 py-3.5">
-                                    <p class="truncate text-sm font-medium text-ink-900">{{ $product->name }}</p>
+                                    <p class="truncate text-sm font-medium text-sui-ink">{{ $product->name }}</p>
 
                                     <p class="mt-0.5 truncate font-mono text-2xs text-ink-400">
                                         {{ $product->slug }} · v{{ $product->version }}
@@ -326,7 +326,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Products')] class extends Co
                                     </flux:badge>
                                 </td>
 
-                                <td class="hidden px-5 py-3.5 text-right text-sm tabular-nums text-ink-900 sm:table-cell">
+                                <td class="hidden px-5 py-3.5 text-right text-sm tabular-nums text-sui-ink sm:table-cell">
                                     {{ $product->isFree() ? __('Free') : $product->formattedPrice() }}
                                 </td>
 

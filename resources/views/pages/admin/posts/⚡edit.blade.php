@@ -578,7 +578,7 @@ Markdown is supported: headings, lists, code fences, blockquotes, and links."
                                 />
 
                                 <span class="min-w-0">
-                                    <span class="block text-sm font-medium text-ink-900">
+                                    <span class="block text-sm font-medium text-sui-ink">
                                         {{ $case->label() }}
                                     </span>
                                     <span class="mt-0.5 block text-xs leading-normal text-ink-500">
@@ -603,7 +603,7 @@ Markdown is supported: headings, lists, code fences, blockquotes, and links."
                     <div class="mt-5 border-t border-sui-hairline pt-5">
                         <label class="flex cursor-pointer items-center justify-between gap-3">
                             <span>
-                                <span class="block text-sm font-medium text-ink-900">Featured</span>
+                                <span class="block text-sm font-medium text-sui-ink">Featured</span>
                                 <span class="mt-0.5 block text-xs leading-normal text-ink-500">Shown as the lead post on the landing page.</span>
                             </span>
 

@@ -223,7 +223,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-sui-warning/20 px-4 py-2.5">
             <div class="flex items-center gap-2">
                 <flux:icon name="sparkles" class="size-4 text-sui-warning" />
-                <h3 class="text-sm font-semibold tracking-tight text-ink-900">
+                <h3 class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('Suggestions') }}
                 </h3>
                 <span
@@ -335,7 +335,7 @@
             >
                 <div class="flex items-start justify-between gap-4 border-b border-sui-hairline px-5 py-4">
                     <div>
-                        <h2 id="editor-generate-title" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink-900">
+                        <h2 id="editor-generate-title" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-sui-ink">
                             <flux:icon name="sparkles" class="size-4 text-sui-accent" />
                             {{ __('Write with AI') }}
                         </h2>
@@ -392,7 +392,7 @@
                                         <flux:icon :name="$category->icon()" class="size-3.5" />
                                     </span>
                                     <span class="min-w-0">
-                                        <span class="block text-xs font-semibold text-ink-900">
+                                        <span class="block text-xs font-semibold text-sui-ink">
                                             {{ $category->label() }}
                                         </span>
                                         <span class="mt-0.5 block text-2xs leading-normal text-ink-500">
@@ -539,7 +539,7 @@
             <div x-show="dialogs.image" x-transition class="relative my-auto w-full max-w-xl overflow-hidden rounded-xl border border-sui-hairline bg-sui-surface shadow-soft-3">
                 <div class="flex items-start justify-between gap-4 border-b border-sui-hairline px-5 py-4">
                     <div>
-                        <h2 id="editor-image-title" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink-900">
+                        <h2 id="editor-image-title" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-sui-ink">
                             <flux:icon name="photo" class="size-4 text-sui-accent" />
                             {{ __('Generate an image') }}
                         </h2>

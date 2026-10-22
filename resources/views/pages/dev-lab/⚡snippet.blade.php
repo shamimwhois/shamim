@@ -243,7 +243,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Snippet')] class extends Compon
              | The code
              --}}
             <section aria-labelledby="snippet-writing-heading" class="sui-card space-y-5 p-5">
-                <h2 id="snippet-writing-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="snippet-writing-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('The snippet') }}
                 </h2>
 
@@ -365,7 +365,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Snippet')] class extends Compon
          --}}
         <aside aria-labelledby="snippet-filing-heading" class="space-y-6">
             <section class="sui-card space-y-5 p-5">
-                <h2 id="snippet-filing-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="snippet-filing-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('Who may read it') }}
                 </h2>
 
@@ -399,7 +399,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Snippet')] class extends Compon
             </section>
 
             <section class="sui-card space-y-4 p-5">
-                <h2 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Address') }}</h2>
+                <h2 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Address') }}</h2>
 
                 <div>
                     <label for="snippet-slug" class="sui-control-label">{{ __('Slug') }}</label>
@@ -427,7 +427,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Snippet')] class extends Compon
             </section>
 
             <section class="sui-card space-y-4 p-5">
-                <h2 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Running it') }}</h2>
+                <h2 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Running it') }}</h2>
 
                 <p class="text-xs leading-normal text-ink-500">
                     {{ $this->currentLanguage->isBrowserRunnable()

@@ -461,7 +461,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Ideas')] class extends Componen
                                     <a
                                         href="{{ route('ideas.edit', ['idea' => $idea->slug]) }}"
                                         wire:navigate
-                                        class="text-sm font-semibold tracking-tight text-ink-900 transition-colors hover:text-sui-accent"
+                                        class="text-sm font-semibold tracking-tight text-sui-ink transition-colors hover:text-sui-accent"
                                     >
                                         {{ $idea->title }}
                                     </a>

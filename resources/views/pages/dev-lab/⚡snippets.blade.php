@@ -296,7 +296,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Snippets')] class extends Compo
                                     <a
                                         href="{{ route('dev-lab.snippets.show', ['snippet' => $snippet->slug]) }}"
                                         wire:navigate
-                                        class="text-sm font-semibold tracking-tight text-ink-900 transition-colors hover:text-sui-accent"
+                                        class="text-sm font-semibold tracking-tight text-sui-ink transition-colors hover:text-sui-accent"
                                     >
                                         {{ $snippet->title }}
                                     </a>

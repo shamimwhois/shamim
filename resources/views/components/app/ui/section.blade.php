@@ -51,7 +51,7 @@
 
                 <div class="min-w-0">
                     @if ($title)
-                        <h2 class="text-sm font-semibold tracking-tight text-ink-900">
+                        <h2 class="text-sm font-semibold tracking-tight text-sui-ink">
                             {{ $title }}
                         </h2>
                     @endif

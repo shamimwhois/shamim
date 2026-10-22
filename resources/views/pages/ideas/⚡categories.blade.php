@@ -166,7 +166,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea categories')] class extend
          --}}
         <section aria-labelledby="category-form-heading" class="sui-card h-fit overflow-hidden">
             <div class="border-b border-sui-hairline px-5 py-4">
-                <h2 id="category-form-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="category-form-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ $this->editingCategoryId === null ? __('New category') : __('Rename category') }}
                 </h2>
             </div>
@@ -220,7 +220,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea categories')] class extend
          --}}
         <section aria-labelledby="category-list-heading" class="sui-card overflow-hidden">
             <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
-                <h2 id="category-list-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="category-list-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('Your categories') }}
                 </h2>
                 <span class="text-2xs text-ink-500">
@@ -245,7 +245,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea categories')] class extend
                             ])
                         >
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-ink-900">{{ $category->name }}</p>
+                                <p class="text-sm font-medium text-sui-ink">{{ $category->name }}</p>
                                 <p class="mt-0.5 text-2xs text-ink-500">
                                     /{{ $category->slug }} ·
                                     {{ trans_choice(':count idea|:count ideas', $category->ideas_count, ['count' => $category->ideas_count]) }}

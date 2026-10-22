@@ -196,7 +196,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
              --}}
             <x-app.ui.section :padded="false">
                 <div class="border-b border-sui-hairline px-5 py-4">
-                    <h2 id="roles-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                    <h2 id="roles-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                         Accounts by role
                     </h2>
                 </div>
@@ -205,7 +205,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                     @foreach ($this->accountsByRole as $row)
                         <li class="flex items-center justify-between gap-4 px-5 py-4">
                             <div class="min-w-0">
-                                <p class="text-sm font-medium text-ink-900">
+                                <p class="text-sm font-medium text-sui-ink">
                                     {{ $row['role']->label() }}
                                 </p>
                                 <p class="mt-0.5 text-xs leading-normal text-ink-500">
@@ -213,7 +213,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                                 </p>
                             </div>
 
-                            <span class="shrink-0 text-lg font-semibold tabular-nums text-ink-900">
+                            <span class="shrink-0 text-lg font-semibold tabular-nums text-sui-ink">
                                 {{ number_format($row['count']) }}
                             </span>
                         </li>
@@ -226,7 +226,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
              --}}
             <x-app.ui.section :padded="false">
                 <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
-                    <h2 id="recent-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                    <h2 id="recent-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                         Recently created
                     </h2>
 
@@ -247,7 +247,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
                             </div>
 
                             <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-medium text-ink-900">
+                                <p class="truncate text-sm font-medium text-sui-ink">
                                     {{ $account->name }}
                                 </p>
                                 <p class="truncate text-2xs text-ink-400">
@@ -269,7 +269,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Admin dashboard')] class exte
          --}}
         <x-app.ui.section :padded="false">
             <div class="border-b border-sui-hairline px-5 py-4">
-                <h2 id="permissions-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="permissions-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     What the admin role can do
                 </h2>
                 <p class="mt-1 text-xs leading-normal text-ink-500">

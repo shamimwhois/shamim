@@ -172,7 +172,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Sales')] class extends Compo
                 @foreach ($this->totals as $currency => $row)
                     <div class="sui-card p-5" wire:key="totals-{{ $currency }}">
                         <p class="sui-label">{{ __('Gross (:currency)', ['currency' => $currency]) }}</p>
-                        <p class="mt-1 text-2xl font-semibold tabular-nums text-ink-900">
+                        <p class="mt-1 text-2xl font-semibold tabular-nums text-sui-ink">
                             {{ \App\Models\MarketplaceProduct::symbolFor($currency) }}{{ number_format($row['gross_cents'] / 100, 2) }}
                         </p>
                         <p class="mt-1 text-2xs text-ink-400">
@@ -261,7 +261,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Sales')] class extends Compo
                         @foreach ($this->orders as $order)
                             <tr wire:key="sale-{{ $order->id }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
                                 <td class="px-5 py-3.5">
-                                    <p class="truncate text-sm font-medium text-ink-900">{{ $order->product_name }}</p>
+                                    <p class="truncate text-sm font-medium text-sui-ink">{{ $order->product_name }}</p>
                                     <p class="mt-0.5 font-mono text-2xs text-ink-400">
                                         {{ $order->order_number }} · {{ $order->created_at->format('j M Y') }}
                                     </p>
@@ -271,7 +271,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Sales')] class extends Compo
                                     {{ $order->buyer->name }}
                                 </td>
 
-                                <td class="px-5 py-3.5 text-right text-sm tabular-nums text-ink-900">
+                                <td class="px-5 py-3.5 text-right text-sm tabular-nums text-sui-ink">
                                     {{ $order->price_cents === 0 ? __('Free') : $order->formattedAmount() }}
                                 </td>
 

@@ -309,7 +309,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Taxonomy')] class extends Com
          --}}
         <section aria-labelledby="categories-heading" class="sui-card overflow-hidden">
             <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
-                <h2 id="categories-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="categories-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     Categories
                 </h2>
                 <span class="text-2xs text-ink-500">
@@ -420,7 +420,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Taxonomy')] class extends Com
                             ></span>
 
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-ink-900">
+                                <p class="text-sm font-medium text-sui-ink">
                                     {{ $category->name }}
                                 </p>
                                 <p class="mt-0.5 text-2xs text-ink-500">
@@ -483,7 +483,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Taxonomy')] class extends Com
          --}}
         <section aria-labelledby="tags-heading" class="sui-card overflow-hidden">
             <div class="flex items-center justify-between gap-4 border-b border-sui-hairline px-5 py-4">
-                <h2 id="tags-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="tags-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     Tags
                 </h2>
                 <span class="text-2xs text-ink-500">

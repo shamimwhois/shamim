@@ -316,7 +316,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Orders')] class extends Compo
 
                             <tr wire:key="order-{{ $order->id }}" class="transition duration-150 ease-soft hover:bg-sui-hover">
                                 <td class="px-5 py-3.5">
-                                    <p class="truncate text-sm font-medium text-ink-900">{{ $order->product_name }}</p>
+                                    <p class="truncate text-sm font-medium text-sui-ink">{{ $order->product_name }}</p>
                                     <p class="mt-0.5 font-mono text-2xs text-ink-400">
                                         {{ $order->order_number }} · {{ $order->created_at->format('j M Y') }}
                                     </p>
@@ -326,7 +326,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Orders')] class extends Compo
                                     {{ $order->buyer->name }}
                                 </td>
 
-                                <td class="px-5 py-3.5 text-right text-sm tabular-nums text-ink-900">
+                                <td class="px-5 py-3.5 text-right text-sm tabular-nums text-sui-ink">
                                     {{ $order->price_cents === 0 ? __('Free') : $order->formattedAmount() }}
                                 </td>
 

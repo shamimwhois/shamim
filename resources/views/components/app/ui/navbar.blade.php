@@ -178,7 +178,7 @@
                               </span>
 
                               <span class="min-w-0 flex-1">
-                                  <span class="block truncate text-sm font-medium text-ink-900">
+                                  <span class="block truncate text-sm font-medium text-sui-ink">
                                       {{ Str::limit($comment->post?->title ?? __('(deleted post)'), 28) }}
                                   </span>
                                   <span class="mt-0.5 block truncate text-xs text-ink-500">
@@ -218,7 +218,7 @@
 
                 <flux:menu class="w-64 rounded-xl shadow-soft-2">
                     <div class="px-3 py-2.5">
-                        <p class="truncate text-sm font-medium text-ink-900">{{ $user->name }}</p>
+                        <p class="truncate text-sm font-medium text-sui-ink">{{ $user->name }}</p>
                         <p class="mt-0.5 truncate text-xs text-ink-500">{{ $user->email }}</p>
                         <div class="mt-2">
                             <x-app.ui.role-badge size="md" />

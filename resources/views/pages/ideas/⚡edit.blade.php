@@ -310,7 +310,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea')] class extends Component
              | The thought
              --}}
             <section aria-labelledby="idea-writing-heading" class="sui-card space-y-5 p-5">
-                <h2 id="idea-writing-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="idea-writing-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('The idea') }}
                 </h2>
 
@@ -389,7 +389,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea')] class extends Component
          --}}
         <aside aria-labelledby="idea-filing-heading" class="space-y-6">
             <section class="sui-card space-y-5 p-5" aria-labelledby="idea-stage-heading">
-                <h2 id="idea-stage-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="idea-stage-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('Stage') }}
                 </h2>
 
@@ -482,7 +482,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea')] class extends Component
              | Visibility
              --}}
             <section class="sui-card space-y-4 p-5" aria-labelledby="idea-visibility-heading">
-                <h2 id="idea-visibility-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                <h2 id="idea-visibility-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                     {{ __('Who can read it') }}
                 </h2>
 
@@ -556,7 +556,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea')] class extends Component
                  | What it became
                  --}}
                 <section class="sui-card space-y-3 p-5" aria-labelledby="idea-plan-heading">
-                    <h2 id="idea-plan-heading" class="text-sm font-semibold tracking-tight text-ink-900">
+                    <h2 id="idea-plan-heading" class="text-sm font-semibold tracking-tight text-sui-ink">
                         {{ __('Plan') }}
                     </h2>
 
@@ -571,7 +571,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Idea')] class extends Component
                             class="flex items-center gap-2 rounded-lg border border-sui-hairline px-3 py-2 transition duration-150 ease-soft hover:bg-sui-hover"
                         >
                             <flux:icon name="queue-list" class="size-4 text-sui-accent" />
-                            <span class="min-w-0 flex-1 truncate text-sm text-ink-900">{{ $this->sourcePlan->title }}</span>
+                            <span class="min-w-0 flex-1 truncate text-sm text-sui-ink">{{ $this->sourcePlan->title }}</span>
                             <x-app.ideas.status-badge :status="$this->sourcePlan->status" size="sm" />
                         </a>
                     @elseif ($this->currentStatus->isPublishable())

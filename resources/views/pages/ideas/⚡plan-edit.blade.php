@@ -447,7 +447,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Plan')] class extends Component
             @if ($this->editingPlan !== null)
                 <x-app.ui.section tone="attention">
                     <div x-data="{ confirming: false }">
-                        <p class="text-sm font-medium text-ink-900">{{ __('Delete this plan') }}</p>
+                        <p class="text-sm font-medium text-sui-ink">{{ __('Delete this plan') }}</p>
                         <p class="mt-1 text-xs leading-normal text-ink-500">
                             {{ __('The tasks under it go too. The idea it came from stays where it is.') }}
                         </p>

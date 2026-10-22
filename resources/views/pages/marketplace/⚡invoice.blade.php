@@ -210,7 +210,7 @@ new #[Layout('layouts::plain')] #[Title('Invoice')] class extends Component
 
                 <tfoot>
                     <tr class="border-t border-ink-200 dark:border-ink-800">
-                        <th scope="row" class="pt-3 text-left font-semibold text-ink-900">{{ __('Total charged') }}</th>
+                        <th scope="row" class="pt-3 text-left font-semibold text-ink-900 dark:text-ink-50">{{ __('Total charged') }}</th>
 
                         <td class="pt-3 text-right text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
                             {{ $order->formattedAmountFor($netCents) }}

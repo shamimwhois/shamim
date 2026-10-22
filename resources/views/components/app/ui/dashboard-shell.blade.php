@@ -119,7 +119,7 @@
                 href="{{ $home }}"
                 wire:navigate
                 x-show="! collapsed"
-                class="group flex min-w-0 items-center gap-2.5 text-sm font-semibold text-ink-900"
+                class="group flex min-w-0 items-center gap-2.5 text-sm font-semibold text-sui-ink"
                 title="{{ $authorName }}"
             >
                 <x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />
@@ -282,7 +282,7 @@
                     <a
                         href="{{ $home }}"
                         wire:navigate
-                        class="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-ink-900"
+                        class="flex min-w-0 items-center gap-2.5 text-sm font-semibold text-sui-ink"
                     >
                         <x-app.icon.logo-mark size="md" class="bg-sui-accent text-sui-ink-on-accent" />
                         <span class="truncate">{{ $authorName }}</span>

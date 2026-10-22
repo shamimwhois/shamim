@@ -205,7 +205,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Payment')] class extends Comp
                 <div @class(['sui-card p-5 sm:p-6', 'ring-1 ring-sui-accent/30' => $editing]) data-test="payment-card-{{ $setting->provider->value }}">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <h2 class="text-sm font-semibold text-ink-900">{{ $setting->provider->label() }}</h2>
+                            <h2 class="text-sm font-semibold text-sui-ink">{{ $setting->provider->label() }}</h2>
                             <p class="mt-1 text-2xs text-ink-400">
                                 {{ $setCount }} / {{ count($fields) }}
                                 {{ __('credentials set') }}
@@ -242,7 +242,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Payment')] class extends Comp
                     @if ($editing)
                         <form class="mt-5 space-y-5 border-t border-sui-hairline pt-5" wire:submit="save">
                             <div class="flex flex-wrap items-center gap-4">
-                                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <label class="flex cursor-pointer items-center gap-2 text-sm text-sui-ink">
                                     <input type="checkbox" wire:model.live="enabled" class="sui-focus size-4 shrink-0 accent-sui-accent" data-test="payment-enabled" />
                                     {{ __('Enabled') }}
                                 </label>

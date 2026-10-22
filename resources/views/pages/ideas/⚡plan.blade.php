@@ -495,7 +495,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Plan')] class extends Component
                                                 @class([
                                                     'text-sm',
                                                     'text-ink-400 line-through' => $task->isDone(),
-                                                    'text-ink-900' => ! $task->isDone(),
+                                                    'text-sui-ink' => ! $task->isDone(),
                                                 ])
                                             >
                                                 {{ $task->title }}

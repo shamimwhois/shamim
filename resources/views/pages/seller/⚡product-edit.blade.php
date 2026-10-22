@@ -713,7 +713,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
          --}}
             <div class="sui-card p-5">
                 <div class="border-b border-sui-hairline pb-4">
-                    <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Details') }}</h3>
+                    <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Details') }}</h3>
                 </div>
 
                 <div class="grid gap-4 pt-4 sm:grid-cols-2">
@@ -785,7 +785,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
          --}}
             <div class="sui-card p-5">
                 <div class="border-b border-sui-hairline pb-4">
-                    <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Pricing & licence') }}</h3>
+                    <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Pricing & licence') }}</h3>
                 </div>
 
                 <div class="grid gap-4 pt-4 sm:grid-cols-2">
@@ -867,7 +867,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
          --}}
             <div class="sui-card p-5">
                 <div class="border-b border-sui-hairline pb-4">
-                    <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Tags') }}</h3>
+                    <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Tags') }}</h3>
                 </div>
 
                 @if ($tags !== [])
@@ -924,7 +924,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
          --}}
             <div class="sui-card p-5">
                 <div class="border-b border-sui-hairline pb-4">
-                    <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Metadata') }}</h3>
+                    <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Metadata') }}</h3>
                 </div>
 
                 <div class="grid gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1038,7 +1038,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
             @if ($this->isOwnListing())
                 <div class="sui-card p-5" data-test="product-screenshots">
                     <div class="border-b border-sui-hairline pb-4">
-                        <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Screenshots') }}</h3>
+                        <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Screenshots') }}</h3>
                         <p class="mt-1 text-xs leading-normal text-ink-500">
                             {{ __('A listing may carry up to :cap images, each under :max. They are stored privately and served by signed link.', [
                                 'cap' => (int) config('marketplace.media.max_per_listing', 8),
@@ -1146,7 +1146,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
             @if ($this->isOwnListing())
                 <div class="sui-card p-5" data-test="product-releases">
                     <div class="border-b border-sui-hairline pb-4">
-                        <h3 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('Releases') }}</h3>
+                        <h3 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('Releases') }}</h3>
                         <p class="mt-1 text-xs leading-normal text-ink-500">
                             {{ __('Each release is one entry in the listing history. Marking it current moves the listing’s version, and buyers download the file attached to the current release.') }}
                         </p>
@@ -1157,7 +1157,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
                             @foreach ($this->releases as $release)
                                 <li wire:key="release-{{ $release->id }}" class="py-3 first:pt-0 last:pb-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="font-mono text-xs font-semibold text-ink-900">{{ $release->version }}</span>
+                                        <span class="font-mono text-xs font-semibold text-sui-ink">{{ $release->version }}</span>
 
                                         @if ($release->is_current)
                                             <flux:badge color="green" size="sm">{{ __('Current') }}</flux:badge>
@@ -1302,7 +1302,7 @@ new #[Layout('layouts::seller.dashboard')] #[Title('Product')] class extends Com
             @if ($this->canSubmit())
                 <div class="sui-card p-5">
                     <div class="border-b border-sui-hairline pb-4">
-                        <h3 class="text-sm font-semibold tracking-tight text-ink-900">
+                        <h3 class="text-sm font-semibold tracking-tight text-sui-ink">
                             {{ __('Before you submit') }}
                         </h3>
                     </div>

@@ -327,7 +327,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Comments')] class extends Com
                         <flux:icon name="check-badge" class="size-5" />
                     </div>
 
-                    <p class="mt-4 text-base font-semibold tracking-tight text-ink-900">
+                    <p class="mt-4 text-base font-semibold tracking-tight text-sui-ink">
                         @if ($status === 'pending')
                             Nothing waiting for review
                         @else
@@ -363,7 +363,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Comments')] class extends Com
                             <div class="min-w-0 flex-1">
                                 {{-- Header --}}
                                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                    <p class="text-sm font-semibold tracking-tight text-ink-900">
+                                    <p class="text-sm font-semibold tracking-tight text-sui-ink">
                                         {{ $comment->user->name }}
                                     </p>
 

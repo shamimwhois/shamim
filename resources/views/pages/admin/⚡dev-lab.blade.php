@@ -338,7 +338,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Developer Lab — administrat
         @if ($tab === 'snippets')
             @if ($this->snippets->isEmpty())
                 <div class="sui-empty">
-                    <p class="text-base font-semibold tracking-tight text-ink-900">
+                    <p class="text-base font-semibold tracking-tight text-sui-ink">
                         {{ $search !== '' || $language !== '' ? __('Nothing matches those filters') : __('Nobody has saved a snippet yet') }}
                     </p>
                     <p class="mt-1.5 text-sm text-ink-500">
@@ -356,7 +356,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Developer Lab — administrat
                             <div class="flex flex-wrap items-start gap-x-4 gap-y-3">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-semibold tracking-tight text-ink-900">
+                                        <p class="text-sm font-semibold tracking-tight text-sui-ink">
                                             {{ $snippet->title }}
                                         </p>
 
@@ -454,7 +454,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Developer Lab — administrat
         @else
             @if ($this->executions->isEmpty())
                 <div class="sui-empty">
-                    <p class="text-base font-semibold tracking-tight text-ink-900">
+                    <p class="text-base font-semibold tracking-tight text-sui-ink">
                         {{ $language !== '' ? __('No runs in that language yet') : __('Nobody has pressed Run yet') }}
                     </p>
                     <p class="mt-1.5 text-sm text-ink-500">
@@ -470,7 +470,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Developer Lab — administrat
                                     {{ $execution->language->label() }}
                                 </flux:badge>
 
-                                <p class="min-w-0 flex-1 truncate text-sm text-ink-800">
+                                <p class="min-w-0 flex-1 truncate text-sm text-sui-ink-secondary">
                                     {{ $execution->label ?? __('Untitled experiment') }}
                                 </p>
 
@@ -494,7 +494,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Developer Lab — administrat
     </x-app.ui.section>
 
     <section class="sui-card mt-6 space-y-3 p-5">
-        <h2 class="text-sm font-semibold tracking-tight text-ink-900">{{ __('What this console does not do') }}</h2>
+        <h2 class="text-sm font-semibold tracking-tight text-sui-ink">{{ __('What this console does not do') }}</h2>
 
         <p class="text-xs leading-normal text-ink-500">
             {{ __('It does not run anything. There is no server-side runner in this module, so an operator cannot execute a snippet from here, preview one on behalf of a visitor, or reach a frame another account left open. The code is stored as text and escaped on every surface, including this one, which is why the excerpt above is plain text rather than a rendered preview.') }}

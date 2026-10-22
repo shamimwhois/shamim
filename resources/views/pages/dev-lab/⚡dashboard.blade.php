@@ -205,7 +205,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Developer Lab')] class extends 
                                 <a
                                     href="{{ route('dev-lab.sandbox', ['workspace' => $workspace->id]) }}"
                                     wire:navigate
-                                    class="text-sm font-semibold tracking-tight text-ink-900 transition-colors hover:text-sui-accent"
+                                    class="text-sm font-semibold tracking-tight text-sui-ink transition-colors hover:text-sui-accent"
                                 >
                                     {{ $workspace->name }}
                                 </a>
@@ -260,7 +260,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Developer Lab')] class extends 
                                 <a
                                     href="{{ route('dev-lab.snippets.edit', ['snippet' => $snippet->slug]) }}"
                                     wire:navigate
-                                    class="text-sm font-semibold tracking-tight text-ink-900 transition-colors hover:text-sui-accent"
+                                    class="text-sm font-semibold tracking-tight text-sui-ink transition-colors hover:text-sui-accent"
                                 >
                                     {{ $snippet->title }}
                                 </a>

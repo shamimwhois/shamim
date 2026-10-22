@@ -234,7 +234,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Ideas — administration')] c
 
         @if ($this->ideas->isEmpty())
             <div class="sui-empty">
-                <p class="text-base font-semibold tracking-tight text-ink-900">
+                <p class="text-base font-semibold tracking-tight text-sui-ink">
                     {{ $search !== '' || $tab !== 'all' ? __('Nothing matches those filters') : __('Nobody has captured an idea yet') }}
                 </p>
                 <p class="mt-1.5 text-sm text-ink-500">
@@ -252,7 +252,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Ideas — administration')] c
                         <div class="flex flex-wrap items-start gap-x-4 gap-y-3">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <p class="text-sm font-semibold tracking-tight text-ink-900">
+                                    <p class="text-sm font-semibold tracking-tight text-sui-ink">
                                         {{ $idea->title }}
                                     </p>
 

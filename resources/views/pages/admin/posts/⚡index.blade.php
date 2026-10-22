@@ -317,7 +317,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Posts')] class extends Compon
                         <flux:icon name="document-text" class="size-5" />
                     </div>
 
-                    <p class="mt-4 text-base font-semibold tracking-tight text-ink-900">
+                    <p class="mt-4 text-base font-semibold tracking-tight text-sui-ink">
                         {{ $this->hasFilters ? 'No posts match those filters' : 'No posts yet' }}
                     </p>
 
@@ -360,7 +360,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Posts')] class extends Compon
                                     <a
                                         href="{{ route('admin.posts.edit', $post) }}"
                                         wire:navigate
-                                        class="block truncate text-sm font-medium text-ink-900 transition duration-150 ease-soft hover:text-sui-accent-ink"
+                                        class="block truncate text-sm font-medium text-sui-ink transition duration-150 ease-soft hover:text-sui-accent-ink"
                                     >
                                         {{ $post->title }}
                                     </a>

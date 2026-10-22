@@ -60,7 +60,7 @@
         {{ Str::of($user->name)->substr(0, 1)->upper() }}
     </div>
     <div class="min-w-0 flex-1" x-show="! collapsed">
-        <p class="truncate text-sm font-medium text-ink-900">
+        <p class="truncate text-sm font-medium text-sui-ink">
             {{ $user->name }}
         </p>
         <p class="truncate text-xs text-ink-500">

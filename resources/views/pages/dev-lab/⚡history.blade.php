@@ -161,7 +161,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Run history')] class extends Co
         <div class="flex flex-wrap items-center gap-3 border-b border-sui-hairline px-5 py-4">
             <p class="text-sm text-ink-600">
                 {{ __('Today') }}
-                <span class="font-semibold text-ink-900">{{ $this->usage['used'] }}</span>
+                <span class="font-semibold text-sui-ink">{{ $this->usage['used'] }}</span>
                 @if ($this->usage['remaining'] !== null)
                     <span class="text-ink-500">
                         {{ __('of :limit runs, :remaining left. The allowance resets at midnight.', [
@@ -235,7 +235,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Run history')] class extends Co
                             {{ $run->language->label() }}
                         </flux:badge>
 
-                        <p class="min-w-0 flex-1 truncate text-sm text-ink-800">
+                        <p class="min-w-0 flex-1 truncate text-sm text-sui-ink-secondary">
                             {{ $run->label ?? __('An unnamed workspace') }}
                         </p>
 
