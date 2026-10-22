@@ -85,7 +85,7 @@
         autocapitalize="off"
         autocomplete="off"
         @if ($hint !== null) aria-describedby="{{ $id }}-hint" @endif
-        class="sui-control mt-2 w-full resize-y rounded-xl bg-sui-raised px-3 py-2.5 font-mono text-xs leading-relaxed text-ink-900"
+        class="sui-control mt-2 w-full resize-y rounded-xl bg-sui-raised px-3 py-2.5 font-mono text-xs leading-relaxed text-sui-ink"
     ></textarea>
 
     @if ($hint !== null)

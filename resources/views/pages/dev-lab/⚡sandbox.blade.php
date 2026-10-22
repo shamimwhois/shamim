@@ -397,7 +397,7 @@ new #[Layout('layouts::app.dashboard')] #[Title('Sandbox')] class extends Compon
                     id="workspace-name"
                     type="text"
                     wire:model.live.debounce.600ms="name"
-                    class="sui-control mt-1.5 w-full max-w-md rounded-xl bg-white px-3 py-2 text-sm font-semibold tracking-tight text-ink-900"
+                    class="sui-control mt-1.5 w-full max-w-md font-semibold tracking-tight"
                     placeholder="{{ __('Name this experiment') }}"
                 />
                 @error('name')
@@ -614,17 +614,17 @@ new #[Layout('layouts::app.dashboard')] #[Title('Sandbox')] class extends Compon
                         </button>
                     </x-slot:actions>
 
-                    <div wire:ignore class="max-h-72 overflow-y-auto bg-ink-950 px-4 py-3">
-                        <p x-show="lines.length === 0" class="font-mono text-2xs leading-relaxed text-ink-500">
+                    <div wire:ignore class="max-h-72 overflow-y-auto bg-code-canvas px-4 py-3">
+                        <p x-show="lines.length === 0" class="font-mono text-2xs leading-relaxed text-code-muted">
                             {{ __('Nothing has run yet. Press Run and the frame’s output appears here. alert(), confirm() and prompt() are blocked, and say so in this panel when called.') }}
                         </p>
 
                         <ul class="space-y-1.5">
                             <template x-for="(line, index) in lines" :key="index">
                                 <li class="font-mono text-2xs leading-relaxed">
-                                    <span class="text-ink-600" x-text="line.at"></span>
+                                    <span class="text-code-muted" x-text="line.at"></span>
                                     <span
-                                        :class="line.level === 'error' ? 'text-sui-danger' : (line.level === 'warn' ? 'text-sui-attention-ink' : 'text-ink-100')"
+                                        :class="line.level === 'error' ? 'text-sui-danger' : (line.level === 'warn' ? 'text-sui-attention-ink' : 'text-code-ink')"
                                         x-text="line.text"
                                     ></span>
                                 </li>

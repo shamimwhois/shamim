@@ -24,7 +24,7 @@
         <flux:icon :name="$icon" class="size-5" />
     </div>
 
-    <p class="mt-4 text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+    <p class="mt-4 text-base font-semibold tracking-tight text-app-ink">
         {{ $title }}
     </p>
 

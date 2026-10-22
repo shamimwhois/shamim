@@ -44,7 +44,7 @@
     @endif
 
     <a href="{{ $href }}" wire:navigate class="focus-ring flex flex-1 flex-col p-5">
-        <h3 class="max-w-[85%] text-base font-semibold leading-snug tracking-tight text-ink-900 dark:text-ink-50">
+        <h3 class="max-w-[85%] text-base font-semibold leading-snug tracking-tight text-app-ink">
             {{ $idea->title }}
         </h3>
 

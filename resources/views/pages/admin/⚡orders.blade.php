@@ -355,7 +355,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Orders')] class extends Compo
                                             <div>
                                                 <h3 class="sui-label">{{ __('Payment attempts') }}</h3>
 
-                                                <ul class="mt-2 space-y-1.5 text-xs text-ink-600 dark:text-ink-300">
+                                                <ul class="mt-2 space-y-1.5 text-xs text-ink-600">
                                                     @forelse ($order->payments as $payment)
                                                         <li wire:key="payment-{{ $payment->id }}">
                                                             {{ $payment->provider->label() }}
@@ -376,7 +376,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Orders')] class extends Compo
                                                 @if ($order->refunds->isNotEmpty())
                                                     <h3 class="sui-label mt-4">{{ __('Refunds') }}</h3>
 
-                                                    <ul class="mt-2 space-y-1.5 text-xs text-ink-600 dark:text-ink-300">
+                                                    <ul class="mt-2 space-y-1.5 text-xs text-ink-600">
                                                         @foreach ($order->refunds as $refund)
                                                             <li wire:key="refund-{{ $refund->id }}">
                                                                 {{ $refund->formattedAmount() }}

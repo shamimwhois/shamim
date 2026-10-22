@@ -82,6 +82,27 @@
     --color-ink-900: #171716;
     --color-ink-950: #0d0d0c;
 
+    /* --- Text roles ------------------------------------------------------ */
+    /* The ink scale does double duty: on the public site it is text, inside
+       the `data-sui` workspace it is also the set of *surfaces* (ink-900 is
+       the dark card, ink-50 the canvas). A component used in both places
+       therefore cannot say `text-ink-900 dark:text-ink-50` — that pairing is
+       correct on the site and dark-on-dark in the workspace. These three
+       roles resolve per scope instead, so one class is right in all four
+       combinations and never needs a `dark:` partner. */
+    --color-app-ink: #171716;            /* headings, values, anything you must read */
+    --color-app-ink-secondary: #262624;  /* body copy */
+    --color-app-ink-faint: #71716b;      /* meta, timestamps, decoration */
+
+    /* --- Code surfaces ---------------------------------------------------- */
+    /* Output panes and consoles keep a dark ground in both themes — the
+       reader is looking at a shell, not at the page — so their ink must not
+       come from a scale the workspace inverts. Same reasoning as the roles
+       above, applied to the other side of the contrast pair. */
+    --color-code-canvas: #0d0d0c;
+    --color-code-ink: #eeeeec;
+    --color-code-muted: #9a9a94;
+
     /* --- Accent: terminal green-teal ------------------------------------- */
     /* Signals "this person works in a shell" without becoming a theme colour. */
     --color-signal-50: #ecfdf6;
@@ -342,6 +363,12 @@
         --color-danger: #f87171;
         --color-info: #60a5fa;
 
+        /* Text roles on the public site's dark ground. `code-*` needs no
+           entry: its canvas is dark in both themes already. */
+        --color-app-ink: #f7f7f6;
+        --color-app-ink-secondary: #e0e0dd;
+        --color-app-ink-faint: #9a9a94;
+
         /* Feed module — the same role names, resolved to the editorial
            dark drums. `info` and `danger` re-scope above, so the azure and
            error aliases need no entry here. */
@@ -499,6 +526,16 @@
     --color-sui-ink-disabled: #8392ab;
     --color-sui-ink-on-accent: #ffffff;
 
+    /* The shared components resolve to the workspace ladder here, so the
+       same class reads #344767 on a white card and #171716 on the site. */
+    --color-app-ink: #344767;
+    --color-app-ink-secondary: #5f6b7e;
+    --color-app-ink-faint: #67748e;
+
+    --color-code-canvas: #0b1526;
+    --color-code-ink: #f1f3f5;
+    --color-code-muted: #94a3b8;
+
     --color-sui-accent: #2b4acb;
     --color-sui-accent-hover: #2440b0;
     --color-sui-accent-active: #1e3793;
@@ -580,6 +617,14 @@
     --color-sui-ink-muted: #94a3b8;
     --color-sui-ink-disabled: #6b7a94;
     --color-sui-ink-on-accent: #0b1526;
+
+    --color-app-ink: #f1f5f9;
+    --color-app-ink-secondary: #b6c2d4;
+    --color-app-ink-faint: #94a3b8;
+
+    --color-code-canvas: #070f1d;
+    --color-code-ink: #f1f5f9;
+    --color-code-muted: #94a3b8;
 
     --color-sui-accent: #7d95e0;
     --color-sui-accent-hover: #9fb0ea;
@@ -758,23 +803,22 @@
     }
 
     body {
-        @apply bg-white text-ink-800 antialiased;
+        @apply bg-white text-app-ink-secondary antialiased;
         font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
         text-rendering: optimizeLegibility;
     }
 
     .dark body {
-        @apply bg-ink-950 text-ink-200;
+        @apply bg-ink-950;
     }
 
-    /* Headings are set tighter and darker than body copy. */
+    /* Headings are set tighter and darker than body copy. The colour comes
+       from the role token rather than the ink step, so a heading with no
+       class of its own stays legible inside the workspace, where `ink-900`
+       is the card and `ink-50` is the canvas. */
     h1, h2, h3, h4 {
-        @apply text-ink-900 font-semibold tracking-tighter;
+        @apply text-app-ink font-semibold tracking-tighter;
         text-wrap: balance;
-    }
-
-    .dark h1, .dark h2, .dark h3, .dark h4 {
-        @apply text-ink-50;
     }
 
     p {
