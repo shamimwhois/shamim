@@ -3,6 +3,7 @@
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
+use Livewire\Livewire;
 
 test('the blog index lists published posts', function () {
     Post::factory()->published()->count(3)->create();
@@ -81,6 +82,36 @@ test('filtered and paged views are excluded from indexing', function () {
 
     $this->get(route('blog.index', ['q' => 'anything']))
         ->assertSee('<meta name="robots" content="noindex', escape: false);
+});
+
+test('a tag outside the popular rail still titles its filtered view', function () {
+    // Fill the rail past its 20-tag limit so the rare tag cannot be in it.
+    foreach (range(1, 21) as $i) {
+        $tag = Tag::factory()->create(['name' => 'Popular '.$i, 'slug' => 'popular-'.$i]);
+        Post::factory()->published()->create()->tags()->attach($tag);
+    }
+
+    $rare = Tag::factory()->create(['name' => 'Rare Tag', 'slug' => 'rare-tag']);
+    Post::factory()->published()->create(['title' => 'The only rare post'])->tags()->attach($rare);
+
+    $this->get(route('blog.index', ['tag' => 'rare-tag']))
+        ->assertOk()
+        ->assertSee('The only rare post')
+        ->assertSee('Tagged: Rare Tag');
+});
+
+test('clearing the search returns to the first page', function () {
+    Post::factory()->published()->count(30)->create([
+        'title' => 'A searchable post',
+    ]);
+
+    Livewire::test('pages::blog.index')
+        ->set('search', 'searchable')
+        ->call('setPage', 2)
+        ->assertSet('paginators.page', 2)
+        ->call('clearSearch')
+        ->assertSet('search', '')
+        ->assertSet('paginators.page', 1);
 });
 
 test('an empty result set shows a helpful empty state', function () {

@@ -126,7 +126,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
 
         unset($this->posts);
 
-        \Flux\Flux::toast(variant: 'success', text: __('Post deleted.'));
+        \Flux\Flux::toast(variant: 'success', text: __('Post moved to trash.'));
     }
 
     /**
@@ -436,7 +436,7 @@ new #[Layout('layouts::dashboard')] #[Title('Posts')] class extends Component
 
                                     <template x-if="confirmingDelete">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-mono text-2xs text-red-600 dark:text-red-400">Delete permanently?</span>
+                                            <span class="font-mono text-2xs text-red-600 dark:text-red-400">Move to trash?</span>
                                             <flux:button variant="danger" size="xs" wire:click="delete({{ $post->id }})" wire:loading.attr="disabled">
                                                 Confirm
                                             </flux:button>

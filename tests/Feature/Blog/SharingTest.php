@@ -1,7 +1,10 @@
 <?php
 
+use App\Actions\Posts\PublishPost;
+use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
+use App\Models\User;
 
 test('the detail page emits open graph article metadata', function () {
     $post = Post::factory()->published()->create();
@@ -104,6 +107,71 @@ test('the rss feed lists published posts and excludes drafts', function () {
     expect($response->getContent())
         ->toContain('A feed item')
         ->not->toContain('A draft item');
+});
+
+test('the rss feed keeps raw characters inside its cdata sections', function () {
+    Post::factory()->published()->create([
+        'title' => 'Queues & caches',
+        'excerpt' => 'Writes & reads at the same time.',
+    ]);
+
+    $content = $this->get(route('feed'))->getContent();
+
+    // CDATA is raw text: escaping it would show a literal `&amp;` in readers.
+    expect($content)->toContain('<![CDATA[Writes & reads at the same time.]]>')
+        ->and($content)->toContain('Queues &amp; caches');
+});
+
+test('publishing a post evicts the cached feed', function () {
+    Post::factory()->published()->create(['title' => 'Already in the feed']);
+
+    expect($this->get(route('feed'))->getContent())->toContain('Already in the feed');
+
+    $draft = Post::factory()->create(['title' => 'Freshly published']);
+    app(PublishPost::class)->handle($draft);
+
+    expect($this->get(route('feed'))->getContent())->toContain('Freshly published');
+});
+
+test('changing an author, category or tag evicts the cached feed', function () {
+    $author = User::factory()->create(['name' => 'Prior Author']);
+    $category = Category::factory()->create(['name' => 'Prior Category']);
+    $tag = Tag::factory()->create(['name' => 'Prior Tag']);
+
+    Post::factory()->published()->withTags([$tag->id])->create([
+        'user_id' => $author->id,
+        'category_id' => $category->id,
+    ]);
+
+    $content = $this->get(route('feed'))->getContent();
+
+    expect($content)->toContain('Prior Author')
+        ->and($content)->toContain('Prior Category')
+        ->and($content)->toContain('Prior Tag');
+
+    // None of these touch a post row, but all three labels are in the feed.
+    $author->update(['name' => 'Current Author']);
+    $category->update(['name' => 'Current Category']);
+    $tag->update(['name' => 'Current Tag']);
+
+    $content = $this->get(route('feed'))->getContent();
+
+    expect($content)->toContain('Current Author')
+        ->toContain('Current Category')
+        ->toContain('Current Tag')
+        ->not->toContain('Prior Author')
+        ->not->toContain('Prior Category')
+        ->not->toContain('Prior Tag');
+});
+
+test('featured posts carry a higher sitemap priority', function () {
+    $featured = Post::factory()->published()->create(['is_featured' => true]);
+
+    $content = $this->get(route('sitemap'))->getContent();
+    $position = strpos($content, '<loc>'.route('blog.show', $featured).'</loc>');
+
+    expect($position)->not->toBeFalse()
+        ->and(substr($content, $position, 300))->toContain('<priority>0.9</priority>');
 });
 
 test('the sitemap lists published posts and excludes drafts', function () {

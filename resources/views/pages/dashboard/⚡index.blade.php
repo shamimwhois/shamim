@@ -44,7 +44,11 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
     }
 
     /**
-     * The most recent comments awaiting moderation.
+     * The most recent comments awaiting moderation on this author's posts.
+     *
+     * Scoped to the signed-in author for the same reason the moderation page is:
+     * a comment on someone else's post is not this author's to approve, and
+     * showing it here would leak the other author's thread.
      *
      * @return Collection<int, Comment>
      */
@@ -53,6 +57,7 @@ new #[Layout('layouts::dashboard')] #[Title('Dashboard')] class extends Componen
     {
         return Comment::query()
             ->pending()
+            ->whereHas('post', fn ($query) => $query->authoredBy(auth()->user()))
             ->with(['post', 'user'])
             ->latest()
             ->limit(5)

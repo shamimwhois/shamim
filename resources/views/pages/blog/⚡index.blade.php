@@ -49,15 +49,36 @@ new #[Title('Writing')] class extends Component
     }
 
     /**
-     * Reset to page 1 whenever a filter changes, and refresh the head metadata
-     * so a shared link previews the filter it actually points at.
+     * Reset to page 1 whenever a filter changes.
      */
     public function updating(string $property): void
     {
         if (in_array($property, ['search', 'category', 'tag'], true)) {
             $this->resetPage();
+        }
+    }
+
+    /**
+     * Refresh the head metadata once the new filter value is in place.
+     *
+     * `updating` runs before the assignment, so metadata built there would
+     * describe the previous filter — the whole reason for using `updated`.
+     */
+    public function updated(string $property): void
+    {
+        if (in_array($property, ['search', 'category', 'tag'], true)) {
             $this->syncMetadata();
         }
+    }
+
+    /**
+     * Clear the search term without leaving the reader on the old page number.
+     */
+    public function clearSearch(): void
+    {
+        $this->search = '';
+        $this->resetPage();
+        $this->syncMetadata();
     }
 
     /**
@@ -194,24 +215,32 @@ new #[Title('Writing')] class extends Component
 
     /**
      * The currently applied category model, when one is selected.
+     *
+     * Resolved directly rather than looked up in the filter rail's collection:
+     * a shared link to a category with no published posts is still a valid URL
+     * and must describe itself rather than silently render "All writing".
      */
     #[Computed]
     public function activeCategory(): ?Category
     {
         return $this->category === ''
             ? null
-            : $this->categories->firstWhere('slug', $this->category);
+            : Category::query()->where('slug', $this->category)->first();
     }
 
     /**
      * The currently applied tag model, when one is selected.
+     *
+     * The rail lists only the 20 most-used tags, so an older tag reached from a
+     * post's tag pill would be missing from it — and with it, the heading and
+     * title for that filtered view.
      */
     #[Computed]
     public function activeTag(): ?Tag
     {
         return $this->tag === ''
             ? null
-            : $this->tags->firstWhere('slug', $this->tag);
+            : Tag::query()->where('slug', $this->tag)->first();
     }
 
     /**
@@ -305,7 +334,7 @@ new #[Title('Writing')] class extends Component
                         @if ($search !== '')
                             <button
                                 type="button"
-                                wire:click="$set('search', '')"
+                                wire:click="clearSearch"
                                 class="absolute inset-y-0 right-3 flex items-center text-ink-400 transition-colors hover:text-ink-700 dark:hover:text-ink-200"
                                 aria-label="Clear search"
                             >
@@ -393,7 +422,7 @@ new #[Title('Writing')] class extends Component
     {{-- ================================================================== --
      | Results
      --}}
-    <section class="shell py-14" aria-live="polite" aria-busy="{{ $this->posts->isEmpty() ? 'false' : 'false' }}">
+    <section class="shell py-14" aria-live="polite">
         {{-- Loading skeleton, shown only while a filter request is in flight --}}
         <div wire:loading.delay.shorter.flex wire:target="search, category, tag" class="hidden grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach (range(1, 6) as $i)

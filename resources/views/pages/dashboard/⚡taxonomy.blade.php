@@ -1,6 +1,5 @@
 <?php
 
-use App\Concerns\HasSlug;
 use App\Models\Category;
 use App\Models\Tag;
 use App\Support\Seo;
@@ -25,8 +24,6 @@ use Livewire\Component;
  */
 new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
 {
-    use HasSlug;
-
     /**
      * Category form (create or edit).
      */
@@ -118,7 +115,7 @@ new #[Layout('layouts::dashboard')] #[Title('Taxonomy')] class extends Component
         } else {
             Category::query()->create([
                 'name' => $name,
-                'slug' => $this->generateUniqueSlug($name),
+                'slug' => Category::generateUniqueSlug($name),
                 'description' => $this->categoryDescription ?: null,
                 'color' => $this->categoryColor ?: null,
             ]);

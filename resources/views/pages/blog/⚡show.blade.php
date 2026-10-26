@@ -8,6 +8,7 @@ use App\Support\MarkdownRenderer;
 use App\Support\Seo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -137,6 +138,21 @@ new #[Title('Post')] class extends Component
             return;
         }
 
+        // A signed-in account does not make flooding acceptable: cap a reader at
+        // a handful of comments per window, keyed per user so a shared IP cannot
+        // silence a whole office.
+        $throttleKey = 'comment:'.$user->id;
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $this->addError('commentBody', __('You are commenting too quickly. Try again in :seconds seconds.', [
+                'seconds' => RateLimiter::availableIn($throttleKey),
+            ]));
+
+            return;
+        }
+
+        RateLimiter::hit($throttleKey, 300);
+
         $this->post->comments()->create([
             'user_id' => $user->id,
             'body' => $this->commentBody,
@@ -206,7 +222,8 @@ new #[Title('Post')] class extends Component
             ->whereNull('parent_id')
             ->with([
                 'user',
-                'replies' => fn ($query) => $query->approved()->with('user')->oldest(),
+                'post',
+                'replies' => fn ($query) => $query->approved()->with(['user', 'post'])->oldest(),
             ])
             ->oldest()
             ->get();

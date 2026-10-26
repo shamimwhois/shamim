@@ -202,27 +202,6 @@ class Post extends Model
     }
 
     /**
-     * Scope to drafts together with any soft-deleted row holding the same slug.
-     *
-     * A trashed post keeps its row — and therefore its slug, which is covered by
-     * a UNIQUE index — so the normal "is this slug still free?" check would miss
-     * it and let a new draft collide with the tombstone. Deliberately not a
-     * catch-all `withTrashed()`: widening `draft()` would silently change the
-     * meaning of every count and listing in the dashboard. This scope is only
-     * ever composed onto a single-row slug check.
-     *
-     * @param  Builder<$this>  $query
-     */
-    #[Scope]
-    protected function draftOrTrashedWithSlug(Builder $query, string $slug): void
-    {
-        $query->withTrashed()->where(function (Builder $query): void {
-            $query->where('status', PostStatus::Draft->value)
-                ->orWhereNotNull('deleted_at');
-        })->where('slug', $slug);
-    }
-
-    /**
      * Scope to posts matching a free-text term.
      *
      * Wildcards in the term are escaped so they match literally.

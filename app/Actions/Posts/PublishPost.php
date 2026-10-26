@@ -4,7 +4,6 @@ namespace App\Actions\Posts;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
-use App\Models\Tag;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,17 +39,14 @@ class PublishPost
 
     /**
      * Determine whether the post is in a state that can be published.
+     *
+     * A post needs a title and a body, and nothing else. Taxonomy is optional
+     * everywhere else in the app (the editor lets a post be saved without a
+     * category or tag), so requiring a tag here would block publishing from the
+     * posts table while the editor published the same post without complaint.
      */
     public function canPublish(Post $post): bool
     {
-        if (trim($post->title) === '' || trim($post->body) === '') {
-            return false;
-        }
-
-        $hasTags = $post->relationLoaded('tags')
-            ? $post->tags->isNotEmpty()
-            : $post->tags()->exists();
-
-        return $hasTags || Tag::query()->exists();
+        return trim($post->title) !== '' && trim($post->body) !== '';
     }
 }

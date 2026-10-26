@@ -121,9 +121,10 @@
                 <span>{{ number_format($post->view_count) }} views</span>
             @endif
 
-            @if ($post->relationLoaded('comments'))
+            {{-- `comments_count` comes from the listing query's withCount. --}}
+            @if (($post->comments_count ?? 0) > 0)
                 <span aria-hidden="true">·</span>
-                <span>{{ $post->comments->count() }} {{ Str::plural('comment', $post->comments->count()) }}</span>
+                <span>{{ $post->comments_count }} {{ Str::plural('comment', $post->comments_count) }}</span>
             @endif
         </div>
     </div>

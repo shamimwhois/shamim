@@ -44,13 +44,13 @@ class UpdatePost
             if (array_key_exists('slug', $data) && filled($data['slug'])) {
                 $slug = $data['slug'];
 
-                // The slug is part of the public URL, so a collision with another
-                // draft (or a soft-deleted tombstone holding the same unique
-                // index) must not be written through. Suffixing preserves the
-                // author's wording; assigning it verbatim would either throw on
-                // the unique index or silently break the other post's link.
-                if (Post::query()
-                    ->draftOrTrashedWithSlug($slug)
+                // The slug is part of the public URL, so it must be unique
+                // across the whole table — published posts and soft-deleted
+                // tombstones both hold the UNIQUE index. Suffixing preserves
+                // the author's wording; assigning it verbatim would throw on
+                // the index or silently break the other post's link.
+                if (Post::withTrashed()
+                    ->where('slug', $slug)
                     ->whereKeyNot($post->getKey())
                     ->exists()) {
                     $slug = Post::generateUniqueSlug($slug, $post->getKey());

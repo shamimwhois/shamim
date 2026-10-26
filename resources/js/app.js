@@ -22,7 +22,19 @@
  * because progress is a continuous function of scroll position, not a
  * threshold crossing.
  */
+/**
+ * Teardown for the previous page's reading-progress listeners.
+ *
+ * Livewire navigates without a full reload, so boot() runs again against a new
+ * document. Without this, every navigation would add another scroll listener
+ * still writing to an element that is no longer in the page.
+ */
+let teardownReadingProgress = null;
+
 function initReadingProgress() {
+    teardownReadingProgress?.();
+    teardownReadingProgress = null;
+
     const bar = document.querySelector('[data-reading-progress]');
 
     if (! bar) {
@@ -67,6 +79,11 @@ function initReadingProgress() {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
 
+    teardownReadingProgress = () => {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+    };
+
     update();
 }
 
@@ -77,72 +94,83 @@ function initReadingProgress() {
  * nearest the top of the viewport wins, which is what readers expect: the TOC
  * reflects the section you are currently inside, not the one you just passed.
  */
+let teardownTableOfContents = null;
+
 function initTableOfContents() {
-    const toc = document.querySelector('[data-toc]');
+    teardownTableOfContents?.();
+    teardownTableOfContents = null;
 
-    if (! toc) {
-        return;
-    }
+    const observers = [];
 
-    const links = Array.from(toc.querySelectorAll('[data-toc-target]'));
+    // A page can render two TOCs (sticky sidebar, mobile disclosure). Both
+    // should track the article; observing only the first left the mobile copy
+    // inert.
+    document.querySelectorAll('[data-toc]').forEach((toc) => {
+        const links = Array.from(toc.querySelectorAll('[data-toc-target]'));
 
-    if (links.length === 0) {
-        return;
-    }
+        if (links.length === 0) {
+            return;
+        }
 
-    const headings = links
-        .map((link) => document.getElementById(link.dataset.tocTarget))
-        .filter((el) => el !== null);
+        const headings = links
+            .map((link) => document.getElementById(link.dataset.tocTarget))
+            .filter((el) => el !== null);
 
-    if (headings.length === 0) {
-        return;
-    }
+        if (headings.length === 0) {
+            return;
+        }
 
-    const setActive = (id) => {
-        links.forEach((link) => {
-            const isActive = link.dataset.tocTarget === id;
-            link.dataset.active = isActive ? 'true' : 'false';
+        const setActive = (id) => {
+            links.forEach((link) => {
+                const isActive = link.dataset.tocTarget === id;
+                link.dataset.active = isActive ? 'true' : 'false';
 
-            if (isActive) {
-                link.setAttribute('aria-current', 'location');
-            } else {
-                link.removeAttribute('aria-current');
-            }
-        });
-    };
-
-    // Track which headings are currently intersecting, then pick the topmost.
-    const visible = new Set();
-
-    const observer = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    visible.add(entry.target.id);
+                if (isActive) {
+                    link.setAttribute('aria-current', 'location');
                 } else {
-                    visible.delete(entry.target.id);
+                    link.removeAttribute('aria-current');
                 }
             });
+        };
 
-            if (visible.size === 0) {
-                return;
-            }
+        // Track which headings are currently intersecting, then pick the topmost.
+        const visible = new Set();
 
-            // Order by document position, not insertion order.
-            const topmost = headings.find((heading) => visible.has(heading.id));
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        visible.add(entry.target.id);
+                    } else {
+                        visible.delete(entry.target.id);
+                    }
+                });
 
-            if (topmost) {
-                setActive(topmost.id);
-            }
-        },
-        {
-            // Treat the band between 96px and 40% viewport height as "current".
-            rootMargin: '-96px 0px -60% 0px',
-            threshold: 0,
-        },
-    );
+                if (visible.size === 0) {
+                    return;
+                }
 
-    headings.forEach((heading) => observer.observe(heading));
+                // Order by document position, not insertion order.
+                const topmost = headings.find((heading) => visible.has(heading.id));
+
+                if (topmost) {
+                    setActive(topmost.id);
+                }
+            },
+            {
+                // Treat the band between 96px and 40% viewport height as "current".
+                rootMargin: '-96px 0px -60% 0px',
+                threshold: 0,
+            },
+        );
+
+        headings.forEach((heading) => observer.observe(heading));
+        observers.push(observer);
+    });
+
+    teardownTableOfContents = () => {
+        observers.forEach((observer) => observer.disconnect());
+    };
 }
 
 /**

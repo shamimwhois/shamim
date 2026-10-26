@@ -23,8 +23,9 @@ use Illuminate\Translation\PotentiallyTranslatedString;
  *   3. **Exclusion of self.** Editing a post must not collide with its own slug,
  *      so the post being edited is excluded from the uniqueness check.
  *
- * Soft-deleted posts are excluded from the collision check. Their slug is free
- * to be reused; the redirect for the old URL is a separate concern.
+ * Soft-deleted posts are included in the collision check. A trashed row still
+ * holds its slug in the UNIQUE index, so offering that slug as "free" would
+ * promise something the database cannot deliver.
  */
 class PostSlug implements ValidationRule
 {

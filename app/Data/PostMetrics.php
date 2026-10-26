@@ -43,7 +43,7 @@ readonly class PostMetrics
      */
     public static function forSite(): self
     {
-        return self::fromQuery(Post::query());
+        return self::fromQuery(Post::query()->published());
     }
 
     /**

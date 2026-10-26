@@ -17,12 +17,16 @@ class SyncTaxonomyCounts
 {
     /**
      * Recount published posts for the post's category and each of its tags.
+     *
+     * `$previousCategoryId` is supplied when a post has just been moved: the
+     * category it left is no longer referenced by the post, so recounting only
+     * the current one would leave the old category's counter inflated.
      */
-    public function handle(Post $post): void
+    public function handle(Post $post, ?int $previousCategoryId = null): void
     {
-        $categoryId = $post->category_id;
+        $categoryIds = array_filter(array_unique([$post->category_id, $previousCategoryId]));
 
-        if ($categoryId !== null) {
+        foreach ($categoryIds as $categoryId) {
             $category = Category::query()->find($categoryId);
 
             if ($category !== null) {

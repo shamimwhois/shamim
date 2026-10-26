@@ -5,8 +5,10 @@ use App\Actions\Posts\UpdatePost;
 use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\Post;
+use App\Models\Tag;
 use App\Models\User;
 use App\Rules\PostSlug;
+use Livewire\Livewire;
 
 test('the posts index requires authentication', function () {
     $this->get(route('dashboard.posts.index'))->assertRedirect(route('login'));
@@ -114,6 +116,38 @@ test('a colliding slug is suffixed rather than silently reusing the URL', functi
     expect($first->slug)->toBe('shared-slug')
         ->and($second->slug)->not->toBe('shared-slug')
         ->and($second->slug)->toBe('shared-slug-1');
+});
+
+test('a slug held by a published post is treated as taken', function () {
+    $author = User::factory()->create();
+
+    $published = Post::factory()->for($author)->published()->create(['slug' => 'live-slug']);
+
+    $fresh = app(CreatePost::class)->handle($author, [
+        'title' => 'Fresh', 'slug' => 'live-slug', 'body' => 'Body.',
+    ]);
+
+    expect($published->slug)->toBe('live-slug')
+        ->and($fresh->slug)->toBe('live-slug-1');
+});
+
+test('a post can be published from the table without any tags', function () {
+    $author = User::factory()->create();
+    $post = Post::factory()->for($author)->create([
+        'title' => 'Tagless but publishable',
+        'body' => 'A body is all this post needs.',
+    ]);
+
+    $this->actingAs($author);
+
+    expect(Tag::query()->count())->toBe(0);
+
+    Livewire::test('pages::dashboard.posts.index')
+        ->call('publish', $post->id)
+        ->assertHasNoErrors();
+
+    expect($post->refresh()->status)->toBe(PostStatus::Published)
+        ->and($post->published_at)->not->toBeNull();
 });
 
 test('a slug held by a soft-deleted post is still treated as taken', function () {

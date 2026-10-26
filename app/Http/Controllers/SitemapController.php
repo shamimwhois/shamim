@@ -20,7 +20,7 @@ class SitemapController extends Controller
         $posts = Post::query()
             ->published()
             ->recent()
-            ->select(['id', 'slug', 'updated_at', 'published_at'])
+            ->select(['id', 'slug', 'updated_at', 'published_at', 'is_featured'])
             ->get();
 
         $categories = Category::query()
@@ -33,12 +33,19 @@ class SitemapController extends Controller
             ->whereHas('posts', fn ($query) => $query->published())
             ->get();
 
-        return response()
-            ->view('sitemap', [
-                'posts' => $posts,
-                'categories' => $categories,
-                'tags' => $tags,
-            ])
-            ->header('Content-Type', 'application/xml; charset=UTF-8');
+        /*
+         * The XML declaration is prefixed here rather than written in Blade:
+         * a literal `<?xml` in a Blade file is tokenised as a PHP open tag
+         * whenever short_open_tag is enabled, which breaks compilation.
+         */
+        $body = view('sitemap', [
+            'posts' => $posts,
+            'categories' => $categories,
+            'tags' => $tags,
+        ])->render();
+
+        return response('<?xml version="1.0" encoding="UTF-8"?>'."\n".$body, 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+        ]);
     }
 }

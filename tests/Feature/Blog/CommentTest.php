@@ -90,6 +90,25 @@ test('a comment body is escaped rather than rendering as markup', function () {
         ->toContain('&lt;script&gt;');
 });
 
+test('a reader cannot flood the comment queue', function () {
+    $post = Post::factory()->published()->create();
+    $reader = User::factory()->create();
+
+    $component = Livewire::actingAs($reader)->test('pages::blog.show', ['post' => $post]);
+
+    foreach (range(1, 5) as $i) {
+        $component->set('commentBody', 'Comment number '.$i.' is long enough.')
+            ->call('postComment')
+            ->assertHasNoErrors();
+    }
+
+    $component->set('commentBody', 'One comment too many.')
+        ->call('postComment')
+        ->assertHasErrors(['commentBody']);
+
+    expect(Comment::query()->where('post_id', $post->id)->count())->toBe(5);
+});
+
 test('replies to a comment are shown under their parent', function () {
     $post = Post::factory()->published()->create();
     $parent = Comment::factory()->for($post)->approved()->create(['body' => 'The original point']);

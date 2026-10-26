@@ -5,7 +5,19 @@
      * Rendered twice (desktop rail and mobile panel), so it is a component
      * rather than duplicated markup. Each item declares its own route-name
      * pattern so the active state is derived, not hand-maintained.
+     *
+     * The moderation badge is queried here rather than passed in by each page:
+     * every dashboard screen renders this nav, and a badge that only appears on
+     * the overview is a badge the author never sees while working. `once()`
+     * keeps the double render down to a single count query.
      */
+    $pendingComments = once(fn (): int => auth()->check()
+        ? \App\Models\Comment::query()
+            ->pending()
+            ->whereHas('post', fn ($query) => $query->authoredBy(auth()->user()))
+            ->count()
+        : 0);
+
     $items = [
         [
             'label' => 'Overview',

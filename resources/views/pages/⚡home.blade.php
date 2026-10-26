@@ -55,9 +55,9 @@ new #[Title('Senior Software Engineer')] class extends Component
     /**
      * Published posts for the writing section.
      *
-     * One query, two views: featured posts are pulled from the same collection.
      * Eager-loads are declared here because the card component reads
-     * `category`, `tags`, and `comments`.
+     * `category`, `tags`, and `comments`. The lead item is a separate query,
+     * because it may be an older post outside this window.
      *
      * @return Collection<int, Post>
      */
@@ -74,12 +74,25 @@ new #[Title('Senior Software Engineer')] class extends Component
     }
 
     /**
+     * The lead item: the newest featured post, wherever it sits in the archive.
+     *
+     * Queried separately rather than filtered out of the latest page, because
+     * featuring an older post would otherwise silently do nothing once newer
+     * posts pushed it past the `latest_limit` window.
+     *
      * @return Collection<int, Post>
      */
     #[Computed]
     public function featured(): Collection
     {
-        return $this->posts->where('is_featured', true)->take(1)->values();
+        return Post::query()
+            ->published()
+            ->featured()
+            ->recent()
+            ->with(['category', 'tags'])
+            ->withCount(['comments' => fn ($query) => $query->approved()])
+            ->limit(1)
+            ->get();
     }
 
     /**

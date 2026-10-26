@@ -1,32 +1,85 @@
-/.phpunit.cache
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
 /node_modules
+/vendor
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
-/storage/*.key
-/storage/pail
-/vendor
+
+# ---------------------------------------------------------------------------
+# Environment files
+# ---------------------------------------------------------------------------
 .env
 .env.backup
 .env.production
+.env.local
+.env.*.local
+!.env.example
+!.env.production.example
+
+# ---------------------------------------------------------------------------
+# Storage and framework caches
+# ---------------------------------------------------------------------------
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/bootstrap/cache/*.php
+
+# ---------------------------------------------------------------------------
+# Databases
+# ---------------------------------------------------------------------------
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# ---------------------------------------------------------------------------
+# Tests and static analysis
+# ---------------------------------------------------------------------------
+/.phpunit.cache
+/.phpunit.result.cache
+/coverage
+/.phpstan.cache
+/.php-cs-fixer.cache
 .phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
+
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
+*.log
 npm-debug.log
 yarn-error.log
+
+# ---------------------------------------------------------------------------
+# OS and editor files
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+Homestead.json
+Homestead.yaml
 /auth.json
 /.fleet
 /.idea
 /.nova
 /.vscode
 /.zed
+
+# ---------------------------------------------------------------------------
+# Local agent / tooling state
+# ---------------------------------------------------------------------------
 /.agents
 /.amp
 /.claude
 /.cursor
 /.factory
+/.freebuff
 /.grok
 /.junie
 /.kiro

@@ -15,17 +15,44 @@ use Illuminate\Support\Facades\Cache;
  */
 class FeedController extends Controller
 {
+    /**
+     * Cache key for the rendered feed.
+     *
+     * Public so observers can reference it: publishing, editing, deleting or
+     * restoring a post all change the feed's contents.
+     */
+    public const CACHE_KEY = 'feed.xml';
+
+    /**
+     * Evict the rendered feed.
+     *
+     * Every row the template reads — a post, its category, its tags, or its
+     * author's name — changes the output, so the write paths for those models
+     * call this rather than each knowing the key.
+     */
+    public static function forget(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+    }
+
     public function __invoke(): Response
     {
-        $xml = Cache::remember('feed.xml', now()->addHour(), function (): string {
+        $xml = Cache::remember(self::CACHE_KEY, now()->addHour(), function (): string {
             $posts = Post::query()
                 ->published()
                 ->recent()
-                ->with('tags')
+                ->with(['tags', 'category', 'user'])
                 ->limit(30)
                 ->get();
 
-            return view('feed', ['posts' => $posts])->render();
+            /*
+             * Prefix the XML declaration in PHP rather than Blade: a literal
+             * `<?xml` in a Blade file is tokenised as a PHP open tag whenever
+             * short_open_tag is enabled, which breaks compilation.
+             */
+            return '<?xml version="1.0" encoding="UTF-8"?>'
+                ."\n"
+                .view('feed', ['posts' => $posts])->render();
         });
 
         return response($xml, 200, [

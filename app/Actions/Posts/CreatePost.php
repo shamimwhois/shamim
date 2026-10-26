@@ -78,6 +78,9 @@ class CreatePost
      * the author's choice is the one that ends up in the public URL — so it is
      * preserved rather than regenerated. It still has to be made unique, because
      * `slug` carries a UNIQUE index and a second post genuinely cannot reuse it.
+     * The check covers every row in the table, published posts included: a
+     * published post colliding with this one would otherwise surface as a
+     * database error on save, not as a suffixed URL.
      * Duplicating the slug silently would be worse than suffixing it: the author
      * would believe two posts share a URL when only one can.
      */
@@ -89,7 +92,7 @@ class CreatePost
             return Post::generateUniqueSlug($title);
         }
 
-        $taken = Post::query()->draftOrTrashedWithSlug($requested)->exists();
+        $taken = Post::withTrashed()->where('slug', $requested)->exists();
 
         return $taken ? Post::generateUniqueSlug($requested) : $requested;
     }

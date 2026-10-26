@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Category;
 use App\Models\Post;
+use App\Models\Tag;
+use App\Models\User;
+use App\Observers\FeedObserver;
 use App\Observers\PostObserver;
 use App\Support\Seo;
 use Carbon\CarbonImmutable;
@@ -40,6 +44,15 @@ class AppServiceProvider extends ServiceProvider
          */
         Post::observe(PostObserver::class);
 
+        /*
+         * The feed renders category names, tag names and author names next to
+         * each post, so a rename in any of those tables also has to drop the
+         * cached XML or readers see labels the site no longer uses.
+         */
+        Category::observe(FeedObserver::class);
+        Tag::observe(FeedObserver::class);
+        User::observe(FeedObserver::class);
+
         $this->configureDefaults();
     }
 
@@ -49,6 +62,16 @@ class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        /*
+         * Debug mode must never leak stack traces, query bindings or
+         * environment values in production. The environment default is
+         * already `false`, but an operator (or a copied `.env`) can flip
+         * APP_DEBUG by mistake — this guard wins either way.
+         */
+        if (app()->isProduction()) {
+            config(['app.debug' => false]);
+        }
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),

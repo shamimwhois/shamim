@@ -1,4 +1,14 @@
-{!! '<?xml version="1.0" encoding="UTF-8"?>' !!}
+@php
+    /**
+     * Prepare a value for a CDATA section.
+     *
+     * CDATA is raw text, so Blade's HTML escaping must not run here: escaping
+     * would turn an ampersand in an excerpt into a literal "&amp;" in readers.
+     * The one sequence CDATA cannot contain is its own terminator, so that is
+     * split across an entity.
+     */
+    $cdata = fn (?string $value): string => str_replace(']]>', ']]&gt;', (string) $value);
+@endphp
 <rss version="2.0"
      xmlns:atom="http://www.w3.org/2005/Atom"
      xmlns:content="http://purl.org/rss/1.0/modules/content/"
@@ -28,8 +38,8 @@
                     <category>{{ $tag->name }}</category>
                 @endforeach
 
-                <description><![CDATA[{{ $post->excerpt }}]]></description>
-                <content:encoded><![CDATA[{!! $post->body_html !!}]]></content:encoded>
+                <description><![CDATA[{!! $cdata($post->excerpt) !!}]]></description>
+                <content:encoded><![CDATA[{!! $cdata($post->body_html) !!}]]></content:encoded>
             </item>
         @endforeach
     </channel>
