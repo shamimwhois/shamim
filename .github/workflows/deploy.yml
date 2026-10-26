@@ -32,6 +32,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify CHANGELOG has an entry for the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          pattern="^## \[${version//./\.}\]( |$)"
+
+          if ! grep -qE "$pattern" CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::Tag ${TAG} has no '## [${version}]' entry."
+            echo "Release notes are written before the tag, so add a dated '## [${version}] - YYYY-MM-DD' section to CHANGELOG.md and re-tag."
+            exit 1
+          fi
+
+          echo "CHANGELOG.md documents ${version}."
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

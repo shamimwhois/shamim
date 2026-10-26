@@ -155,7 +155,7 @@ Two workflows are included:
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `.github/workflows/tests.yml` | Push to `main`, pull requests, or called by deploy | Installs dependencies, builds assets, runs Pint, PHPStan, and Pest |
-| `.github/workflows/deploy.yml` | Push a `v*.*.*` tag, or manual dispatch | Runs the test workflow, builds assets, rsyncs the release, installs production dependencies, migrates, optimizes, restarts workers, and health-checks `/up` |
+| `.github/workflows/deploy.yml` | Push a `v*.*.*` tag, or manual dispatch | Runs the test workflow, refuses a tag without a matching `CHANGELOG.md` entry, builds assets, rsyncs the release, installs production dependencies, migrates, optimizes, restarts workers, and health-checks `/up` |
 
 Configure the **production** environment in GitHub with these secrets:
 
