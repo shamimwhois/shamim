@@ -173,12 +173,13 @@ The pipeline deploys the working tree without `.git`, `.github`, `tests`, `docs`
 
 ### Releasing
 
+Write the release notes under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md), then cut the release:
+
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+scripts/release.sh 1.1.0
 ```
 
-The tag must match `v*.*.*`. A failed test job blocks the deploy. The **production** environment can be protected with required reviewers in repository settings.
+It moves those notes under `## [1.1.0] - <today>`, commits them, creates the annotated `v1.1.0` tag, and pushes the branch and the tag. Pass `--no-push` to commit and tag locally without publishing. The tag must match `v*.*.*`, and the deploy refuses a tag that `CHANGELOG.md` does not document, so the notes and the tag always ship together. A failed test job blocks the deploy. The **production** environment can be protected with required reviewers in repository settings.
 
 ### Notes and limitations
 
