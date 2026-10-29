@@ -19,6 +19,9 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
     Route::livewire('settings/profile', 'pages::settings.profile')->name('profile.edit');
+    Route::livewire('settings/terminal', 'pages::settings.terminal')->name('settings.terminal');
+    Route::livewire('settings/safety', 'pages::settings.safety')->name('settings.safety');
+    Route::livewire('settings/devices', 'pages::settings.devices')->name('settings.devices');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

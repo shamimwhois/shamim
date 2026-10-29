@@ -37,6 +37,13 @@
                     'external' => false,
                 ]
                 : null,
+            filled(config('portfolio.author.links.phone.url'))
+                ? [
+                    'label' => 'Call '.str_replace('tel:', '', (string) config('portfolio.author.links.phone.url')),
+                    'url' => config('portfolio.author.links.phone.url'),
+                    'external' => false,
+                ]
+                : null,
             ['label' => 'About', 'route' => 'about'],
         ])),
     ];
@@ -75,7 +82,7 @@
             {{-- Link columns --}}
             @foreach ($columns as $heading => $links)
                 <nav aria-label="{{ $heading }}">
-                    <h2 class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                    <h2 class="font-mono text-2xs font-medium uppercase tracking-widest text-ink-500 dark:text-ink-400">
                         {{ $heading }}
                     </h2>
                     <ul class="mt-4 space-y-2.5">

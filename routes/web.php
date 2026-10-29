@@ -5,6 +5,7 @@ use App\Http\Controllers\Editor\EditorAiController;
 use App\Http\Controllers\ErrorPageController;
 use App\Http\Controllers\FeedAttachmentController;
 use App\Http\Controllers\FeedController;
+use App\Http\Controllers\LogSearchController;
 use App\Http\Controllers\MarketplaceMediaController;
 use App\Http\Controllers\OrderDownloadController;
 use App\Http\Controllers\RobotsController;
@@ -83,6 +84,23 @@ Route::get('feed/attachments/{attachment}', [FeedAttachmentController::class, 's
     ->name('feed.attachments.show');
 
 Route::livewire('feed/{slug}', 'pages::feed.show')->name('feed.show');
+
+/*
+| The rest of the product's surfaces, all wearing the log's frame. A profile is
+| addressed by its handle the way the design writes one — `/@priya` — and the
+| inbox, remotes and the starred list are ordinary pages rather than tabs on the
+| feed, because each answers a different question and deserves its own URL.
+*/
+Route::get('log/developers', LogSearchController::class)->name('log.search');
+
+Route::livewire('@{handle}', 'pages::profile')
+    ->where('handle', '[A-Za-z0-9_-]+')
+    ->name('profile.show');
+
+Route::livewire('starred', 'pages::starred')->name('starred.index');
+Route::livewire('search', 'pages::search')->name('search.index');
+Route::livewire('notifications', 'pages::notifications')->name('notifications.index');
+Route::livewire('remotes/{remote?}', 'pages::remotes')->name('remotes.index');
 
 /*
 | The marketplace is a storefront, not a workspace: anyone may read it, the way

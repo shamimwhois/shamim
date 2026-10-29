@@ -5,6 +5,7 @@ use App\Models\LabSnippet;
 use App\Support\Seo;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -42,7 +43,7 @@ use Livewire\Component;
  * (`layouts::guest.home`), the way the marketplace and hub pages do, because a guest
  * has no workspace chrome to be drawn inside.
  */
-new #[Title('Developer Lab')] class extends Component
+new #[Title('Developer Lab')] #[Layout('layouts::feed')] class extends Component
 {
     public function mount(): void
     {
@@ -55,6 +56,13 @@ new #[Title('Developer Lab')] class extends Component
 
     /**
      * The panels this page is built from, in the order a reader meets them.
+     *
+     * The page assembles them rather than writing one template, so the order of
+     * the page, the wording of every panel and the audience rule stay in this
+     * file where they can be read together. What changed when the page moved onto
+     * the log's frame is the shape of a panel: each one is now a section of the
+     * log's column rather than a raised card, so the data is the same and the
+     * rendering is the log's.
      *
      * @return list<array{component: string, data: array<string, mixed>}>
      */
@@ -87,7 +95,7 @@ new #[Title('Developer Lab')] class extends Component
                     'description' => __('There is no server-side runner. Nothing this lab stores is executed by the application, which means no CPU quota, no container, and no PHP. The four limits that follow are the design, not oversights:'),
                     'points' => [
                         __('A PHP snippet is text. It is listed, escaped on every page, and copyable. The Run button does not appear for it, and the action that records a run refuses the language on the server as well as in the interface, so the absence is not a hidden control.'),
-                        __('The preview has no origin. The frame is sandboxed without same-origin permission, so a page running in it cannot read this site’s cookies, its storage, or the document around it, and cannot call back into the application with your session attached.'),
+                        __('The preview has no origin. The frame is sandboxed without same-origin permission, so a page running in it cannot read this site\'s cookies, its storage, or the document around it, and cannot call back into the application with your session attached.'),
                         __('An infinite loop hangs your tab. Run rebuilds the frame, so pressing Run again replaces a looping document with a fresh one, and the daily allowance limits how often the button may be pressed. There is no timeout, because a browser does not give the page one to enforce.'),
                         __('`alert()`, `confirm()` and `prompt()` do not open. A modal from a sandboxed frame would be the frame speaking to your browser rather than to itself, so the console pane says what was called instead.'),
                     ],
@@ -242,51 +250,125 @@ new #[Title('Developer Lab')] class extends Component
         return LabSnippet::query()->published()->count();
     }
 }; ?>
+<x-log.module
+    active="dev-lab"
+    data-test="dev-lab-landing"
+    :title="__('Developer Lab')"
+    :meta="trans_choice(':count snippet|:count snippets', $this->publishedCount, ['count' => $this->publishedCount])"
+    :note="__('An editor, a sandboxed preview, and a shelf for the code worth keeping. What runs, what is only stored, and why.')"
+>
+    @php
+        $overview = $this->sections()[0]['data'];
+        $capabilities = $this->sections()[1]['data']['groups'];
+        $status = $this->sections()[3]['data'];
+        $access = $this->sections()[4]['data'];
+    @endphp
 
-<div data-test="dev-lab-landing">
-    <x-app.ui.header
-        :title="__('Developer Lab')"
-        :description="__('An editor, a sandboxed preview, and a shelf for the code worth keeping. What runs, what is only stored, and why.')"
-        :breadcrumbs="[['label' => __('Home')], ['label' => __('Developer Lab')]]"
-    />
+    {{-- The module's own state, in one band: what it is, and the fact that it
+         runs in the reader's browser rather than on a server. --}}
+    <div class="dn-band">
+        <span class="dn-entry-glyph" aria-hidden="true">
+            <x-feed.icon name="dev-lab" :size="18" />
+        </span>
 
-    <x-app.ui.body max="prose">
-        @foreach ($this->sections() as $section)
-            <x-dynamic-component :component="$section['component']" :data="$section['data']" />
-        @endforeach
+        <span class="dn-band-body">
+            <span class="dn-band-title">{{ $overview['title'] }}</span>
+            <span class="dn-band-text">{{ $overview['description'] }}</span>
+        </span>
 
-        @if ($this->featured->isNotEmpty())
-            <x-app.ui.section
-                :title="__('Published this week and before')"
-                icon="globe-alt"
-            >
-                <p class="text-sm leading-normal text-ink-500">
-                    {{ trans_choice(
-                        'There is :count published snippet on the gallery.|There are :count published snippets on the gallery.',
-                        $this->publishedCount,
-                        ['count' => $this->publishedCount],
-                    ) }}
-                </p>
+        <span class="dn-band-actions">
+            <span class="dn-status-chip">{{ $overview['status'] }}</span>
+        </span>
+    </div>
 
-                <ul class="mt-4 space-y-3">
-                    @foreach ($this->featured as $snippet)
-                        <li wire:key="dev-lab-featured-{{ $snippet->id }}">
-                            <x-app.dev-lab.snippet-card :snippet="$snippet" compact />
+    {{-- The audience band: what this visitor in front of the page can do. The
+         copy is chosen at render time — a guest, an account that may open the
+         sandbox and an account that may not are promised three different
+         things, and the page says so from the same place. --}}
+    <div class="dn-band" data-test="dev-lab-access">
+        <span class="dn-band-body">
+            <span class="dn-band-title">{{ $access['heading'] }}</span>
+            <span class="dn-band-text">{{ $access['description'] }}</span>
+        </span>
+
+        <span class="dn-band-actions">
+            @if ($access['action'] ?? null)
+                <a href="{{ $access['action']['href'] }}" wire:navigate class="dn-btn dn-btn-sm">
+                    {{ $access['action']['label'] }}
+                </a>
+            @endif
+
+            @if ($access['secondary'] ?? null)
+                <a href="{{ $access['secondary']['href'] }}" wire:navigate class="dn-btn dn-btn-outline dn-btn-sm">
+                    {{ $access['secondary']['label'] }}
+                </a>
+            @endif
+        </span>
+    </div>
+
+    <x-log.section :title="__('What the lab does')" :count="__('today')">
+        @foreach ($capabilities as $group)
+            <div class="dn-capability">
+                <div class="dn-capability-head">
+                    <span class="dn-capability-label">{{ $group['label'] }}</span>
+                </div>
+
+                <ul class="dn-capability-list">
+                    @foreach ($group['items'] as $item)
+                        <li>
+                            <span class="dn-capability-marker" aria-hidden="true">
+                                <x-feed.icon name="check" :size="13" />
+                            </span>
+                            <span>{{ $item }}</span>
                         </li>
                     @endforeach
                 </ul>
+            </div>
+        @endforeach
+    </x-log.section>
 
-                <flux:button
-                    :href="route('dev-lab.gallery')"
-                    wire:navigate
-                    variant="ghost"
-                    size="sm"
-                    icon="arrow-long-right"
-                    class="mt-4"
-                >
-                    {{ __('Browse the gallery') }}
-                </flux:button>
-            </x-app.ui.section>
-        @endif
-    </x-app.ui.body>
-</div>
+    <x-log.lab-showcase :panes="config('dev_lab.showcase')" />
+
+    <x-log.section :title="$status['title']" :description="$status['description']">
+        <div class="dn-capability">
+            <ul class="dn-capability-list">
+                @foreach ($status['points'] as $point)
+                    <li>
+                        <span class="dn-capability-marker is-pending" aria-hidden="true">
+                            <x-feed.icon name="link" :size="13" />
+                        </span>
+                        <span>{{ $point }}</span>
+                    </li>
+                @endforeach
+            </ul>
+
+            <p class="dn-lab-note">
+                {{ __('Specification') }}: <span class="dn-mono">{{ $status['spec'] }}</span>
+            </p>
+        </div>
+    </x-log.section>
+
+    @if ($this->featured->isNotEmpty())
+        <x-log.section
+            :title="__('Published this week and before')"
+            :count="trans_choice(':count snippet|:count snippets', $this->publishedCount, ['count' => $this->publishedCount])"
+            :href="route('dev-lab.gallery')"
+        >
+            @foreach ($this->featured as $snippet)
+                <x-log.entry
+                    :href="route('dev-lab.snippets.show', ['snippet' => $snippet->slug])"
+                    :title="$snippet->title"
+                    :eyebrow="$snippet->language->label()"
+                    :description="$snippet->excerpt(160)"
+                    :badge="$snippet->language->isBrowserRunnable() ? null : __('stored')"
+                    :meta="[
+                        $snippet->user?->name ?? __('Someone'),
+                        $snippet->published_at?->translatedFormat('j M Y'),
+                        trans_choice(':count line|:count lines', $snippet->lineCount(), ['count' => $snippet->lineCount()]),
+                    ]"
+                    :wire:key="'dev-lab-featured-'.$snippet->id"
+                />
+            @endforeach
+        </x-log.section>
+    @endif
+</x-log.module>

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -37,7 +38,7 @@ use Livewire\WithPagination;
  * for two characters, the same floor the ideas landing uses, because one keystroke
  * matching half the corpus is noise presented as a result.
  */
-new #[Title('Snippet gallery')] class extends Component
+new #[Title('Snippet gallery')] #[Layout('layouts::feed')] class extends Component
 {
     use WithPagination;
 
@@ -314,354 +315,225 @@ new #[Title('Snippet gallery')] class extends Component
         ]);
     }
 }; ?>
-
 @php
-    $selectClasses = 'focus-ring min-h-10 appearance-none rounded-lg border border-ink-200 bg-white py-2 pl-3 pr-9 text-sm text-ink-700 transition-colors hover:border-ink-300 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-200 dark:hover:border-ink-700';
     $activeAuthorName = $this->activeAuthor === null ? null : $this->activeAuthor['name'];
 @endphp
 
-<div data-test="dev-lab-gallery">
-    {{-- ================================================================== --
-     | Header
-     --}}
-    <section class="relative overflow-hidden border-b border-ink-200 dark:border-ink-800">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
-
-        <div class="shell relative py-12 lg:py-16">
-            <nav aria-label="{{ __('Breadcrumb') }}">
-                <ol class="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400 dark:text-ink-500">
-                    <li>
-                        <a href="{{ route('home') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('Home') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li>
-                        <a href="{{ route('dev-lab.index') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('Developer Lab') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li class="text-ink-600 dark:text-ink-300">{{ __('Gallery') }}</li>
-                </ol>
-            </nav>
-
-            <h1 class="mt-6 max-w-3xl text-[clamp(2rem,4.5vw,3.25rem)] font-semibold leading-[1.05] tracking-tightest text-ink-900 dark:text-ink-50">
-                {{ __('Code people pulled out of the sandbox') }}
-            </h1>
-
-            <p class="mt-5 max-w-2xl text-base leading-relaxed text-ink-600 dark:text-ink-300">
-                {{ __('A snippet is somebody’s working HTML, CSS, JavaScript or PHP, saved with a name and a note. Runnable ones offer a preview in a frame that cannot reach this site. PHP is stored and copyable, and there is no Run button for it.') }}
-            </p>
-
-            <div class="mt-8 flex flex-wrap items-center gap-3">
+<x-log.module
+    active="dev-lab"
+    data-test="dev-lab-gallery"
+    :title="__('Gallery')"
+    :meta="trans_choice(':count snippet|:count snippets', $this->snippets->total(), ['count' => $this->snippets->total()])"
+    :note="__('A snippet is somebody’s working HTML, CSS, JavaScript or PHP, saved with a name and a note. Runnable ones offer a preview in a frame that cannot reach this site.')"
+>
+    <x-slot:filters>
+        <div class="dn-module-tools">
+            <div class="dn-search-field">
+                <x-feed.icon name="search" :size="16" />
                 <label for="gallery-search" class="sr-only">{{ __('Search snippets') }}</label>
-                <div class="relative max-w-md flex-1">
-                    <span aria-hidden="true" class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 dark:text-ink-500">
-                        <flux:icon name="magnifying-glass" class="size-4" />
-                    </span>
-
-                    <input
-                        id="gallery-search"
-                        type="search"
-                        wire:model.live.debounce.400ms="search"
-                        placeholder="{{ __('Search titles, notes and the code itself') }}"
-                        class="focus-ring min-h-12 w-full rounded-full border border-ink-200 bg-white py-3 pl-11 pr-4 text-sm text-ink-900 placeholder:text-ink-400 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-500"
-                    >
-                </div>
-
-                @auth
-                    <a
-                        href="{{ route('dev-lab.snippets') }}"
-                        wire:navigate
-                        class="focus-ring inline-flex min-h-12 items-center gap-2 rounded-full border border-ink-200 bg-white px-5 text-sm font-medium text-ink-800 transition-colors hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-100"
-                    >
-                        {{ __('Your snippets') }}
-                    </a>
-                @else
-                    <a
-                        href="{{ route('dev-lab.index') }}"
-                        wire:navigate
-                        class="focus-ring inline-flex min-h-12 items-center gap-2 rounded-full border border-ink-200 bg-white px-5 text-sm font-medium text-ink-800 transition-colors hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-100"
-                    >
-                        {{ __('What the lab runs') }}
-                    </a>
-                @endauth
+                <input
+                    id="gallery-search"
+                    type="search"
+                    wire:model.live.debounce.400ms="search"
+                    placeholder="{{ __('Search titles, notes and the code itself') }}"
+                    autocomplete="off"
+                />
             </div>
-        </div>
-    </section>
 
-    {{-- ================================================================== --
-     | Subjects
-     --}}
-    @if ($this->topics->isNotEmpty())
-        <section class="border-b border-ink-200 py-8 dark:border-ink-800" aria-labelledby="gallery-topics-heading">
-            <div class="shell">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <h2 id="gallery-topics-heading" class="font-mono text-2xs font-semibold uppercase tracking-widest text-ink-500 dark:text-ink-400">
-                        {{ __('Browse by subject') }}
-                    </h2>
-
-                    <div class="flex items-center gap-4">
-                        @if ($this->topicSlug !== '')
-                            <button
-                                type="button"
-                                wire:click="toggleTopic('{{ $this->topicSlug }}')"
-                                class="focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 font-mono text-2xs uppercase tracking-widest text-signal-700 transition-colors hover:bg-signal-50 dark:text-signal-400 dark:hover:bg-signal-950/40"
-                            >
-                                {{ __('Clear subject') }}
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        @endif
-
-                        {{-- The same shelf the ideas landing filters by, and the same index it
-                             comes from. See `pages/⚡topics.blade.php`. --}}
-                        <a
-                            href="{{ route('topics.index') }}"
-                            wire:navigate
-                            class="focus-ring inline-flex min-h-8 items-center gap-1.5 font-mono text-2xs uppercase tracking-widest text-ink-500 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
-                        >
-                            {{ __('Every subject') }}
-                            <span aria-hidden="true">&rarr;</span>
-                        </a>
-                    </div>
-                </div>
-
-                <ul class="mt-4 flex snap-x gap-2 overflow-x-auto pb-2" role="list">
-                    @foreach ($this->topics as $topic)
-                        <li class="shrink-0" wire:key="gallery-subject-{{ $topic->id }}">
-                            <button
-                                type="button"
-                                wire:click="toggleTopic('{{ $topic->slug }}')"
-                                @class([
-                                    'focus-ring inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors',
-                                    'border-signal-600 bg-signal-600 text-white dark:border-signal-500 dark:bg-signal-500 dark:text-ink-950' => $this->topicSlug === $topic->slug,
-                                    'border-ink-200 bg-white text-ink-600 hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-300 dark:hover:border-signal-600 dark:hover:text-signal-400' => $this->topicSlug !== $topic->slug,
-                                ])
-                                @if ($this->topicSlug === $topic->slug) aria-pressed="true" @endif
-                            >
-                                <flux:icon :name="$topic->icon ?? 'tag'" class="size-4" />
-                                <span>{{ $topic->name }}</span>
-                                <span class="text-2xs tabular-nums opacity-70">{{ $topic->lab_snippets_count }}</span>
-                            </button>
-                        </li>
+            <div class="dn-market-sort">
+                <label for="gallery-sort" class="dn-field-key">{{ __('sort') }}</label>
+                <select id="gallery-sort" wire:model.live="sort" class="dn-input" style="width: auto;">
+                    @foreach ($this->sorts() as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
-                </ul>
-            </div>
-        </section>
-    @endif
-
-    {{-- ================================================================== --
-     | The list
-     --}}
-    <section data-reveal class="shell py-14 lg:py-16" aria-labelledby="gallery-list-heading">
-        <div class="flex flex-wrap items-end justify-between gap-6">
-            <div class="min-w-0">
-                <h2 id="gallery-list-heading" class="text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
-                    {{ $this->activeTopic?->name ?? $activeAuthorName ?? __('Everything published') }}
-                </h2>
-
-                <p class="mt-3 max-w-xl text-sm leading-relaxed text-ink-500 dark:text-ink-400">
-                    {{ $this->activeTopic?->description ?? __('A snippet is listed once its author turns on visibility. PHP is stored and copyable; nothing here runs on this site’s server.') }}
-                </p>
+                </select>
             </div>
 
-            <p class="shrink-0 font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500" aria-live="polite">
-                {{ trans_choice(':count snippet|:count snippets', $this->total, ['count' => $this->total]) }}
-            </p>
+            @if ($this->authors->isNotEmpty())
+                <div class="dn-market-sort">
+                    <label for="gallery-author" class="dn-field-key">{{ __('author') }}</label>
+                    <select id="gallery-author" wire:model.live="authorHandle" class="dn-input" style="width: auto;">
+                        <option value="">{{ __('Anyone') }}</option>
+                        @foreach ($this->authors as $author)
+                            <option value="{{ $author['handle'] }}">
+                                {{ $author['name'] }} ({{ $author['count'] }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
+            @if ($this->hasActiveFilters)
+                <button type="button" class="dn-btn dn-btn-ghost dn-btn-sm" wire:click="clearFilters">
+                    {{ __('Reset filters') }}
+                </button>
+            @endif
         </div>
 
-        <div class="mt-8 flex flex-wrap gap-2" role="tablist" aria-label="{{ __('Filter by language') }}">
+        {{-- The language row. Only a language somebody has published in gets a
+             chip, so a chip can never open an empty list. A hand-typed language
+             is echoed below instead. --}}
+        <div class="dn-module-tools" style="padding-top: 0;">
+            <span class="dn-field-key">{{ __('language') }}</span>
+
             <button
                 type="button"
-                role="tab"
-                wire:key="gallery-lang-"
-                aria-selected="{{ $language === '' ? 'true' : 'false' }}"
+                class="dn-filter {{ $language === '' ? 'is-active' : '' }}"
                 wire:click="$set('language', '')"
-                @class([
-                    'focus-ring inline-flex min-h-10 items-center rounded-full border px-4 text-sm transition-colors',
-                    'border-signal-600 bg-signal-600 text-white dark:border-signal-500 dark:bg-signal-500 dark:text-ink-950' => $language === '',
-                    'border-ink-200 bg-white text-ink-600 hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-300' => $language !== '',
-                ])
-            >
-                {{ __('Everything') }}
-            </button>
+                @if ($language === '') aria-current="true" @endif
+            >{{ __('Everything') }}</button>
 
             @foreach (LabLanguage::cases() as $case)
                 @continue(($this->languageCounts[$case->value] ?? 0) === 0)
 
                 <button
                     type="button"
-                    role="tab"
                     wire:key="gallery-lang-{{ $case->value }}"
                     aria-selected="{{ $language === $case->value ? 'true' : 'false' }}"
                     wire:click="$set('language', '{{ $case->value }}')"
                     data-test="language-chip-{{ $case->value }}"
-                    @class([
-                        'focus-ring inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm transition-colors',
-                        'border-signal-600 bg-signal-600 text-white dark:border-signal-500 dark:bg-signal-500 dark:text-ink-950' => $language === $case->value,
-                        'border-ink-200 bg-white text-ink-600 hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-300' => $language !== $case->value,
-                    ])
+                    class="dn-filter {{ $language === $case->value ? 'is-active' : '' }}"
+                    style="padding: 2px 6px;"
                 >
                     {{ $case->label() }}
-                    <span class="text-2xs tabular-nums opacity-70">{{ $this->languageCounts[$case->value] }}</span>
+                    <span class="dn-filter-count">{{ $this->languageCounts[$case->value] }}</span>
                     @unless ($case->isBrowserRunnable())
-                        <span class="font-mono text-2xs uppercase tracking-widest opacity-70">{{ __('stored') }}</span>
+                        <span class="dn-filter-count">{{ __('stored') }}</span>
                     @endunless
                 </button>
             @endforeach
         </div>
 
-        {{-- Toolbar. Native selects, styled once: a custom listbox is more
-             JavaScript than a filter needs, and native selects are already
-             keyboard- and screen-reader-native. --}}
-        <div class="mt-6 flex flex-wrap items-end gap-3 border-y border-ink-200 py-4 dark:border-ink-800">
-            <div>
-                <label for="gallery-sort" class="mb-1.5 block font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                    {{ __('Sort') }}
-                </label>
-                <div class="relative">
-                    <select id="gallery-sort" wire:model.live="sort" class="{{ $selectClasses }}">
-                        @foreach ($this->sorts() as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <flux:icon name="chevron-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-                </div>
+        {{-- The filters that are actually applied, echoed back so a reader can
+             see what to undo and take it off. --}}
+        @if ($language !== '' || $this->topicSlug !== '' || $this->authorHandle !== '' || $this->search !== '')
+            <div class="dn-module-tools" style="padding-top: 0;" data-test="active-filters">
+                <span class="dn-field-key">{{ __('applied') }}</span>
+
+                @if ($language !== '')
+                    <span class="dn-filter-chip">
+                        <span class="dn-field-key">{{ __('language') }}</span>
+                        <span>{{ LabLanguage::tryFrom($language)?->label() ?? $language }}</span>
+                        <button type="button" wire:click="$set('language', '')" aria-label="{{ __('Clear the language filter') }}">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </span>
+                @endif
+
+                @if ($this->topicSlug !== '')
+                    <span class="dn-filter-chip">
+                        <span class="dn-field-key">{{ __('subject') }}</span>
+                        <span>{{ $this->activeTopic?->name ?? $this->topicSlug }}</span>
+                        <button type="button" wire:click="toggleTopic('{{ $this->topicSlug }}')" aria-label="{{ __('Clear the subject filter') }}">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </span>
+                @endif
+
+                @if ($this->authorHandle !== '')
+                    <span class="dn-filter-chip">
+                        <span class="dn-field-key">{{ __('author') }}</span>
+                        <span>{{ $activeAuthorName ?? $this->authorHandle }}</span>
+                        <button type="button" wire:click="$set('authorHandle', '')" aria-label="{{ __('Clear the author filter') }}">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </span>
+                @endif
+
+                @if ($this->search !== '')
+                    <span class="dn-filter-chip">
+                        <span class="dn-field-key">{{ __('query') }}</span>
+                        <span>{{ $this->search }}</span>
+                        <button type="button" wire:click="$set('search', '')" aria-label="{{ __('Clear the search term') }}">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </span>
+                @endif
             </div>
-
-            @if ($this->authors->isNotEmpty())
-                <div>
-                    <label for="gallery-author" class="mb-1.5 block font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                        {{ __('Author') }}
-                    </label>
-                    <div class="relative">
-                        <select id="gallery-author" wire:model.live="authorHandle" class="{{ $selectClasses }}">
-                            <option value="">{{ __('Anyone') }}</option>
-                            @foreach ($this->authors as $author)
-                                <option value="{{ $author['handle'] }}">
-                                    {{ $author['name'] }} ({{ $author['count'] }})
-                                </option>
-                            @endforeach
-                        </select>
-                        <flux:icon name="chevron-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-                    </div>
-                </div>
-            @endif
-
-            @if ($language !== '')
-                <p class="flex min-h-10 items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 text-xs text-ink-600 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300">
-                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">{{ __('Language') }}</span>
-                    <span class="max-w-40 truncate">{{ LabLanguage::tryFrom($language)?->label() ?? $language }}</span>
-                    <button type="button" wire:click="$set('language', '')" class="focus-ring rounded p-0.5 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200" aria-label="{{ __('Clear the language filter') }}">
-                        <flux:icon name="x-mark" class="size-3.5" />
-                    </button>
-                </p>
-            @endif
-
-            @if ($this->topicSlug !== '')
-                <p class="flex min-h-10 items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 text-xs text-ink-600 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300">
-                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">{{ __('Subject') }}</span>
-                    <span class="max-w-40 truncate">{{ $this->activeTopic?->name ?? $this->topicSlug }}</span>
-                    <button type="button" wire:click="toggleTopic('{{ $this->topicSlug }}')" class="focus-ring rounded p-0.5 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200" aria-label="{{ __('Clear the subject filter') }}">
-                        <flux:icon name="x-mark" class="size-3.5" />
-                    </button>
-                </p>
-            @endif
-
-            @if ($this->authorHandle !== '')
-                <p class="flex min-h-10 items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 text-xs text-ink-600 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300">
-                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">{{ __('Author') }}</span>
-                    <span class="max-w-40 truncate">{{ $activeAuthorName ?? $this->authorHandle }}</span>
-                    <button type="button" wire:click="$set('authorHandle', '')" class="focus-ring rounded p-0.5 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200" aria-label="{{ __('Clear the author filter') }}">
-                        <flux:icon name="x-mark" class="size-3.5" />
-                    </button>
-                </p>
-            @endif
-
-            @if ($this->search !== '')
-                <p class="flex min-h-10 items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 text-xs text-ink-600 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300">
-                    <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">{{ __('Query') }}</span>
-                    <span class="max-w-40 truncate">{{ $this->search }}</span>
-                    <button type="button" wire:click="$set('search', '')" class="focus-ring rounded p-0.5 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200" aria-label="{{ __('Clear the search term') }}">
-                        <flux:icon name="x-mark" class="size-3.5" />
-                    </button>
-                </p>
-            @endif
-
-            @if ($this->hasActiveFilters)
-                <button
-                    type="button"
-                    wire:click="clearFilters"
-                    class="focus-ring ml-auto inline-flex min-h-10 items-center rounded-full px-3 text-xs font-medium text-ink-500 transition-colors hover:text-signal-700 dark:text-ink-400 dark:hover:text-signal-400"
-                >
-                    {{ __('Reset filters') }}
-                </button>
-            @endif
-        </div>
-
-        @if ($this->search !== '' && ! $this->isSearching())
-            <p class="mt-6 flex flex-wrap items-center gap-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400" role="status">
-                <flux:icon name="exclamation-circle" class="size-4 shrink-0 text-ink-400 dark:text-ink-500" />
-                {{ __('Type at least two characters to search — what is listed below is still everything published.') }}
-            </p>
         @endif
 
-        {{-- Loading skeleton, shown only while a filter request is in flight. The
-             wrapper carries the directive and the inner element carries the grid,
-             because `wire:loading` hides by writing `display: none` inline and a
-             grid class on the same element would be fighting that. --}}
-        <div wire:loading.delay.shorter wire:target="search, language, topicSlug, authorHandle, sort" aria-hidden="true" data-test="gallery-skeleton">
-            <div class="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                @foreach (range(1, 6) as $slot)
-                    <div class="animate-pulse rounded-xl border border-ink-200 bg-white p-5 dark:border-ink-800 dark:bg-ink-950">
-                        <div class="h-2.5 w-24 rounded-full bg-ink-200 dark:bg-ink-800"></div>
-                        <div class="mt-4 h-3 w-full rounded bg-ink-100 dark:bg-ink-900"></div>
-                        <div class="mt-2 h-3 w-5/6 rounded bg-ink-100 dark:bg-ink-900"></div>
-                        <div class="mt-2 h-3 w-2/3 rounded bg-ink-100 dark:bg-ink-900"></div>
-                        <div class="mt-6 flex gap-2">
-                            <div class="h-4 w-14 rounded-full bg-ink-100 dark:bg-ink-900"></div>
-                            <div class="h-4 w-10 rounded-full bg-ink-100 dark:bg-ink-900"></div>
-                        </div>
-                    </div>
+        @if ($this->topics->isNotEmpty())
+            <div class="dn-module-tools" style="padding-top: 0;">
+                <span class="dn-field-key">{{ __('subjects') }}</span>
+
+                @foreach ($this->topics as $topic)
+                    <button
+                        type="button"
+                        class="dn-filter {{ $this->topicSlug === $topic->slug ? 'is-active' : '' }}"
+                        wire:click="toggleTopic('{{ $topic->slug }}')"
+                        @if ($this->topicSlug === $topic->slug) aria-pressed="true" @endif
+                        style="padding: 2px 6px;"
+                    >{{ $topic->name }}</button>
                 @endforeach
             </div>
-        </div>
+        @endif
+    </x-slot:filters>
 
-        <div wire:loading.remove wire:target="search, language, topicSlug, authorHandle, sort" data-test="gallery-results">
-            @if ($this->snippets->isNotEmpty())
-            <div class="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    @if ($this->search !== '' && ! $this->isSearching())
+        <p class="dn-module-note" role="status">
+            {{ __('Type at least two characters to search — what is listed below is still everything published.') }}
+        </p>
+    @endif
+
+    {{-- The skeleton is shown only while a filter request is in flight. --}}
+    <div wire:loading.delay.shorter wire:target="search, language, topicSlug, authorHandle, sort" aria-hidden="true" data-test="gallery-skeleton">
+        <div class="dn-entries">
+            @foreach (range(1, 6) as $slot)
+                <div class="dn-entry">
+                    <span class="dn-entry-glyph" aria-hidden="true">&nbsp;</span>
+                    <span class="dn-entry-main">
+                        <span class="dn-entry-title">&nbsp;</span>
+                        <span class="dn-entry-desc">&nbsp;</span>
+                    </span>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    <div wire:loading.remove wire:target="search, language, topicSlug, authorHandle, sort" data-test="gallery-results">
+        @if ($this->snippets->isNotEmpty())
+            <div class="dn-entries">
                 @foreach ($this->snippets as $snippet)
-                    <x-app.dev-lab.snippet-card
-                        :snippet="$snippet"
-                        wire:key="gallery-snippet-{{ $snippet->id }}"
+                    <x-log.entry
+                        :href="route('dev-lab.snippets.show', ['snippet' => $snippet->slug])"
+                        :title="$snippet->title"
+                        :eyebrow="$snippet->language->label()"
+                        :description="$snippet->excerpt()"
+                        :badge="$snippet->language->isBrowserRunnable() ? null : __('No run button')"
+                        :meta="[
+                            $snippet->user?->name ?? __('Someone'),
+                            $snippet->published_at?->translatedFormat('j M Y'),
+                            trans_choice(':count line|:count lines', $snippet->lineCount(), ['count' => $snippet->lineCount()]),
+                        ]"
+                        :wire:key="'gallery-snippet-'.$snippet->id"
                     />
                 @endforeach
             </div>
 
-            <x-app.ui.pagination :paginator="$this->snippets" label="{{ __('Snippets pagination') }}" class="mt-10" />
+            <x-app.ui.pagination :paginator="$this->snippets" label="{{ __('Snippets pagination') }}" class="dn-pagination" />
         @else
-                <x-app.ui.empty-state
-                    class="mt-8"
-                    icon="code-bracket"
-                    :title="$this->hasActiveFilters
-                        ? __('Nothing matches this view')
-                        : __('Nobody has published a snippet yet')"
-                    :description="$this->hasActiveFilters
-                        ? __('Search runs over the saved code as plain text. Try a shorter phrase, drop the language or subject, or reset the filters to see everything published.')
-                        : __('Snippets appear here when their author turns on visibility. Keep your own in the sandbox; it is the same editor with a Save button.')"
-                >
+            <div class="dn-module-empty">
+                <p class="dn-empty-command">
+                    fatal: {{ $this->hasActiveFilters ? __('nothing matches this view') : __('nobody has published a snippet yet') }}
+                </p>
+                <p class="dn-empty-text">
                     @if ($this->hasActiveFilters)
-                        <flux:button wire:click="clearFilters" icon="arrow-path">
-                            {{ __('Reset filters') }}
-                        </flux:button>
-                    @elseif (auth()->check())
-                        <flux:button :href="route('dev-lab.snippets.create')" wire:navigate icon="plus">
-                            {{ __('Save your own') }}
-                        </flux:button>
+                        {{ __('Search runs over the saved code as plain text. Try a shorter phrase, drop the language or subject, or reset the filters to see everything published.') }}
+                    @else
+                        {{ __('Snippets appear here when their author turns on visibility. Keep your own in the sandbox; it is the same editor with a Save button.') }}
                     @endif
-                </x-app.ui.empty-state>
-            @endif
-        </div>
-    </section>
-</div>
+                </p>
+
+                @if ($this->hasActiveFilters)
+                    <button type="button" class="dn-btn dn-btn-outline dn-btn-sm" wire:click="clearFilters" style="margin-top: 16px;">
+                        {{ __('Reset filters') }}
+                    </button>
+                @elseif (auth()->check())
+                    <a href="{{ route('dev-lab.snippets.create') }}" wire:navigate class="dn-btn dn-btn-outline dn-btn-sm" style="margin-top: 16px;">
+                        {{ __('Save your own') }}
+                    </a>
+                @endif
+            </div>
+        @endif
+    </div>
+</x-log.module>

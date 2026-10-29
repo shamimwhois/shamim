@@ -16,10 +16,10 @@ use Livewire\Component;
  *
  * Structure (docs/UI-UX-BRIEF.md §6.1), top to bottom:
  *   01 Hero          — who, what, and the one action that matters
- *   02 Writing       — the featured/latest posts, because writing is the proof
- *   03 Expertise     — capability areas, not a logo wall
- *   04 Selected work — outcome-first project summaries
- *   05 Stats band    — static professional figures plus live post counts
+ *   02 CI/CD         — the delivery pipeline, drawn: the technical argument
+ *   03 Writing       — the featured/latest posts, because writing is the proof
+ *   04 Expertise     — capability areas, not a logo wall
+ *   05 Selected work — outcome-first project summaries
  *   06 Contact       — a single, unambiguous call to action
  *
  * Data-heavy sections read from `#[Computed]` properties so Livewire caches
@@ -139,77 +139,30 @@ new #[Title('Full Stack Developer')] class extends Component
 
 <div>
     {{-- ================================================================== --
-     | 01 — Hero
-     | The grid field fades out behind the headline; the accent underline on
-     | the tagline is the only saturated colour above the fold.
+     | 01 — Hero Deck
+     | The full-viewport opening frame: void, starfield, horizon plane and
+     | signal reticle, with the name, the role and the two actions that
+     | matter. Colour comes from the `--color-hx-*` role set, so it follows
+     | the theme toggle and the accent picker like every other section.
      --}}
-    <section class="relative overflow-hidden" aria-labelledby="hero-heading">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
-
-        <div class="shell relative pb-20 pt-16 sm:pt-24 lg:pb-28 lg:pt-32">
-            <x-app.ui.section-marker :number="1" :label="$this->profile()->availability ?? 'Available'" accent />
-
-            <h1
-                id="hero-heading"
-                class="sui-text-gradient mt-8 max-w-4xl text-4xl font-semibold leading-[1.08] tracking-tightest [--text-gradient-from:var(--color-ink-900)] [--text-gradient-to:var(--color-signal-700)] sm:text-5xl dark:[--text-gradient-from:var(--color-ink-50)] dark:[--text-gradient-to:var(--color-signal-400)]"
-            >
-                {{ $this->profile()->name }}
-                <span class="block mt-3 text-2xl font-normal leading-snug tracking-tight text-ink-400 sm:text-3xl dark:text-ink-500">
-                    {{ $this->profile()->role }}
-                </span>
-            </h1>
-
-            <p class="mt-8 max-w-2xl text-lg leading-relaxed text-ink-600 dark:text-ink-300">
-                {{ $this->profile()->tagline }}
-            </p>
-
-            <div class="mt-10 flex flex-wrap items-center gap-3">
-                <flux:button variant="primary" :href="route('blog.index')" icon-trailing="arrow-right">
-                    Read the writing
-                </flux:button>
-
-                @if ($email = $this->profile()->link('email'))
-                    <flux:button variant="ghost" :href="$email['url']" icon="envelope">
-                        Get in touch
-                    </flux:button>
-                @endif
-
-                @if ($github = $this->profile()->link('github'))
-                    <flux:button
-                        variant="ghost"
-                        :href="$github['url']"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        icon="code-bracket"
-                    >
-                        GitHub
-                    </flux:button>
-                @endif
-            </div>
-
-            {{-- Quick facts rail --}}
-            <dl class="mt-16 grid grid-cols-2 gap-x-8 gap-y-6 border-t border-ink-200 pt-8 sm:grid-cols-4 dark:border-ink-800">
-                @foreach ($this->profile()->stats as $stat)
-                    <div>
-                        <dt class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                            {{ $stat['label'] }}
-                        </dt>
-                        <dd class="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-ink-900 dark:text-ink-50">
-                            {{ $stat['value'] }}
-                        </dd>
-                    </div>
-                @endforeach
-            </dl>
-        </div>
-    </section>
+    <x-app.ui.hero-deck :profile="$this->profile()" />
 
     {{-- ================================================================== --
-     | 02 — Writing
+     | 02 — CI/CD & Laravel
+     | The delivery pipeline as a diagram, not a bullet list: the fork into
+     | static analysis, tests and the asset build, the join at the release,
+     | and the atomic switch that follows. Placed here because it is the
+     | claim the rest of the page is evidence for.
+     --}}
+    <x-app.ui.cicd-laravel :number="2" />
+
+    {{-- ================================================================== --
+     | 03 — Writing
      --}}
     <section data-reveal class="shell py-20 lg:py-24" aria-labelledby="writing-heading">
         <div class="flex flex-wrap items-end justify-between gap-6">
             <div>
-                <x-app.ui.section-marker :number="2" label="Writing" />
+                <x-app.ui.section-marker :number="3" label="Writing" />
                 <h2 id="writing-heading" class="mt-5 max-w-xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                     Notes on building systems that last
                 </h2>
@@ -294,11 +247,11 @@ new #[Title('Full Stack Developer')] class extends Component
     </section>
 
     {{-- ================================================================== --
-     | 03 — Expertise
+     | 04 — Expertise
      --}}
     <section data-reveal class="border-y border-ink-200 bg-ink-50/60 py-20 lg:py-24 dark:border-ink-800 dark:bg-ink-900/30" aria-labelledby="expertise-heading">
         <div class="shell">
-            <x-app.ui.section-marker :number="3" label="Expertise" />
+            <x-app.ui.section-marker :number="4" label="Expertise" />
             <h2 id="expertise-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 What I am actually good at
             </h2>
@@ -332,10 +285,12 @@ new #[Title('Full Stack Developer')] class extends Component
     </section>
 
     {{-- ================================================================== --
-     | 04 — Selected work
+     | 05 — Selected work
+     | `id="work"` is the hero's primary call to action; `scroll-mt-20` clears
+     | the sticky header so the heading is not parked underneath it.
      --}}
-    <section data-reveal class="shell py-20 lg:py-24" aria-labelledby="work-heading">
-        <x-app.ui.section-marker :number="4" label="Selected work" />
+    <section id="work" data-reveal class="shell scroll-mt-20 py-20 lg:py-24" aria-labelledby="work-heading">
+        <x-app.ui.section-marker :number="5" label="Selected work" />
         <h2 id="work-heading" class="mt-5 max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
             Systems I have built and shipped
         </h2>
@@ -380,13 +335,15 @@ new #[Title('Full Stack Developer')] class extends Component
     </section>
 
     {{-- ================================================================== --
-     | 05 — Contact
+     | 06 — Contact
+     | `id="contact"` is the page's terminal anchor, reached from the footer
+     | and from the About page's own contact block.
      --}}
-    <section data-reveal class="border-t border-ink-200 py-20 lg:py-24 dark:border-ink-800" aria-labelledby="contact-heading">
+    <section id="contact" data-reveal class="scroll-mt-20 border-t border-ink-200 py-20 lg:py-24 dark:border-ink-800" aria-labelledby="contact-heading">
         <div class="shell">
             <div class="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-center">
                 <div>
-                    <x-app.ui.section-marker :number="5" label="Contact" />
+                    <x-app.ui.section-marker :number="6" label="Contact" />
                     <h2 id="contact-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                         Let us talk about the hard part
                     </h2>

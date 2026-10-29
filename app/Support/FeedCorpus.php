@@ -22,7 +22,7 @@ use DateTimeInterface;
  * @phpstan-type FeedReply array{author: string, avatar: string, time: string, body: string}
  * @phpstan-type PollOption array{label: string, votes: int}
  * @phpstan-type DiffLine array{num: int, kind: 'ctx'|'add'|'del'|'meta', code: string, comment?: array{author: string, avatar: string, body: string, replies: array<int, FeedReply>}}
- * @phpstan-type FeedCorpusPost array{id: int, slug: string, title: string, author: string, handle: string, avatar: string, role: string, time: string, topic: string, type: string, answered: bool, score: int, reports: int, views: int, body: string, tags: array<int, string>, reactions: array{like: int, love: int, insight: int}, comments: int, pinned: bool, featured: bool, hidden: bool, deleted: bool, code?: string, codeFile?: string, readMinutes?: int, poll?: array{options: array<int, PollOption>, votes: int, closes: string}, answer?: array{author: string, avatar: string, body: string}, activity?: array{label: string, detail: string}, detail?: array{title: string, code: string, diff: array{filename: string, summary: string, lines: array<int, DiffLine>}, replies: array<int, FeedReply>}}
+ * @phpstan-type FeedCorpusPost array{id: int, slug: string, title: string, author: string, handle: string, avatar: string, role: string, time: string, topic: string, type: string, answered: bool, score: int, reports: int, views: int, body: string, tags: array<int, string>, reactions: array{like: int, love: int, insight: int}, comments: int, pinned: bool, featured: bool, hidden: bool, deleted: bool, code?: string, codeFile?: string, readMinutes?: int, poll?: array{options: array<int, PollOption>, votes: int, closes: string}, answer?: array{author: string, avatar: string, body: string}, activity?: array{label: string, detail: string}, detail?: array{title: string, code: string, diff: array{filename: string, summary: string, lines: array<int, DiffLine>}, replies: array<int, FeedReply>}, media?: int}}
  */
 final class FeedCorpus
 {
@@ -37,12 +37,13 @@ final class FeedCorpus
         return [
             [
                 'id' => 1, 'slug' => 'eloquent-n1-dashboard', 'title' => 'Pulled the N+1 out of the dashboard post list: 140ms → 18ms',
-                'author' => 'Shamim Hossain', 'handle' => '@shamim', 'avatar' => 'SH', 'role' => 'Full Stack Developer · Laravel',
+                'author' => 'Md Shamim Hossain', 'handle' => '@shamimstack', 'avatar' => 'MS', 'role' => 'Full Stack Developer · Laravel',
                 'time' => '2h ago', 'topic' => 'backend', 'type' => 'showcase', 'answered' => true, 'score' => 210, 'reports' => 0, 'views' => 2140,
                 'body' => 'Shipped a small but satisfying refactor today: pulled the N+1 out of the dashboard post list by eager-loading category + tags in a single query. Page went from 140ms to 18ms. The boring wins are the best wins.',
                 'tags' => ['Laravel', 'Performance', 'Eloquent'],
                 'reactions' => ['like' => 24, 'love' => 6, 'insight' => 3],
                 'comments' => 14, 'pinned' => false, 'featured' => false, 'hidden' => false, 'deleted' => false,
+                'media' => 2,
             ],
             [
                 'id' => 2, 'slug' => 'design-systems-hill', 'title' => 'Hot take: most design systems are just component libraries with a marketing page',
@@ -84,6 +85,7 @@ final class FeedCorpus
                 'tags' => ['OpenSource', 'Release'],
                 'reactions' => ['like' => 96, 'love' => 40, 'insight' => 22],
                 'comments' => 23, 'pinned' => false, 'featured' => false, 'hidden' => false, 'deleted' => false,
+                'media' => 1,
             ],
             [
                 'id' => 6, 'slug' => 'boring-tools', 'title' => 'The tools I trust are the boring ones — what quietly carries your workflow?',

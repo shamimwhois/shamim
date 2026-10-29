@@ -1,6 +1,11 @@
 /* ------------------------------------------------------------------ */
 /* About hero :: full-bleed low-poly portrait                           */
 /*                                                                     */
+/* Scope note: this file used to carry the landing page's `.brain-hero` */
+/* block as well. That hero was replaced by `hero-deck.css` (the Signal */
+/* Deck), so this is now the About page's hero only — portrait, name     */
+/* draw, and the CTA push.                                              */
+/*                                                                     */
 /* The portrait is not a card. It fills its column edge to edge and runs */
 /* off the top, bottom and right of the hero. In light mode the white     */
 /* studio field is removed by the `#hero-portrait-knockout` SVG filter    */
@@ -26,8 +31,8 @@
     z-index: 0;
     background: radial-gradient(
         58% 54% at 52% 44%,
-        rgb(16 185 129 / 0.16),
-        rgb(16 185 129 / 0.05) 55%,
+        color-mix(in srgb, var(--color-signal-500) 16%, transparent),
+        color-mix(in srgb, var(--color-signal-500) 5%, transparent) 55%,
         transparent 78%
     );
     filter: blur(30px);
@@ -37,8 +42,8 @@
 .dark .hero-portrait__glow {
     background: radial-gradient(
         56% 52% at 52% 44%,
-        rgb(45 212 191 / 0.22),
-        rgb(139 92 246 / 0.1) 52%,
+        color-mix(in srgb, var(--color-signal-400) 22%, transparent),
+        color-mix(in srgb, var(--color-signal-300) 9%, transparent) 52%,
         transparent 76%
     );
 }
@@ -115,12 +120,12 @@
     position: absolute;
     z-index: 0;
     border-radius: 9999px;
-    border: 1px solid rgb(16 185 129 / 0.18);
+    border: 1px solid color-mix(in srgb, var(--color-signal-500) 18%, transparent);
     pointer-events: none;
 }
 
 .dark .hero-portrait__orbit {
-    border-color: rgb(45 212 191 / 0.22);
+    border-color: color-mix(in srgb, var(--color-signal-400) 24%, transparent);
 }
 
 .hero-portrait__orbit--a {
@@ -136,7 +141,7 @@
     right: -4%;
     width: 28%;
     aspect-ratio: 1;
-    border-color: rgb(139 92 246 / 0.22);
+    border-color: color-mix(in srgb, var(--color-signal-600) 22%, transparent);
     animation: hero-portrait-orbit 24s linear infinite reverse;
 }
 
@@ -207,7 +212,7 @@
     position: absolute;
     inset: 0;
     border-radius: 9999px;
-    border: 2px solid rgb(255 255 255 / 0.8);
+    border: 2px solid color-mix(in srgb, currentColor 80%, transparent);
     transform: scale(1);
     opacity: 0.6;
     animation: hero-cta-ring-expand 2.6s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
@@ -245,3 +250,4 @@
         transform: none;
     }
 }
+

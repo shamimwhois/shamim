@@ -134,7 +134,7 @@ class MarketplaceProductSeeder extends Seeder
         $fallback = User::query()->orderBy('id')->firstOrFail();
 
         return [
-            'admin' => User::query()->where('email', 'test@example.com')->first() ?? $fallback,
+            'admin' => User::query()->where('email', 'shamimstack@gmail.com')->first() ?? $fallback,
             'seller' => User::query()->where('email', 'seller@example.com')->first() ?? $fallback,
             'user' => User::query()->where('email', 'user@example.com')->first() ?? $fallback,
         ];

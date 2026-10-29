@@ -27,7 +27,7 @@ use Laravel\Dusk\Browser;
 
 it('changes an account’s role and leaves the picker showing the role it changed to', function () {
     /** @var User $admin */
-    $admin = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $admin = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     /** @var User $target */
     $target = User::query()->where('email', 'user@example.com')->firstOrFail();
@@ -66,7 +66,7 @@ it('changes an account’s role and leaves the picker showing the role it change
 
 it('will not offer the admin a picker for their own account', function () {
     /** @var User $admin */
-    $admin = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $admin = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     $this->browse(function (Browser $browser) use ($admin) {
         $browser

@@ -41,11 +41,15 @@
             <span class="feed-rail-index">01</span>
             {{ __('Navigation') }}
         </p>
-        <nav class="flex flex-col gap-0.5" aria-label="{{ __('Feed views') }}">
-            <a href="{{ route('home') }}" wire:navigate class="feed-rail-link" wire:key="rail-home">
-                <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg>
-                <span class="flex-1 text-left">{{ __('Home') }}</span>
-            </a>
+        <nav class="flex flex-col gap-0.5" aria-label="{{ __('Feed views') }}">                <a
+                    href="{{ route('home') }}"
+                    wire:navigate
+                    class="feed-rail-link"
+                    wire:key="rail-home"
+                >
+                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg>
+                    <span class="flex-1 text-left">{{ __('Home') }}</span>
+                </a>
             @foreach (['for-you' => __('For you'), 'following' => __('Following'), 'latest' => __('Latest'), 'trending' => __('Trending'), 'unanswered' => __('Unanswered')] as $key => $label)
                 <button
                     type="button"
@@ -73,7 +77,12 @@
         <nav class="flex gap-1 overflow-x-auto pb-0.5 xl:flex-col xl:gap-0.5 xl:overflow-visible" aria-label="{{ __('Communities') }}">
             {{-- The directory itself — the rail lists the busiest circles below,
                  this row opens the whole catalogue with its own search. --}}
-            <a href="{{ route('communities.index') }}" wire:navigate class="feed-rail-link" wire:key="rail-communities-all">
+            <a
+                href="{{ route('communities.index') }}"
+                wire:navigate
+                class="feed-rail-link"
+                wire:key="rail-communities-all"
+            >
                 <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
                 <span class="flex-1 text-left">{{ __('All communities') }}</span>
                 <span class="feed-count">{{ $communityCount }}</span>
@@ -167,7 +176,12 @@
             {{ __('Showcase') }}
         </p>
         <nav class="flex gap-1 overflow-x-auto pb-0.5 xl:flex-col xl:gap-0.5 xl:overflow-visible" aria-label="{{ __('Showcase') }}">
-            <a href="{{ route('marketplace.index') }}" wire:navigate class="feed-rail-link" wire:key="rail-showcase-projects">
+            <a
+                href="{{ route('marketplace.index') }}"
+                wire:navigate
+                class="feed-rail-link"
+                wire:key="rail-showcase-projects"
+            >
                 <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3V9c.828 0 1.5.672 1.5 1.5v3m0 0V15a1.5 1.5 0 01-1.5 1.5H21M4.5 9.878V15a1.5 1.5 0 001.5 1.5h.75m11.25-6.378a2.25 2.25 0 012.25 2.25v3.75m-2.25-2.25a2.25 2.25 0 00-2.25 2.25v.75m-8.25-3.75h9m-9 3H12" /></svg>
                 <span class="flex-1 text-left">{{ __('Projects') }}</span>
             </a>

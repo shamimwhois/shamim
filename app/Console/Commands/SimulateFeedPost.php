@@ -65,7 +65,7 @@ class SimulateFeedPost extends Command
             'code' => "export function useOptimisticList<T extends { id: string }>(initial: T[]) {\n  const [items, setItems] = useState(initial);\n\n  const add = (item: T) => setItems((prev) => [item, ...prev]);\n  const reconcile = (saved: T) =>\n    setItems((prev) => prev.map((i) => (i.id === saved.id ? saved : i)));\n\n  return { items, add, reconcile };\n}",
         ],
         [
-            'persona' => 'shamim',
+            'persona' => 'shamimstack',
             'topic' => 'tooling', 'type' => 'showcase',
             'title' => 'Shipped a command palette for the dashboard in three evenings',
             'body' => 'Cmd-K now jumps to any dashboard route, searches posts and runs the two actions people actually use. No new dependency: a Livewire component, a keyboard listener and a server-side index over route names.',

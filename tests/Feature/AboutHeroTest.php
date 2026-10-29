@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 |--------------------------------------------------------------------------
-| About hero portraits
+| About hero
 |--------------------------------------------------------------------------
 |
 | The about hero deliberately ships two portraits — one per theme — so that
@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\File;
 | than asking a single image to survive both backgrounds. These tests pin the
 | pair, and the assets behind them, so a refactor that drops to one image (or
 | renames the file) fails here instead of on a live page.
+|
+| The CTA row is pinned for the same reason. Its second pill is a CV download,
+| and a hardcoded href there meant "Download CV" silently reloaded the page it
+| was already on. The href is configuration, so the pill must appear exactly
+| when a real url is configured and must take that url.
 |
 */
 
@@ -36,6 +41,31 @@ test('the hero portrait assets exist on disk', function () {
         expect(File::exists(public_path('images/'.$asset)))
             ->toBeTrue("Missing hero portrait [{$asset}]; the about hero renders an empty panel without it.");
     }
+});
+
+test('the CV pill is withheld until a real url is configured', function () {
+    // Counting the pill's own class rather than the label: the anchor row
+    // above also says "Download CV" (it jumps to the work grid), so the label
+    // alone cannot tell the two apart. `class="btn-push` is markup-only — the
+    // stylesheet uses `.btn-push` — so the bundled CSS cannot inflate it.
+    $html = $this->get(route('about'))->assertOk()->getContent();
+
+    expect(substr_count($html, 'class="btn-push'))
+        ->toBe(1, 'The CV pill rendered without a CV behind it.');
+
+    expect($html)->not->toContain('href="/about"');
+});
+
+test('the CV pill points at the configured url', function () {
+    config(['portfolio.author.links.cv.url' => 'https://example.test/shamim-cv.pdf']);
+
+    $html = $this->get(route('about'))->assertOk()->getContent();
+
+    expect(substr_count($html, 'class="btn-push'))
+        ->toBe(2, 'The CV pill did not render despite a configured url.');
+
+    expect($html)->toContain('href="https://example.test/shamim-cv.pdf"', false)
+        ->and($html)->toContain('Download CV');
 });
 
 test('the hero portrait images carry explicit dimensions to avoid layout shift', function () {

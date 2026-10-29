@@ -30,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $released_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read MarketplaceProduct $product
+ * @property-read MarketplaceProduct|null $product
  */
 #[Fillable([
     'marketplace_product_id',
@@ -76,9 +76,14 @@ class MarketplaceProductVersion extends Model
      */
     public function deliverableName(): string
     {
-        return $this->original_name !== null && trim($this->original_name) !== ''
-            ? $this->original_name
-            : ($this->product?->slug ?? 'release').'-'.$this->version.'.zip';
+        if ($this->original_name !== null && trim($this->original_name) !== '') {
+            return $this->original_name;
+        }
+
+        // See MarketplaceProductMedia::alt() — a deleted listing is
+        // soft-deleted, so the release row outlives it and the relation
+        // resolves to null.
+        return ($this->product->slug ?? 'release').'-'.$this->version.'.zip';
     }
 
     /**

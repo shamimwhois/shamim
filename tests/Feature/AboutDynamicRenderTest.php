@@ -106,7 +106,9 @@ test('stored reasons replace the built-in claims and the navigation label', func
     $this->get(route('about'))
         ->assertOk()
         ->assertSee('Ships and stays')
-        ->assertDontSee('I close loops')
+        // The stored row replaces the built-in claim, and the stored section
+        // label replaces the rail's default wording.
+        ->assertDontSee('Backend Engineering')
         ->assertDontSee('Why me');
 });
 
@@ -314,4 +316,77 @@ test('the workflow band falls back to the built-in demo when its rows are hidden
         ->assertSee('Autonomous Engineering')
         ->assertSee('Redesign navbar profile')
         ->assertDontSee('Withdrawn card');
+});
+
+test('the thinking explorer renders its built-in defaults', function () {
+    // The value claims used to render under this band. They are section 02's
+    // specification now, so this test only pins the explorer's own content.
+    $this->get(route('about'))
+        ->assertOk()
+        ->assertSee('Problem Solving')
+        ->assertSee('System 1 — Fast thinking')
+        ->assertSee('Reproduce first');
+});
+
+test('stored thinking rows replace the built-in explorer content', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Reasons]);
+    AboutItem::factory()->create([
+        'about_section_id' => $section->id,
+        'type' => AboutItemType::ThinkingCategory,
+        'title' => 'Model Context',
+        'subtitle' => 'model-context',
+        'body' => 'How context is gathered, cached and spent.',
+        'url_label' => 'deep',
+    ]);
+    AboutItem::factory()->create([
+        'about_section_id' => $section->id,
+        'type' => AboutItemType::ThinkingNode,
+        'title' => 'Context budgets',
+        'subtitle' => 'model-context',
+        'body' => 'A token spent on context is a token not spent on reasoning.',
+    ]);
+
+    $this->get(route('about'))
+        ->assertOk()
+        ->assertSee('Model Context')
+        ->assertSee('Context budgets')
+        // By key, not by name: "Client & Team Focus" is a claim
+        // card now, so the name is on the page either way.
+        ->assertDontSee('data-hub-key="problem-solving"', false);
+});
+
+test('a typo in a stored category key degrades to a safe slug', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Reasons]);
+    AboutItem::factory()->create([
+        'about_section_id' => $section->id,
+        'type' => AboutItemType::ThinkingCategory,
+        'title' => 'Edge Cases',
+        'subtitle' => 'Not A Key!!',
+        'body' => 'Stored with an unusable key.',
+    ]);
+
+    $explorer = app(AboutContent::class)->thinkingExplorer();
+
+    expect($explorer['categories'][0]['key'])->toBe('not-a-key')
+        ->and($explorer['categories'][0]['name'])->toBe('Edge Cases')
+        ->and($explorer['categories'][0]['affinity'])->toBe('both');
+});
+
+test('thinking rows never leak into the claim cards', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Reasons]);
+    AboutItem::factory()->create([
+        'about_section_id' => $section->id,
+        'type' => AboutItemType::ThinkingMode,
+        'title' => 'Stored mode',
+        'subtitle' => 'system_2',
+        'body' => 'Stored mode description.',
+    ]);
+
+    // A thinking row feeds the explorer's mode legend; it must not become a
+    // claim card. The six claims are still the Reasons section's own rows.
+    $this->get(route('about'))
+        ->assertOk()
+        ->assertSee('Stored mode')
+        ->assertSee('Backend Engineering')
+        ->assertSee('Client & Team Focus');
 });

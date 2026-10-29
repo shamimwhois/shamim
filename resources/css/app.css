@@ -1,7 +1,9 @@
 @import 'tailwindcss';
 @import '../../vendor/livewire/flux/dist/flux.css';
 @import './feed.css';
+@import './log.css';
 @import './marketplace.css';
+@import './cicd.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -151,6 +153,124 @@
     --color-aw-ink: var(--color-ink-900);     /* primary text */
     --color-aw-ink-muted: var(--color-ink-600);  /* secondary text, metadata */
     --color-aw-ink-faint: var(--color-ink-500);  /* disabled, timestamps, placeholders */
+
+    /* --- Thinking Explorer (sections 02 + 04) ---------------------------- */
+    /* The two interactive bands on the About page wear the page's own ink
+       ladder and the signal accent — never a private palette — so they follow
+       the light/dark theme *and* the accent the visitor picked.
+
+       The two thinking modes are told apart by value, not by a second hue:
+       System 1 (fast) wears the accent, System 2 (deep) wears the ink. One
+       accent, one neutral, and the page keeps its monochrome thesis. */
+    --color-te-canvas: #ffffff;                /* the panel's own ground */
+    --color-te-panel: var(--color-ink-50);     /* inner panels, the map card */
+    --color-te-card: #ffffff;                  /* chips, nodes, raised rows */
+    --color-te-raised: var(--color-ink-100);   /* hover washes */
+    --color-te-line: var(--color-ink-200);     /* hairlines, the grid */
+    --color-te-accent: var(--color-signal-700);    /* System 1 fill */
+    --color-te-accent-soft: var(--color-signal-700); /* the accent as text */
+    --color-te-on-accent: #ffffff;             /* ink on a filled accent chip */
+    --color-te-chain: var(--color-signal-500); /* the travelling signal */
+    --color-te-deep: var(--color-ink-900);     /* System 2 fill — the neutral */
+    --color-te-deep-soft: var(--color-ink-600); /* System 2 as text */
+    --color-te-on-deep: #ffffff;               /* ink on a filled neutral chip */
+    --color-te-deep-chain: var(--color-ink-500); /* System 2's travelling signal */
+    --color-te-ink: var(--color-ink-900);      /* primary text */
+    --color-te-ink-muted: var(--color-ink-600);/* secondary text, metadata */
+    --color-te-ink-faint: var(--color-ink-500);/* disabled, timestamps, placeholders */
+
+    /* --- CI/CD plate (landing page, section 02) -------------------------- */
+    /* The delivery graph and its rail. Same construction as the two sets
+       above — roles, never hues — so the band follows the theme and the
+       accent picker without a second palette.
+
+       `canvas` is the diagram's own ground (it sits a step away from the
+       white plate so the graph reads as an inset field), `panel` is the
+       rail, `card` is a node's fill, `well` is the recessed command line.
+       `danger` is used once, for the rollback path — the only negative
+       outcome the diagram draws. */
+    --color-cd-canvas: var(--color-ink-50);     /* the diagram's field */
+    --color-cd-panel: var(--color-ink-50);      /* the rail's ground */
+    --color-cd-card: #ffffff;                   /* node fills */
+    --color-cd-raised: var(--color-ink-100);    /* row hover, selected row */
+    --color-cd-well: var(--color-ink-100);      /* the command line */
+    --color-cd-glow: rgb(16 185 129 / 0.18);    /* ambient pool behind the plate */
+    --color-cd-line: var(--color-ink-200);      /* hairlines */
+    --color-cd-line-strong: var(--color-ink-300); /* edges, node rings */
+    --color-cd-accent: var(--color-signal-700);    /* the flow, the selection */
+    --color-cd-accent-soft: var(--color-signal-700); /* the accent as text */
+    --color-cd-on-accent: #ffffff;             /* ink on a filled accent chip */
+    --color-cd-danger: #b91c1c;                 /* rollback, and nothing else */
+    --color-cd-ink: var(--color-ink-900);       /* primary text */
+    --color-cd-ink-muted: var(--color-ink-600); /* secondary text */
+    --color-cd-ink-faint: var(--color-ink-500); /* ordinals, kinds, labels */
+
+    /* --- Hero Deck (landing page, section 01) ---------------------------- */
+    /* The full-viewport opening frame, and the fourth section to be built on
+       the alias pattern above — roles, never hues. That is the whole reason it
+       can carry the sci-fi treatment without breaking the site: the ground,
+       the grid, the bloom and the reticle all resolve to ink and signal stops,
+       so the hero follows the light/dark theme *and* the accent the visitor
+       picked. The previous hero hard-coded one dark palette and therefore
+       could not.
+
+       The two themes are two readings of the same roles rather than two
+       palettes. Light is the pale-blueprint treatment: the ground is the ink
+       ladder's own first step, the grid is a printed rule at ink-300, the
+       bloom is a soft wash, and the corners fall off to ink-100. Dark is deep
+       space: the same ground drops to ink-950, the grid recedes to the
+       800/900 pair so the plane reads as distance rather than as a table, and
+       the vignette goes to black because that is what a vignette is — a
+       shadow, not a colour.
+         void / void-deep    the ground, and the vignette's outer stop
+         vignette            the falloff itself, so it can be a shadow
+         grid / grid-soft    the horizon plane's two line weights
+         panel               HUD plate fills
+         line / line-strong  hairlines, corner brackets, reticle rings
+         accent / accent-soft / on-accent
+         ink / ink-muted / ink-faint
+         star                starfield pinpricks — ink in light, white in dark
+    */
+    --color-hx-void: var(--color-ink-50);
+    --color-hx-void-deep: var(--color-ink-100);
+    --color-hx-vignette: rgb(13 13 12 / 0.12);
+    --color-hx-grid: var(--color-ink-300);
+    --color-hx-grid-soft: var(--color-ink-200);
+    --color-hx-panel: #ffffff;
+    --color-hx-line: var(--color-ink-200);
+    --color-hx-line-strong: var(--color-ink-300);
+    --color-hx-accent: var(--color-signal-700);
+    --color-hx-accent-soft: var(--color-signal-600);
+    --color-hx-on-accent: #ffffff;
+    --color-hx-ink: var(--color-ink-900);
+    --color-hx-ink-muted: var(--color-ink-600);
+    --color-hx-ink-faint: var(--color-ink-500);
+    --color-hx-star: var(--color-ink-400);
+
+    /* --- How I work (about page, section 05) ---------------------------- */
+    /* The instrument panel between the two rails. Same construction as the
+       sets above — roles, never hues — so the panel follows the light/dark
+       theme and the accent the visitor picked instead of the private navy
+       palette it shipped with (which also meant it could not follow either).
+
+       `canvas` is the panel's own ground, `card` the rail cells and node
+       fills, `line` every hairline; `grid` draws both technical grids, and
+       `sweep` is the band of light that crosses the surface when the panel
+       powers up. `accent` carries the deliberate path — the deep branch, the
+       gate, the SHIP chip, the hover bars — while the fast path stays on the
+       ink ladder, so the two branches are told apart by value rather than by
+       a second hue: the same rule the Thinking Explorer uses for its two
+       modes. */
+    --color-hiw-canvas: var(--color-ink-50);   /* the panel's own ground */
+    --color-hiw-card: #ffffff;                /* rail cells, node fills */
+    --color-hiw-line: var(--color-ink-200);   /* hairlines, node rings */
+    --color-hiw-grid: rgb(13 13 12 / 0.045);  /* both technical grids */
+    --color-hiw-sweep: rgb(13 13 12 / 0.05);  /* the power-up band */
+    --color-hiw-accent: var(--color-signal-700);  /* the deliberate path */
+    --color-hiw-on-accent: #ffffff;           /* ink on a filled accent chip */
+    --color-hiw-ink: var(--color-ink-900);     /* primary text */
+    --color-hiw-ink-muted: var(--color-ink-600); /* secondary text, node labels */
+    --color-hiw-ink-faint: var(--color-ink-500); /* ordinals, captions, keys */
 
     /* --- Semantic ------------------------------------------------------- */
     --color-success: var(--color-signal-600);
@@ -402,6 +522,84 @@
         --color-aw-ink: var(--color-ink-50);
         --color-aw-ink-muted: var(--color-ink-300);
         --color-aw-ink-faint: var(--color-ink-400);
+
+        /* Thinking Explorer — the same roles, resolved to the dark drums. The
+           accent is the lighter signal stop so it still reads on ink-950, and
+           System 2's neutral flips to the light end of the ink ladder. */
+        --color-te-canvas: var(--color-ink-950);
+        --color-te-panel: var(--color-ink-900);
+        --color-te-card: var(--color-ink-800);
+        --color-te-raised: var(--color-ink-700);
+        --color-te-line: var(--color-ink-800);
+        --color-te-accent: var(--color-signal-400);
+        --color-te-accent-soft: var(--color-signal-300);
+        --color-te-on-accent: var(--color-ink-950);
+        --color-te-chain: var(--color-signal-300);
+        --color-te-deep: var(--color-ink-100);
+        --color-te-deep-soft: var(--color-ink-300);
+        --color-te-on-deep: var(--color-ink-950);
+        --color-te-deep-chain: var(--color-ink-400);
+        --color-te-ink: var(--color-ink-50);
+        --color-te-ink-muted: var(--color-ink-300);
+        --color-te-ink-faint: var(--color-ink-400);
+
+        /* CI/CD plate — the same roles on the dark drums. The rail drops to
+           the canvas and the diagram keeps ink-900, so the plate reads as one
+           surface with a slightly recessed field rather than a floating card.
+           The accent moves to the light signal stop; rollback stays red. */
+        --color-cd-canvas: var(--color-ink-900);
+        --color-cd-panel: var(--color-ink-950);
+        --color-cd-card: var(--color-ink-800);
+        --color-cd-raised: var(--color-ink-800);
+        --color-cd-well: var(--color-ink-950);
+        --color-cd-glow: rgb(52 211 153 / 0.07);
+        --color-cd-line: var(--color-ink-800);
+        --color-cd-line-strong: var(--color-ink-700);
+        --color-cd-accent: var(--color-signal-400);
+        --color-cd-accent-soft: var(--color-signal-300);
+        --color-cd-on-accent: var(--color-ink-950);
+        --color-cd-danger: #f87171;
+        --color-cd-ink: var(--color-ink-50);
+        --color-cd-ink-muted: var(--color-ink-300);
+        --color-cd-ink-faint: var(--color-ink-400);
+
+        /* Hero Deck — the same roles on the deep-space drums. The grid drops
+           a full step from the light theme's so the receding plane reads as
+           distance, and the accent moves to the light signal stop, which is
+           the one that clears AA on ink-950. */
+        --color-hx-void: var(--color-ink-950);
+        --color-hx-void-deep: var(--color-ink-950);
+        --color-hx-vignette: rgb(0 0 0 / 0.72);
+        --color-hx-grid: var(--color-ink-800);
+        --color-hx-grid-soft: var(--color-ink-900);
+        --color-hx-panel: var(--color-ink-900);
+        --color-hx-line: var(--color-ink-800);
+        --color-hx-line-strong: var(--color-ink-700);
+        --color-hx-accent: var(--color-signal-400);
+        --color-hx-accent-soft: var(--color-signal-300);
+        --color-hx-on-accent: var(--color-ink-950);
+        --color-hx-ink: var(--color-ink-50);
+        --color-hx-ink-muted: var(--color-ink-300);
+        --color-hx-ink-faint: var(--color-ink-400);
+        --color-hx-star: var(--color-white);
+
+        /* How I work — the same roles on the dark drums, mirrored exactly:
+           the page ground is ink-950, so the canvas lifts a step to ink-900
+           the way it sinks a step to ink-50 on the light page, the cards
+           always sit a step *further* from the ground than the canvas does,
+           and the line is two steps off the ground in both themes, which is
+           what keeps a hairline visible on either side of it. The accent
+           moves to the light signal stop, which clears AA on this ground. */
+        --color-hiw-canvas: var(--color-ink-900);
+        --color-hiw-card: var(--color-ink-800);
+        --color-hiw-line: var(--color-ink-700);
+        --color-hiw-grid: rgb(255 255 255 / 0.04);
+        --color-hiw-sweep: rgb(255 255 255 / 0.055);
+        --color-hiw-accent: var(--color-signal-400);
+        --color-hiw-on-accent: var(--color-ink-950);
+        --color-hiw-ink: var(--color-ink-50);
+        --color-hiw-ink-muted: var(--color-ink-300);
+        --color-hiw-ink-faint: var(--color-ink-400);
     }
 }
 
@@ -1611,6 +1809,7 @@ select:focus[data-flux-control] {
 
 @import './about-effects.css';
 @import './hero-visual.css';
+@import './hero-deck.css';
 
 /* ==========================================================================
    Accent picker scopes — `data-accent` on <html>

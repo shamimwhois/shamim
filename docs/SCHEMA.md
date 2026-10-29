@@ -926,7 +926,7 @@ cite it.
 
 | Seeder | Produces | Notes |
 | --- | --- | --- |
-| `UserSeeder` | **3 accounts, one per role** | `test@example.com` (admin, listed **first** so it owns the seeded posts), `seller@example.com` (seller), `user@example.com` (user). Password `password`. |
+| `UserSeeder` | **3 accounts, one per role** | `shamimstack@gmail.com` (admin, listed **first** so it owns the seeded posts), `seller@example.com` (seller), `user@example.com` (user). Password `password`. |
 | `CategorySeeder` | 6 categories: Architecture, Backend, Frontend, DevOps, Databases, Career | Real names — these read as a real engineer's taxonomy |
 | `TagSeeder` | ~24 tags: laravel, php, livewire, react, typescript, postgres, redis, docker, testing, performance, security, caching, queues, observability, … | Slug-normalised, de-duplicated |
 | `PostSeeder` | 12 posts: 9 published, 2 drafts, 1 featured | Real technical prose with code fences and headings. Each post gets 1 category and 2–4 tags. Created through the real `CreatePost` action — not raw inserts |
@@ -951,8 +951,8 @@ step.
 
 **`App\Support\FeedPersonas` is the single source for feed identities.** Ten
 authors — `handle`, `name`, `email`, `avatar`, `role` — as a plain value list that
-touches no database, read by `UserSeeder` (which gives `test@example.com` its
-`shamim` handle), `CommunitySeeder` (whose member roster is handles into the
+touches no database, read by `UserSeeder` (which gives `shamimstack@gmail.com` its
+`shamimstack` handle), `CommunitySeeder` (whose member roster is handles into the
 registry), `FeedPostSeeder` (which resolves `user_id` from a corpus byline, and is
 order-independent because `authorFor()` creates the account if this install has
 none), and `feed:simulate` (`App\Console\Commands\SimulateFeedPost`).

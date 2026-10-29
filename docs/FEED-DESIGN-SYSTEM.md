@@ -104,7 +104,7 @@ and layout; anything structural or stateful lives here.
 | `.feed-tab-count` | the unanswered count badge (error wash) |
 | `.feed-pill` / `.feed-filter` | filter triggers; selected = mint / azure border + wash |
 | `.feed-menu` / `.feed-menu-item` | dropdown panel and rows; current item azure |
-| `.feed-chip` | the small status pill; variants `is-mint`, `is-azure`, `is-error`, `is-attention` — a chip is **never hand-tinted** |
+| `.feed-chip` | the small status pill; variants `is-mint`, `is-azure`, `is-error`, `is-attention`, `is-quiet` — a chip is **never hand-tinted** |
 | `.feed-segment` | continuous well with a floating raised pill (segmented control) |
 | `.feed-vote` | the score drum |
 | `.feed-action` | the mint primary action with its hover glow |
@@ -185,6 +185,38 @@ cards, and a console-style rail on the left.
 4. **Drama comes from scale and structure, not decoration.** No glass, no
    neon, no gradient wash of a second hue. The impact is a huge headline, a
    hard-edged grid texture, one solid accent block, and a real ticker.
+
+### The composer (`pages/feed/⚡composer-modal.blade.php`)
+
+The write surface rides the same tokens as the rest of the module; the modal
+*shell* is the app's (`x-app.ui.modal`), the composer's insides are the
+module's. The composer never hardcodes a surface colour — a sticky bar on a
+phone fills with `bg-feed-canvas`, never a raw `bg-white`/`dark:bg-zinc-800`
+pair (that pair once shipped here; it stranded a light bar on the dark
+canvas exactly like the amber chip did).
+
+| Class | Shape |
+| --- | --- |
+| `.feed-well` | recessed fill + hairline (discard confirm, staged media, deferred options). The name was in markup before the rule existed — the fill was silently missing, which is why the rule was written |
+| `.feed-input` | every form field: well fill, hairline, azure focus ring. `.is-headline` earns the one piece of scale; `.is-mono` is terminal text for code/URLs |
+| `.feed-dropzone` | the editor's field: the hero's masked technical grid echoed at desk scale; `:focus-within` raises the azure ring; `.is-dragging` turns the border mint dashed — the one moment drama is warranted |
+| `.feed-preview` | the preview renders as the wire card will: card fill, `.feed-preview-title` at card-title weight, snippet inside the always-dark `.feed-code` panel |
+| `.feed-composer-rule` | the hairline above the publish bar |
+| `.feed-steps` | the workflow rail: the four steps as chips joined by hairline connectors — done is `is-mint`, the step being worked is `is-azure` and carries `aria-current="step"`, an optional step with nothing in it is `is-quiet` (never struck through) |
+
+Rules the composer obeys:
+
+1. **Sticky bars are canvas-filled, not colour-guessed.** The dialog is the
+   scroll container at every size, so header and publish bar are sticky on
+   phones and must carry a token fill.
+2. **Fields never re-declare their run.** A form-field change is one edit in
+   `feed.css`, not twelve in the Blade.
+3. **The preview is the proof.** It renders through the same vocabulary the
+   wire card uses — same title weight, same terminal panel for snippets —
+   so what an author approves is what a reader sees.
+4. **In the grid texture's zone, content paints above it.** Children of
+   `.feed-dropzone` carry `relative` — the `::before` is positioned and
+   would otherwise paint over in-flow text.
 
 ---
 

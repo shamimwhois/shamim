@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\FeedPost;
 use App\Models\User;
 use App\Support\FeedCorpus;
+use App\Support\FeedCorpusMedia;
 use App\Support\FeedPersonas;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -37,7 +38,7 @@ class FeedPostSeeder extends Seeder
     public function run(): void
     {
         foreach (FeedCorpus::posts() as $post) {
-            FeedPost::query()->updateOrCreate(
+            $row = FeedPost::query()->updateOrCreate(
                 ['slug' => $post['slug']],
                 [
                     'user_id' => $this->authorFor($post['handle'])?->id,
@@ -70,6 +71,11 @@ class FeedPostSeeder extends Seeder
                     'detail' => $post['detail'] ?? null,
                 ],
             );
+
+            // The showcase rows ship with images: painted here rather than
+            // stored in the repository, so the image grid is reviewable on a
+            // fresh install without a binary in git.
+            FeedCorpusMedia::attachTo($row, (int) ($post['media'] ?? 0));
         }
     }
 

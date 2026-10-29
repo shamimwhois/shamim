@@ -18,7 +18,7 @@
     <span @class([
         'font-mono text-2xs font-medium tabular-nums',
         'text-signal-600 dark:text-signal-400' => $accent,
-        'text-ink-400 dark:text-ink-500' => ! $accent,
+        'text-ink-500 dark:text-ink-400' => ! $accent,
     ])>
         {{ str_pad((string) $number, 2, '0', STR_PAD_LEFT) }}
     </span>

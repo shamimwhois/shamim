@@ -30,7 +30,7 @@ use Laravel\Dusk\Browser;
 
 it('keeps the theme across a real reload, in both directions', function () {
     /** @var User $account */
-    $account = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $account = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     $this->browse(function (Browser $browser) use ($account) {
         $browser

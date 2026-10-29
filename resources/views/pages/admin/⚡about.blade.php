@@ -732,13 +732,103 @@ new #[Layout('layouts::admin.dashboard')] #[Title('About content')] class extend
     }
 
     /**
+     * Seed the Thinking Explorer rows from the built-in taxonomy, mirroring
+     * the workflow board's "seed from defaults": the console writes exactly
+     * what a fresh install renders, never a drifting second copy.
+     *
+     * Unlike the workflow guard, existing generic claim rows are fine — the
+     * explorer shares the reasons section with them by design. Only existing
+     * thinking rows block the seed, because silently appending a second copy
+     * of the defaults would be worse than doing nothing.
+     */
+    public function seedThinkingDefaults(): void
+    {
+        $this->authorizeManage();
+
+        $section = $this->selectedSection;
+
+        if ($section === null || ! $this->isThinkingSection($section->type)) {
+            return;
+        }
+
+        $hasThinkingRows = $section->items()
+            ->whereIn('type', [
+                AboutItemType::ThinkingMode->value,
+                AboutItemType::ThinkingCategory->value,
+                AboutItemType::ThinkingNode->value,
+            ])
+            ->exists();
+
+        if ($hasThinkingRows) {
+            Flux::toast(
+                variant: 'danger',
+                text: __('This section already has thinking rows. Delete them first if you want the defaults back.'),
+            );
+
+            return;
+        }
+
+        $save = app(SaveAboutItem::class);
+
+        // The two sections read different vocabularies — the disciplines behind
+        // section 02's model, and the abilities behind section 04's — so the
+        // seed must write the set that belongs to the section being seeded.
+        $rows = $section->type === AboutSectionType::Principles
+            ? app(AboutContent::class)->thinkingWorkDefaultRows()
+            : app(AboutContent::class)->thinkingDefaultRows();
+
+        foreach ($rows as $row) {
+            $save->handle($section, $row + ['parent_id' => null, 'is_visible' => true]);
+        }
+
+        unset($this->sections, $this->selectedSection);
+
+        Flux::toast(variant: 'success', text: __('Thinking defaults seeded.'));
+    }
+
+    /**
+     * Whether a section hosts one of the two thinking explorers.
+     *
+     * The reasons section backs section 02's model and the principles section
+     * backs section 04's abilities; both use the same three row types, and
+     * they are kept apart by the section they live in.
+     */
+    private function isThinkingSection(AboutSectionType $type): bool
+    {
+        return $type === AboutSectionType::Reasons
+            || $type === AboutSectionType::Principles;
+    }
+
+    /**
+     * The selected reasons section's Thinking Explorer row counts, for the
+     * console cockpit.
+     *
+     * @return array{modes: int, categories: int, nodes: int}
+     */
+    public function thinkingCounts(): array
+    {
+        $section = $this->selectedSection;
+
+        if ($section === null || ! $this->isThinkingSection($section->type)) {
+            return ['modes' => 0, 'categories' => 0, 'nodes' => 0];
+        }
+
+        $base = $section->items()->visible()->ordered();
+
+        return [
+            'modes' => (clone $base)->where('type', AboutItemType::ThinkingMode->value)->count(),
+            'categories' => (clone $base)->where('type', AboutItemType::ThinkingCategory->value)->count(),
+            'nodes' => (clone $base)->where('type', AboutItemType::ThinkingNode->value)->count(),
+        ];
+    }
+
+    /**
      * The workflow row kinds, in the order the console offers them.
      *
      * @return array<int, string>
      */
     private function workflowKinds(): array
-    {
-        return [
+    {        return [
             AboutItemType::WorkflowTask->value,
             AboutItemType::WorkflowAgent->value,
             AboutItemType::WorkflowMetric->value,
@@ -1219,6 +1309,63 @@ new #[Layout('layouts::admin.dashboard')] #[Title('About content')] class extend
                             <svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="size-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18M18 6v4.5M18 6l-7.5 7.5M6 14.25v3.375c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125v-9c0-.621-.504-1.125-1.125-1.125H13.5" /></svg>
                         </a>
                     </div>
+
+                    @if ($section->type === AboutSectionType::Reasons || $section->type === AboutSectionType::Principles)
+                        {{-- ================================================= --
+                         | Thinking Explorer cockpit.
+                         |
+                         | The explorer's rows ride this same section (by
+                         | design — one row set, no second table), so the
+                         | console explains the column mapping an operator
+                         | needs and offers the defaults as a one-click
+                         | seed. The generic editor below handles the
+                         | create/edit work; only the counts live here.
+                         --}}
+                        @php $thinking = $this->thinkingCounts(); @endphp
+                        <div class="sui-card overflow-hidden">
+                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sui-hairline px-5 py-4">
+                                <div>
+                                    <h3 class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+                                        {{ __('Thinking Explorer') }}
+                                    </h3>
+                                    <p class="mt-0.5 text-2xs text-ink-500">
+                                        {{ __('Interactive brain content — stored alongside the section’s own rows, partitioned by row type.') }}
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <p class="font-mono text-2xs tabular-nums text-ink-500">
+                                        {{ $thinking['modes'] }} {{ __('modes') }}
+                                        <span aria-hidden="true">·</span>
+                                        {{ $thinking['categories'] }} {{ __('categories') }}
+                                        <span aria-hidden="true">·</span>
+                                        {{ $thinking['nodes'] }} {{ __('nodes') }}
+                                    </p>
+
+                                    @if ($thinking['modes'] === 0 && $thinking['categories'] === 0 && $thinking['nodes'] === 0)
+                                        <flux:button size="sm" icon="sparkles" wire:click="seedThinkingDefaults" wire:loading.attr="disabled">
+                                            {{ __('Seed the defaults') }}
+                                        </flux:button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <dl class="grid gap-4 px-5 py-4 text-2xs text-ink-500 sm:grid-cols-3">
+                                <div>
+                                    <dt class="sui-control-label">{{ __('Thinking mode row') }}</dt>
+                                    <dd class="mt-1">key → <code class="font-mono">subtitle</code> · name → <code class="font-mono">title</code> · description → <code class="font-mono">body</code></dd>
+                                </div>
+                                <div>
+                                    <dt class="sui-control-label">{{ __('Thinking category row') }}</dt>
+                                    <dd class="mt-1">key → <code class="font-mono">subtitle</code> · affinity → <code class="font-mono">affinity</code> · stored rows replace the built-ins</dd>
+                                </div>
+                                <div>
+                                    <dt class="sui-control-label">{{ __('Knowledge node row') }}</dt>
+                                    <dd class="mt-1">parent key → <code class="font-mono">subtitle</code> · label → <code class="font-mono">title</code> · explanation → <code class="font-mono">body</code></dd>
+                                </div>
+                            </dl>
+                        </div>
+                    @endif
 
                     @if ($section->type === AboutSectionType::AiWorkflow)
                         {{-- ================================================= --

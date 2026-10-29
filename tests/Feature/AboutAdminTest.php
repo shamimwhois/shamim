@@ -254,3 +254,154 @@ test('mutation buttons disable themselves while a request is in flight', functio
         ->assertOk()
         ->assertSee('wire:loading.attr="disabled"', escape: false);
 });
+
+test('a thinking category row is created through the generic editor and surfaces on the page', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Reasons]);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->set('itemType', AboutItemType::ThinkingCategory->value)
+        ->set('itemTitle', 'Trade-off Weighing')
+        ->set('itemSubtitle', 'trade-offs')
+        ->set('itemBody', 'How competing constraints get ranked.')
+        ->set('itemUrlLabel', 'deep')
+        ->call('saveItem')
+        ->assertHasNoErrors();
+
+    $item = AboutItem::query()->where('title', 'Trade-off Weighing')->first();
+
+    expect($item)->not->toBeNull()
+        ->and($item->type)->toBe(AboutItemType::ThinkingCategory)
+        ->and($item->subtitle)->toBe('trade-offs');
+
+    // The built-in category is gone by key, not by name: a claim card is
+    // called "Client & Team Focus", so the name is a substring
+    // of the page either way.
+    $this->get(route('about'))
+        ->assertOk()
+        ->assertSee('Trade-off Weighing')
+        ->assertSee('data-hub-key="trade-offs"', false)
+        ->assertDontSee('data-hub-key="problem-solving"', false);
+});
+
+test('seeding the thinking defaults writes the taxonomy and refuses a second seed', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Reasons]);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults')
+        ->assertHasNoErrors();
+
+    expect(AboutItem::query()->where('about_section_id', $section->id)->where('type', AboutItemType::ThinkingMode)->count())->toBe(2)
+        ->and(AboutItem::query()->where('about_section_id', $section->id)->where('type', AboutItemType::ThinkingCategory)->count())->toBe(6)
+        ->and(AboutItem::query()->where('about_section_id', $section->id)->where('type', AboutItemType::ThinkingNode)->count())->toBe(18);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults');
+
+    expect(AboutItem::query()->where('about_section_id', $section->id)->count())->toBe(26);
+});
+
+test('seeding the section 04 thinking defaults writes the ability vocabulary', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Principles]);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults')
+        ->assertHasNoErrors();
+
+    $modes = AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::ThinkingMode)
+        ->count();
+
+    $categories = AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::ThinkingCategory)
+        ->count();
+
+    $nodes = AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::ThinkingNode)
+        ->count();
+
+    // Two modes, ten abilities, and one node per ability's mind map.
+    expect($modes)->toBe(2)
+        ->and($categories)->toBe(10)
+        ->and($nodes)->toBe(37);
+
+    // The seeded rows carry the affinity that decides the hemisphere.
+    $fast = AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::ThinkingCategory)
+        ->where('url_label', 'fast')
+        ->count();
+
+    $deep = AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::ThinkingCategory)
+        ->where('url_label', 'deep')
+        ->count();
+
+    expect($fast)->toBe(5)
+        ->and($deep)->toBe(5);
+});
+
+test('seeding the section 04 defaults leaves the operating principles alone', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Principles]);
+
+    AboutItem::factory()->create([
+        'about_section_id' => $section->id,
+        'type' => AboutItemType::Entry,
+        'title' => 'I close loops',
+    ]);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults')
+        ->assertHasNoErrors();
+
+    // The seed adds the thinking rows; it never rewrites the section's
+    // own content.
+    expect(AboutItem::query()
+        ->where('about_section_id', $section->id)
+        ->where('type', AboutItemType::Entry)
+        ->count())->toBe(1);
+});
+
+test('seeding a section 04 defaults refuses a second seed', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Principles]);
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults')
+        ->assertHasNoErrors();
+
+    $before = AboutItem::query()->where('about_section_id', $section->id)->count();
+
+    Livewire::actingAs(User::factory()->admin()->create())
+        ->test('pages::admin.about')
+        ->set('sectionKey', $section->key)
+        ->call('seedThinkingDefaults');
+
+    expect(AboutItem::query()->where('about_section_id', $section->id)->count())->toBe($before);
+});
+
+test('a visitor cannot seed the section 04 thinking defaults', function () {
+    $section = AboutSection::factory()->create(['type' => AboutSectionType::Principles]);
+
+    // The console refuses the page outright, so the seed is unreachable for
+    // anyone without about:manage.
+    $this->actingAs(User::factory()->create())
+        ->get('/admin/about')
+        ->assertForbidden();
+
+    expect(AboutItem::query()->where('about_section_id', $section->id)->count())->toBe(0);
+});

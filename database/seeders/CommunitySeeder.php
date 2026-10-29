@@ -146,10 +146,10 @@ class CommunitySeeder extends Seeder
         }
 
         // Never let a persona collide with the fixture accounts that ship
-        // with the app (seller@example.com and user@example.com).
+        // with the app (shamimstack@gmail.com and user@example.com).
         $personas = array_values(array_filter(
             $personas,
-            fn (User $user): bool => ! in_array($user->email, ['test@example.com', 'seller@example.com', 'user@example.com'], true),
+            fn (User $user): bool => ! in_array($user->email, ['shamimstack@gmail.com', 'seller@example.com', 'user@example.com'], true),
         ));
 
         return ['owner' => $owner, 'personas' => $personas];

@@ -107,14 +107,14 @@ it('filters the queue by tab and free text', function (): void {
     actingAs(User::factory()->admin()->create());
 
     Livewire::test('pages::admin.feed')
-        ->assertSee('Shamim Hossain')
+        ->assertSee('Md Shamim Hossain')
         ->set('tab', 'curated')
-        ->assertDontSee('Shamim Hossain')
+        ->assertDontSee('Md Shamim Hossain')
         ->assertSee('Rayhan Kabir')
         ->set('tab', 'all')
         ->set('q', 'nadia')
         ->assertSee('Nadia Petrova')
-        ->assertDontSee('Shamim Hossain');
+        ->assertDontSee('Md Shamim Hossain');
 });
 
 it('refuses the console to an account without admin:access at the endpoint', function (): void {

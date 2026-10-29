@@ -186,6 +186,30 @@ class FeedPost extends Model
     }
 
     /**
+     * The stars this commit has earned.
+     *
+     * The log counts them with `withCount('stars')` on the one query it already
+     * runs, so a row's count costs nothing per row, and the reader's own stars
+     * are a single pluck keyed by post id.
+     *
+     * @return HasMany<FeedStar, $this>
+     */
+    public function stars(): HasMany
+    {
+        return $this->hasMany(FeedStar::class);
+    }
+
+    /**
+     * The commit's thread, oldest first.
+     *
+     * @return HasMany<FeedReply, $this>
+     */
+    public function replies(): HasMany
+    {
+        return $this->hasMany(FeedReply::class)->oldest();
+    }
+
+    /**
      * Get the attribute used for route model binding.
      */
     public function getRouteKeyName(): string

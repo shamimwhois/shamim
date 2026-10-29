@@ -693,19 +693,33 @@ new class extends Component
     /**
      * The workflow rail, with the optional middle steps marked as skipped.
      *
-     * @return array<int, array{key: string, label: string, done: bool, skipped: bool}>
+     * `current` is derived here rather than tracked as state: it is the first
+     * step that is neither finished nor inapplicable, so it can never drift
+     * from the four booleans it is read from. Exactly one step carries it.
+     *
+     * @return array<int, array{key: string, label: string, done: bool, skipped: bool, current: bool}>
      */
     public function steps(): array
     {
         $attached = $this->hasMedia;
         $preview = $this->needsPreview();
 
-        return [
+        $steps = [
             ['key' => 'compose', 'label' => __('Compose'), 'done' => $this->bodyLength() > 0, 'skipped' => false],
             ['key' => 'attach', 'label' => __('Attach'), 'done' => $attached, 'skipped' => ! $attached],
             ['key' => 'preview', 'label' => __('Preview'), 'done' => $this->previewed, 'skipped' => ! $preview],
             ['key' => 'publish', 'label' => __('Publish'), 'done' => false, 'skipped' => false],
         ];
+
+        $placed = false;
+
+        foreach ($steps as $index => $step) {
+            $steps[$index]['current'] = ! $placed && ! $step['done'] && ! $step['skipped'];
+
+            $placed = $placed || $steps[$index]['current'];
+        }
+
+        return $steps;
     }
 
     /**
@@ -1078,19 +1092,24 @@ new class extends Component
         :title="__('Create post')"
         maxWidth="2xl"
         :closable="false"
-        class="max-sm:w-[calc(100%-1.5rem)] max-sm:max-h-[calc(100dvh-2rem)] sm:max-h-[88dvh] overflow-y-auto"
+        class="max-sm:w-[calc(100%-1.5rem)] max-sm:max-h-[calc(100dvh-2rem)] sm:max-h-[88dvh] sm:max-w-3xl overflow-y-auto"
     >
-        {{-- Header: identity, audience, workflow rail.
+        {{-- Header: the byline and Close.
 
-             The dialog is the scroll container at every size, which is what lets
-             the two bars below be sticky. On a phone the sheet is nearly the
-             whole screen and the editor is taller than it, so an author who
+             The dialog's own heading already says "Create post", so this row
+             only has to answer *who* is writing — an eyebrow that repeated the
+             heading, under a pulsing dot, was decoration (and a pulse means
+             "live" everywhere else on the feed, where something actually is).
+
+             The dialog is the scroll container at every size, which is what
+             lets the two bars below be sticky. On a phone the sheet is nearly
+             the whole screen and the editor is taller than it, so an author who
              scrolls to attach a screenshot can still reach Close above and
              Publish below — a composer that hides its own publish button behind
              a scroll is a composer that gets abandoned. `max-sm:` rather than an
              override of the desktop width: below the breakpoint the sheet is
-             sized, above it the dialog keeps its centred `2xl` measure. --}}
-        <div class="flex flex-wrap items-start justify-between gap-3 max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:-mx-6 max-sm:bg-white max-sm:px-6 max-sm:py-3 max-sm:dark:bg-zinc-800">
+             sized, above it the dialog keeps its centred measure. --}}
+        <div class="flex flex-wrap items-start justify-between gap-3 max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:-mx-6 max-sm:bg-feed-canvas max-sm:px-6 max-sm:py-3">
             <div class="flex min-w-0 items-center gap-3">
                 <x-feed.avatar :initials="$initials" tone="mint" />
                 <div class="min-w-0">
@@ -1117,27 +1136,37 @@ new class extends Component
         </div>
 
         @if ($confirmingClose)
-            <div class="feed-well rounded-lg p-3" role="alertdialog" aria-labelledby="composer-discard-heading" data-test="composer-discard-confirm">
+            <div class="feed-well p-3" role="alertdialog" aria-labelledby="composer-discard-heading" data-test="composer-discard-confirm">
                 <p id="composer-discard-heading" class="text-sm font-medium text-feed-ink">{{ __('Discard this post?') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-feed-ink-2">{{ __('Closing the composer normally keeps what you wrote. Discarding clears it.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button type="button" wire:click="keepEditing" class="feed-action" data-test="composer-keep-editing">{{ __('Keep editing') }}</button>
-                    <button type="button" wire:click="discardAndClose" class="feed-filter" data-test="composer-discard">{{ __('Discard') }}</button>
+                    <button type="button" wire:click="discardAndClose" class="feed-filter !text-feed-error" data-test="composer-discard">{{ __('Discard') }}</button>
                 </div>
             </div>
         @endif
 
-        {{-- Workflow rail: optional steps read as skipped, not as failures. --}}
-        <ol class="flex flex-wrap items-center gap-1.5" aria-label="{{ __('Publishing steps') }}">
-            @foreach ($this->steps() as $step)
-                <li>
+        {{-- Workflow rail: the chip carries the step's state. Done is mint, the
+             step being worked is azure and declares `aria-current="step"`, and
+             an optional step with nothing in it reads quiet — the old
+             line-through struck two steps out on the very first open, which
+             reads as cancelled rather than "nothing attached yet". --}}
+        <ol class="feed-steps" aria-label="{{ __('Publishing steps') }}">
+            @foreach ($this->steps() as $index => $step)
+                <li @if ($step['current']) aria-current="step" @endif>
                     <span
-                        class="feed-chip {{ $step['done'] ? 'is-mint' : '' }} {{ $step['skipped'] ? 'opacity-45 line-through' : '' }}"
-                        @if ($step['skipped'])
+                        class="feed-chip {{ $step['done'] ? 'is-mint' : '' }} {{ $step['current'] ? 'is-azure' : '' }} {{ $step['skipped'] && ! $step['done'] ? 'is-quiet' : '' }}"
+                        @if ($step['skipped'] && ! $step['done'])
                             title="{{ __('Skipped — nothing to ' . strtolower($step['label']) . ' here') }}"
                         @endif
                     >
+                        <span class="font-mono tabular-nums opacity-70">{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</span>
                         {{ $step['label'] }}
+                        @if ($step['done'])
+                            <span class="sr-only">{{ __('— done') }}</span>
+                        @elseif ($step['skipped'])
+                            <span class="sr-only">{{ __('— nothing to do here') }}</span>
+                        @endif
                     </span>
                 </li>
             @endforeach
@@ -1154,7 +1183,7 @@ new class extends Component
                             type="text"
                             wire:model.live.debounce.600ms="title"
                             placeholder="{{ __('Add a headline — leave it blank and the first line becomes one') }}"
-                            class="w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink placeholder:text-feed-ink-3 focus:border-feed-azure focus:outline-none"
+                            class="feed-input is-headline"
                             data-test="composer-title"
                         />
                     </div>
@@ -1164,8 +1193,8 @@ new class extends Component
                         x-on:dragover.prevent="dragging = true"
                         x-on:dragleave.prevent="dragging = false"
                         x-on:drop.prevent="dragging = false; addUploads($event.dataTransfer)"
-                        :class="dragging ? 'border-feed-azure' : 'border-feed-line'"
-                        class="relative rounded-lg border border-dashed p-0.5"
+                        :class="dragging ? 'is-dragging' : ''"
+                        class="feed-dropzone relative p-0.5"
                         data-test="composer-dropzone"
                     >
                         <label for="composer-body" class="sr-only">{{ __('Post body') }}</label>
@@ -1176,16 +1205,16 @@ new class extends Component
                             x-on:keydown.meta.enter.prevent="$wire.call('publish')"
                             x-on:keydown.ctrl.enter.prevent="$wire.call('publish')"
                             placeholder="{{ __('Share what you are building, ask what you are stuck on…') }}"
-                            class="w-full resize-y rounded-md bg-transparent px-3 py-2.5 text-sm leading-relaxed text-feed-ink placeholder:text-feed-ink-3 focus:outline-none"
+                            class="relative w-full resize-y bg-transparent px-3 py-2.5 text-sm leading-relaxed text-feed-ink placeholder:text-feed-ink-3 focus:outline-none"
                             data-test="composer-body"
                         >{{ $body }}</textarea>
 
-                        <div class="flex items-center justify-between gap-3 border-t border-feed-line px-3 py-1.5">
-                            <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">
+                        <div class="relative flex items-center justify-between gap-3 border-t border-feed-line px-3 py-1.5">
+                            <p class="feed-meta">
                                 {{ __('Drop, paste or pick an image') }}
                             </p>
                             <p
-                                class="font-mono text-[10px] {{ $bodyLength > $maxBody ? 'text-feed-error' : ($bodyLength > $maxBody * 0.9 ? 'text-amber-400' : 'text-feed-ink-3') }}"
+                                class="feed-meta {{ $bodyLength > $maxBody ? '!text-feed-error' : ($bodyLength > $maxBody * 0.9 ? '!text-warning' : '') }}"
                                 data-test="composer-counter"
                             >{{ number_format($bodyLength) }} / {{ number_format($maxBody) }}</p>
                         </div>
@@ -1258,13 +1287,13 @@ new class extends Component
                     @if ($showLinkField ?? false)
                         <div class="flex flex-wrap items-end gap-2">
                             <div class="min-w-0 flex-1">
-                                <label for="composer-link" class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Link') }}</label>
+                                <label for="composer-link" class="feed-eyebrow">{{ __('Link') }}</label>
                                 <input
                                     id="composer-link"
                                     type="url"
                                     wire:model.blur="linkUrl"
                                     placeholder="https://"
-                                    class="mt-1 w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 font-mono text-xs text-feed-ink focus:border-feed-azure focus:outline-none"
+                                    class="feed-input is-mono mt-1"
                                 />
                             </div>
                             <button type="button" wire:click="addLink" class="feed-action">{{ __('Add to post') }}</button>
@@ -1277,7 +1306,7 @@ new class extends Component
                     {{-- Uploading state: Livewire 4 emits no per-file byte progress,
                          so the honest indicator is "this file is in flight". --}}
                     <div wire:loading wire:target="uploads" class="space-y-1" data-test="composer-uploading">
-                        <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Uploading images…') }}</p>
+                        <p class="feed-eyebrow">{{ __('Uploading images…') }}</p>
                         <div class="h-1 w-full overflow-hidden rounded-full bg-feed-raised">
                             <div class="h-full w-1/3 animate-pulse rounded-full bg-feed-azure"></div>
                         </div>
@@ -1287,7 +1316,7 @@ new class extends Component
                         <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-feed-error/45 px-3 py-2" role="alert">
                             <p class="text-xs text-feed-error">{{ $message }}</p>
                             @if (! empty($uploads))
-                                <button type="button" wire:click="retryUploads" class="feed-filter text-feed-error">{{ __('Try again') }}</button>
+                                <button type="button" wire:click="retryUploads" class="feed-filter !text-feed-error">{{ __('Try again') }}</button>
                             @endif
                         </div>
                     @enderror
@@ -1296,7 +1325,7 @@ new class extends Component
                     @if ($this->hasMedia)
                         <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3" data-test="composer-media-list">
                             @foreach ($this->stagedMedia as $attachment)
-                                <li class="feed-well space-y-1.5 rounded-lg p-1.5">
+                                <li class="feed-well space-y-1.5 p-1.5">
                                     <div class="relative">
                                         <img
                                             src="{{ $attachment->url() }}"
@@ -1321,14 +1350,14 @@ new class extends Component
                                         wire:model.blur="alts.{{ $attachment->id }}"
                                         value="{{ $attachment->alt_text }}"
                                         placeholder="{{ __('Describe this image') }}"
-                                        class="w-full rounded-md border border-feed-line bg-feed-well px-2 py-1 text-[11px] text-feed-ink placeholder:text-feed-ink-3 focus:border-feed-azure focus:outline-none"
+                                        class="feed-input !px-2 !py-1 text-[11px]"
                                         data-test="composer-alt-text"
                                     />
                                     <p class="font-mono text-[10px] text-feed-ink-3">{{ $attachment->humanSize() }} · {{ $attachment->mime }}</p>
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">
+                        <p class="feed-eyebrow">
                             {{ __(':used of :cap images', ['used' => $this->stagedMedia->count(), 'cap' => $maxAttachments]) }}
                         </p>
                     @endif
@@ -1336,20 +1365,20 @@ new class extends Component
                     {{-- ============ Type-dependent structure ============ --}}
                     @if ($type === 'snippet')
                         <div class="space-y-2">
-                            <label for="composer-code-file" class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Code') }}</label>
+                            <label for="composer-code-file" class="feed-eyebrow">{{ __('Code') }}</label>
                             <input
                                 id="composer-code-file"
                                 type="text"
                                 wire:model.blur="codeFile"
                                 placeholder="{{ __('filename, e.g. Queue::afterCommit.php') }}"
-                                class="w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 font-mono text-xs text-feed-ink focus:border-feed-azure focus:outline-none"
+                                class="feed-input is-mono"
                                 data-test="composer-code-file"
                             />
                             <textarea
                                 rows="6"
                                 wire:model.blur="code"
                                 placeholder="{{ __('Paste the snippet') }}"
-                                class="w-full resize-y rounded-md border border-feed-line bg-feed-well px-3 py-2 font-mono text-xs leading-relaxed text-feed-ink focus:border-feed-azure focus:outline-none"
+                                class="feed-input is-mono resize-y leading-relaxed"
                                 aria-label="{{ __('Code snippet') }}"
                                 data-test="composer-code"
                             >{{ $code }}</textarea>
@@ -1358,14 +1387,14 @@ new class extends Component
 
                     @if ($type === 'poll')
                         <div class="space-y-2" data-test="composer-poll">
-                            <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Poll choices') }}</p>
+                            <p class="feed-eyebrow">{{ __('Poll choices') }}</p>
                             @foreach ($pollOptions as $index => $option)
                                 <div class="flex items-center gap-2">
                                     <input
                                         type="text"
                                         wire:model.live="pollOptions.{{ $index }}.label"
                                         placeholder="{{ __('Choice :n', ['n' => $index + 1]) }}"
-                                        class="min-w-0 flex-1 rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink focus:border-feed-azure focus:outline-none"
+                                        class="feed-input min-w-0 flex-1"
                                         aria-label="{{ __('Poll choice :n', ['n' => $index + 1]) }}"
                                         data-test="composer-poll-option"
                                     />
@@ -1386,7 +1415,7 @@ new class extends Component
                                     type="text"
                                     wire:model.blur="pollCloses"
                                     placeholder="{{ __('Closes — e.g. Friday') }}"
-                                    class="min-w-0 flex-1 rounded-md border border-feed-line bg-feed-well px-3 py-2 text-xs text-feed-ink focus:border-feed-azure focus:outline-none"
+                                    class="feed-input min-w-0 flex-1"
                                     aria-label="{{ __('When the poll closes') }}"
                                 />
                             </div>
@@ -1399,22 +1428,22 @@ new class extends Component
                     @if ($showActivity)
                         <div class="grid gap-2 sm:grid-cols-2" data-test="composer-activity">
                             <div>
-                                <label for="composer-activity-label" class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Feeling / activity') }}</label>
+                                <label for="composer-activity-label" class="feed-eyebrow">{{ __('Feeling / activity') }}</label>
                                 <input
                                     id="composer-activity-label"
                                     type="text"
                                     wire:model.blur="activityLabel"
                                     placeholder="{{ __('shipping, learning, stuck…') }}"
-                                    class="mt-1 w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink focus:border-feed-azure focus:outline-none"
+                                    class="feed-input mt-1"
                                 />
                             </div>
                             <div>
-                                <label for="composer-activity-detail" class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Detail (optional)') }}</label>
+                                <label for="composer-activity-detail" class="feed-eyebrow">{{ __('Detail (optional)') }}</label>
                                 <input
                                     id="composer-activity-detail"
                                     type="text"
                                     wire:model.blur="activityDetail"
-                                    class="mt-1 w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink focus:border-feed-azure focus:outline-none"
+                                    class="feed-input mt-1"
                                 />
                             </div>
                         </div>
@@ -1424,11 +1453,11 @@ new class extends Component
                 {{-- ============ Settings column ============ --}}
                 <div class="space-y-4 sm:col-span-2">
                     <fieldset class="space-y-2">
-                        <legend class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Who can see it') }}</legend>
+                        <legend class="feed-eyebrow">{{ __('Who can see it') }}</legend>
                         <div class="space-y-1.5" role="radiogroup" aria-label="{{ __('Audience') }}">
                             @foreach (\App\Enums\FeedPostAudience::cases() as $choice)
                                 <label
-                                    class="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors {{ $audience === $choice->value ? 'border-feed-azure bg-feed-well' : 'border-feed-line hover:border-feed-line-strong' }}"
+                                    class="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors focus-within:border-feed-azure {{ $audience === $choice->value ? 'border-feed-azure bg-feed-well' : 'border-feed-line hover:border-feed-line-strong' }}"
                                 >
                                     <input
                                         type="radio"
@@ -1447,11 +1476,11 @@ new class extends Component
                         </div>
 
                         @if ($audience === \App\Enums\FeedPostAudience::Community->value)
-                            <label for="composer-community" class="mt-2 block font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Community') }}</label>
+                            <label for="composer-community" class="feed-eyebrow mt-2 block">{{ __('Community') }}</label>
                             <select
                                 id="composer-community"
                                 wire:model.live="communityId"
-                                class="mt-1 w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink focus:border-feed-azure focus:outline-none"
+                                class="feed-input mt-1"
                                 data-test="composer-community"
                             >
                                 <option value="">{{ __('Choose a community you have joined') }}</option>
@@ -1473,23 +1502,23 @@ new class extends Component
                     </fieldset>
 
                     <fieldset class="space-y-2">
-                        <legend class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{__('Format')}}</legend>
+                        <legend class="feed-eyebrow">{{__('Format')}}</legend>
                         <div class="flex flex-wrap gap-1.5">
                             @foreach ($this->availableTypes() as $choice)
                                 <button
                                     type="button"
                                     wire:click="$set('type', '{{ $choice }}')"
                                     aria-pressed="{{ $type === $choice ? 'true' : 'false' }}"
-                                    class="{{ $type === $choice ? 'feed-action text-[13px]! shadow-none!' : 'feed-filter' }}"
+                                    class="feed-type-button"
                                     data-test="composer-type-{{ $choice }}"
                                 >{{ Str::ucfirst($choice) }}</button>
                             @endforeach
                         </div>
-                        <label for="composer-topic" class="mt-2 block font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Topic') }}</label>
+                        <label for="composer-topic" class="feed-eyebrow mt-2 block">{{ __('Topic') }}</label>
                         <select
                             id="composer-topic"
                             wire:model.live="topic"
-                            class="mt-1 w-full rounded-md border border-feed-line bg-feed-well px-3 py-2 text-sm text-feed-ink focus:border-feed-azure focus:outline-none"
+                            class="feed-input mt-1"
                             data-test="composer-topic"
                         >
                             @foreach ($this->availableTopics() as $choice)
@@ -1499,7 +1528,7 @@ new class extends Component
                     </fieldset>
 
                     <fieldset class="space-y-2">
-                        <legend class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Tags') }}</legend>
+                        <legend class="feed-eyebrow">{{ __('Tags') }}</legend>
                         @if ($tags !== [])
                             <ul class="flex flex-wrap gap-1.5" data-test="composer-tags">
                                 @foreach ($tags as $index => $tag)
@@ -1517,7 +1546,7 @@ new class extends Component
                                 wire:model.blur="tagInput"
                                 wire:keydown.enter="addTag"
                                 placeholder="{{ __('Add a tag') }}"
-                                class="min-w-0 flex-1 rounded-md border border-feed-line bg-feed-well px-3 py-2 text-xs text-feed-ink focus:border-feed-azure focus:outline-none"
+                                class="feed-input min-w-0 flex-1"
                                 aria-label="{{ __('Add a tag') }}"
                             />
                             <button type="button" wire:click="addTag" class="feed-filter">{{ __('Add') }}</button>
@@ -1546,12 +1575,12 @@ new class extends Component
                     {{-- ============ Drafts ============ --}}
                     @if ($opened)
                         <fieldset class="space-y-2" data-test="composer-drafts">
-                            <legend class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Your drafts') }}</legend>
+                            <legend class="feed-eyebrow">{{ __('Your drafts') }}</legend>
                             @forelse ($this->drafts as $draft)
-                                <div class="flex items-start gap-2 rounded-lg border border-feed-line px-2.5 py-2">
+                                <div class="feed-inset flex items-start gap-2 px-2.5 py-2">
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-xs font-medium text-feed-ink">{{ $draft->title ?: Str::limit($draft->body, 48) }}</p>
-                                        <p class="font-mono text-[10px] text-feed-ink-3">{{ $draft->updated_at?->diffForHumans() }}</p>
+                                        <p class="feed-meta">{{ $draft->updated_at?->diffForHumans() }}</p>
                                     </div>
                                     <button type="button" wire:click="restoreDraft({{ $draft->id }})" class="feed-filter shrink-0" data-test="composer-restore-draft">{{ __('Edit') }}</button>
                                     <button type="button" wire:click="discardDraftRow({{ $draft->id }})" class="feed-filter shrink-0" aria-label="{{ __('Delete this draft') }}" data-test="composer-delete-draft">{{ __('Delete') }}</button>
@@ -1566,16 +1595,22 @@ new class extends Component
 
             {{-- ============ Preview ============ --}}
             @if ($previewed)
-                <section class="feed-well space-y-3 rounded-lg p-4" aria-label="{{ __('Preview') }}" data-test="composer-preview">
-                    <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Preview — as the feed will show it') }}</p>
-                    <p class="text-sm font-semibold text-feed-ink">{{ $title !== '' ? $title : Str::limit(Str::before(trim($body)."\n", "\n"), 120) }}</p>
-                    <p class="text-[11px] text-feed-ink-2">
+                <section class="feed-preview space-y-3" aria-label="{{ __('Preview') }}" data-test="composer-preview">
+                    <p class="feed-eyebrow">{{ __('Preview — as the feed will show it') }}</p>
+                    <p class="feed-preview-title">{{ $title !== '' ? $title : Str::limit(Str::before(trim($body)."\n", "\n"), 120) }}</p>
+                    <p class="feed-meta">
                         {{ __('by :author · :audience', ['author' => $author?->name ?? __('you'), 'audience' => mb_strtolower(\App\Enums\FeedPostAudience::tryFrom($audience)?->label() ?? __('Public'))]) }}
                     </p>
                     <p class="whitespace-pre-wrap break-words text-sm leading-relaxed text-feed-ink">{{ $body }}</p>
 
                     @if ($type === 'snippet' && trim($code) !== '')
-                        <pre class="overflow-x-auto rounded-md bg-feed-well p-3 font-mono text-[11px] text-feed-ink"><code>{{ $code }}</code></pre>
+                        {{-- The artefact renders as the card's terminal panel will. --}}
+                        <div class="feed-code">
+                            @if (trim($codeFile) !== '')
+                                <p class="feed-meta mb-2 border-b border-ink-800 pb-2 !text-ink-500">{{ $codeFile }}</p>
+                            @endif
+                            <pre class="whitespace-pre"><code>{{ $code }}</code></pre>
+                        </div>
                     @endif
 
                     @if ($type === 'poll')
@@ -1591,7 +1626,7 @@ new class extends Component
                     @if ($this->hasMedia)
                         <div class="flex flex-wrap gap-2">
                             @foreach ($this->stagedMedia as $attachment)
-                                <img src="{{ $attachment->url() }}" alt="{{ $attachment->alt() }}" class="size-16 rounded-md object-cover" />
+                                <img src="{{ $attachment->url() }}" alt="{{ $attachment->alt() }}" class="size-16 rounded-md border border-feed-line object-cover" />
                             @endforeach
                         </div>
                     @endif
@@ -1600,8 +1635,8 @@ new class extends Component
 
             {{-- ============ Deferred toolbar matrix ============ --}}
             @if ($showMore)
-                <section id="composer-more-panel" class="space-y-2 rounded-lg border border-feed-line p-3" aria-label="{{ __('Options not available yet') }}" data-test="composer-more-panel">
-                    <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('Not available yet') }}</p>
+                <section id="composer-more-panel" class="feed-well space-y-2 p-3" aria-label="{{ __('Options not available yet') }}" data-test="composer-more-panel">
+                    <p class="feed-eyebrow">{{ __('Not available yet') }}</p>
                     <ul class="grid gap-1.5 sm:grid-cols-2">
                         @foreach ($this->deferredOptions() as $option)
                             <li>
@@ -1624,7 +1659,7 @@ new class extends Component
             @endif
 
             {{-- ============ Publish bar ============ --}}
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-feed-line pt-4 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-6 max-sm:-mb-6 max-sm:bg-white max-sm:px-6 max-sm:pb-6 max-sm:dark:bg-zinc-800">
+            <div class="feed-composer-rule flex flex-wrap items-center justify-between gap-3 pt-4 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:-mx-6 max-sm:-mb-6 max-sm:bg-feed-canvas max-sm:px-6 max-sm:pb-6">
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" wire:click="saveDraft" class="feed-filter" data-test="composer-save-draft">{{ __('Save draft') }}</button>
 
@@ -1633,7 +1668,7 @@ new class extends Component
                         id="composer-schedule"
                         type="datetime-local"
                         wire:model.blur="scheduledAt"
-                        class="rounded-md border border-feed-line bg-feed-well px-2.5 py-1.5 text-xs text-feed-ink focus:border-feed-azure focus:outline-none"
+                        class="feed-input is-mono !w-auto !px-2.5 !py-1.5"
                         data-test="composer-schedule-input"
                     />
                     <button type="button" wire:click="schedule" class="feed-filter" data-test="composer-schedule">{{ __('Schedule') }}</button>
@@ -1641,8 +1676,13 @@ new class extends Component
 
                 <div class="flex items-center gap-2">
                     @if ($this->needsPreview() && ! $previewed)
-                        <span class="hidden font-mono text-[10px] uppercase tracking-wider text-feed-ink-3 sm:inline">{{ __('Preview first') }}</span>
+                        <span class="feed-eyebrow hidden sm:inline">{{ __('Preview first') }}</span>
                     @endif
+
+                    {{-- The shortcut the textarea already obeys, shown where it
+                         pays off. Hidden on a phone: fingers do not have a
+                         Command key. --}}
+                    <span class="feed-meta hidden sm:inline" aria-hidden="true">⌘ + ↵</span>
 
                     <button type="submit" class="feed-action" data-test="composer-publish">
                         {{ $previewed || ! $this->needsPreview() ? __('Publish') : __('Preview') }}

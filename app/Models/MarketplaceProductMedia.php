@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\URL;
  * @property int $sort_order
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read MarketplaceProduct $product
+ * @property-read MarketplaceProduct|null $product
  */
 #[Fillable([
     'marketplace_product_id',
@@ -105,9 +105,15 @@ class MarketplaceProductMedia extends Model
      */
     public function alt(): string
     {
-        return $this->alt_text !== null && trim($this->alt_text) !== ''
-            ? $this->alt_text
-            : __('Screenshot of :name', ['name' => $this->product?->name ?? __('this listing')]);
+        if ($this->alt_text !== null && trim($this->alt_text) !== '') {
+            return $this->alt_text;
+        }
+
+        // A deleted listing is soft-deleted, not destroyed, so the screenshot
+        // row outlives it and the relation resolves to null. The null
+        // coalescing operator absorbs that without a warning, which is why
+        // the property is read directly rather than through `?->`.
+        return __('Screenshot of :name', ['name' => $this->product->name ?? __('this listing')]);
     }
 
     /**

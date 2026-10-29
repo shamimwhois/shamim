@@ -36,7 +36,7 @@ class AboutSectionFactory extends Factory
                 'circle-stack',
                 'briefcase',
                 'code-bracket',
-                'pen-square',
+                'puzzle-piece',
                 'envelope',
             ]),
             'sort_order' => fake()->numberBetween(0, 20),

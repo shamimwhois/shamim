@@ -67,7 +67,7 @@
                     @endif
                 >{{ $display }}</div>
 
-                <div class="mt-1.5 font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                <div class="mt-1.5 font-mono text-2xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
                     {{ $stat['label'] }}
                 </div>
             </div>

@@ -12,10 +12,10 @@
  */
 
 /**
- * Editor AI client, the rich text editor's Alpine component, and the Developer Lab
- * sandbox.
+ * Editor AI client, the rich text editor's Alpine component, the Developer Lab
+ * sandbox, and the About page's two thinking explorers.
  *
- * Imported for their side effects: both attach themselves to `window` so the
+ * Imported for their side effects: each attaches itself to `window` so the
  * Blade component can reference them by name from an `x-data` attribute without
  * the template having to know how the bundle is split.
  */
@@ -23,6 +23,8 @@ import './editor-ai.js';
 import './rich-text-editor.js';
 import './lab-sandbox.js';
 import './sound.js';
+import './thinking-explorer.js';
+import './log-shell.js';
 
 import { initInteractionSound, playAmbient } from './sound.js';
 
@@ -225,46 +227,6 @@ function initTocToggle() {
 
     toc.dataset.tocToggleReady = 'true';
 
-    window.setTimeout(() => {
-        const live = document.querySelector('[data-toc]');
-        const label = live.querySelector('.about-toc-link__label');
-        const nav = live.querySelector('#about-toc-list') ?? live;
-
-        const measure = (tag) => {
-            const l = label.getBoundingClientRect();
-            const n = nav.getBoundingClientRect();
-            const cs = getComputedStyle(label);
-            console.log('TOCPROBE', JSON.stringify({
-                tag,
-                w: window.innerWidth,
-                navL: Math.round(n.left),
-                navW: Math.round(n.width),
-                labelW: Math.round(l.width),
-                maxWidth: cs.maxWidth,
-                cssWidth: cs.width,
-                minWidth: cs.minWidth,
-                flex: cs.flex,
-                op: cs.opacity,
-                sheetHasRule: [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => r.cssText?.includes('data-pinned')); } catch { return false; } }),
-            }));
-        };
-
-        window.scrollTo({ top: 2500, behavior: 'instant' });
-
-        window.setTimeout(() => {
-            measure('collapsed');
-
-            live.dataset.pinned = 'open';
-            window.setTimeout(() => measure('pinned-open'), 500);
-
-            live.dataset.pinned = 'shut';
-            window.setTimeout(() => measure('pinned-shut'), 500);
-
-            delete live.dataset.pinned;
-            window.setTimeout(() => measure('unpinned'), 500);
-        }, 700);
-    }, 1500);
-
     // null means "no pin yet" — the rail follows the pointer. 'open' pins
     // the labels open, 'shut' pins them shut.
     let pinned = null;
@@ -295,15 +257,9 @@ function initTocToggle() {
     });
 
     toggle.addEventListener('click', () => {
-        // Cycle the pin: shut → open → follow the pointer. The first click
-        // on a rail the pointer is already opening shuts it.
-        if (pinned === null) {
-            pinned = 'shut';
-        } else if (pinned === 'shut') {
-            pinned = 'open';
-        } else {
-            pinned = null;
-        }
+        // A plain two-state toggle. The rail follows the pointer until the
+        // reader first clicks, and from then the pin wins over the hover.
+        pinned = pinned === 'open' ? 'shut' : 'open';
 
         render();
     });

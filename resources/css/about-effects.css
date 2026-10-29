@@ -2,18 +2,20 @@
 /* About hero typography — modern / vintage / 3D animated                   */
 /* ------------------------------------------------------------------------ */
 
-/* Modern gradient display text (signal teal → deep teal). */
+/* Modern gradient display text (signal token ramp → deep teal). The
+   stops come from the theme's signal scale so a palette change ripples
+   through the whole page instead of forking on a hex copy. */
 .about-type-modern {
-    background-image: linear-gradient(110deg, #047857 0%, #10b981 45%, #34d399 100%);
+    background-image: linear-gradient(110deg, var(--color-signal-700) 0%, var(--color-signal-500) 45%, var(--color-signal-400) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    text-shadow: 0 0 40px rgb(16 185 129 / 0.18);
+    text-shadow: 0 0 40px color-mix(in srgb, var(--color-signal-500) 18%, transparent);
 }
 
 .dark .about-type-modern {
-    background-image: linear-gradient(110deg, #34d399 0%, #6ee7b7 50%, #a7f3d2 100%);
-    text-shadow: 0 0 46px rgb(52 211 153 / 0.22);
+    background-image: linear-gradient(110deg, var(--color-signal-400) 0%, var(--color-signal-300) 50%, var(--color-signal-200) 100%);
+    text-shadow: 0 0 46px color-mix(in srgb, var(--color-signal-400) 22%, transparent);
 }
 
 /* Blinking terminal caret used by the typewriter effect. */
@@ -21,12 +23,12 @@
     display: inline-block;
     width: 0.6ch;
     margin-left: 2px;
-    color: rgb(5 150 105);
+    color: var(--color-signal-600);
     animation: about-caret-blink 1.05s steps(1) infinite;
 }
 
 .dark .about-typewriter-caret {
-    color: rgb(52 211 153);
+    color: var(--color-signal-400);
 }
 
 @keyframes about-caret-blink {
@@ -70,6 +72,16 @@
         -0.5px 0 0 color-mix(in oklab, var(--color-signal-600) 60%, transparent);
 }
 
+/* Ambient accent wash behind the hero copy. A whisper of the signal accent
+   so the display type has something to refract in both themes — the same
+   "weather, not decoration" idiom as the AI Workflow band. Faint enough that
+   the portrait and the drawn name stay on top of it. */
+.about-hero__glow {
+    background:
+        radial-gradient(36rem 17rem at 18% 30%, color-mix(in oklab, var(--color-aw-accent) 12%, transparent), transparent 70%),
+        radial-gradient(28rem 15rem at 88% 8%, color-mix(in oklab, var(--color-aw-verified) 8%, transparent), transparent 70%);
+}
+
 /* 3D floating stage. */
 .about-hero-3d {
     perspective: 900px;
@@ -89,20 +101,20 @@
     display: grid;
     place-items: center;
     border-radius: 1rem;
-    border: 1px solid rgb(5 150 105 / 0.35);
-    background: linear-gradient(135deg, rgb(236 253 245 / 0.85), rgb(167 243 210 / 0.35));
+    border: 1px solid color-mix(in srgb, var(--color-signal-600) 35%, transparent);
+    background: linear-gradient(135deg, var(--color-signal-50) 0%, var(--color-signal-200) 100%);
     backdrop-filter: blur(10px);
     font-family: var(--font-calligraphy);
     font-size: 3.5rem;
-    color: #047857;
+    color: var(--color-signal-700);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
 }
 
 .dark .about-hero-3d__face {
-    background: linear-gradient(135deg, rgb(6 78 59 / 0.7), rgb(5 150 105 / 0.25));
-    color: #6ee7b7;
-    border-color: rgb(52 211 153 / 0.35);
+    background: linear-gradient(135deg, var(--color-signal-900) 0%, color-mix(in srgb, var(--color-signal-600) 25%, transparent) 100%);
+    color: var(--color-signal-300);
+    border-color: color-mix(in srgb, var(--color-signal-400) 35%, transparent);
 }
 
 .about-hero-3d__face--front  { transform: translateZ(60px); }
@@ -186,7 +198,7 @@
     z-index: -1;
     background: radial-gradient(
         60% 55% at 50% 45%,
-        rgb(16 185 129 / 0.12),
+        color-mix(in srgb, var(--color-signal-500) 12%, transparent),
         transparent 72%
     );
     filter: blur(28px);
@@ -196,8 +208,8 @@
 .dark .about-how__glow {
     background: radial-gradient(
         58% 52% at 50% 45%,
-        rgb(45 212 191 / 0.16),
-        rgb(139 92 246 / 0.07) 55%,
+        color-mix(in srgb, var(--color-signal-400) 16%, transparent),
+        color-mix(in srgb, var(--color-signal-300) 7%, transparent) 55%,
         transparent 75%
     );
 }
@@ -407,7 +419,7 @@
 
 .cap-card:hover,
 .cap-card:focus-visible {
-    box-shadow: 0 18px 40px -18px rgb(4 120 87 / 0.35);
+    box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--color-signal-600) 35%, transparent);
 }
 
 .dark .cap-card:hover,
@@ -953,4 +965,2577 @@
 .sec-rule {
     -webkit-mask-image: linear-gradient(to right, #000 42%, rgb(0 0 0 / 0.12));
     mask-image: linear-gradient(to right, #000 42%, rgb(0 0 0 / 0.12));
+}
+/* ==========================================================================
+   Thinking Explorer + Thinking Modes — the section 02 and 04 bands
+   --------------------------------------------------------------------------
+   The two interactive bands on the About page wear the page's own ink ladder
+   and its one accent — never a private palette — so they follow the
+   light/dark theme *and* the accent the visitor picked from the accent
+   picker. The tokens live in app.css as `--color-te-*`; this file only
+   consumes them.
+
+   The two thinking modes are told apart by value, not by a second hue:
+   System 1 (fast) wears the accent, System 2 (deep) wears the ink. The band
+   therefore stays monochrome-plus-one-colour in every theme, which is the
+   site's whole thesis (docs/UI-UX-BRIEF.md §1).
+
+   The stage publishes the colour currently in force as a handful of custom
+   properties, so a rule never has to know which mode is live:
+
+       --te-accent        the filled / active colour
+       --te-accent-ink    the ink that sits on --te-accent
+       --te-accent-soft   the accent as text
+       --te-chain         the travelling signal
+       --te-hub           the always-visible category anchors
+       --te-idle          the unselected tissue
+       --te-tissue        the cortex mass the WebGL model is sculpted from
+
+   The canvas reads the same values through a probe element, which is why
+   the brain follows the theme as well.
+   ========================================================================== */
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* --- The stage ----------------------------------------------------------- */
+
+.te-stage {
+    /* The instrument ground.
+       The stage draws its canvas and surface colors from the theme's own ink
+       ladder (--color-te-*) and accent from the visitor's accent picker
+       (--color-signal-*). It renders light in the light theme and dark in the
+       dark theme, following the page rather than forcing a permanent
+       instrument-panel treatment. Decorative layers are aria-hidden. */
+    --color-te-canvas: var(--color-ink-50);
+    --color-te-panel: var(--color-ink-100);
+    --color-te-card: var(--color-ink-100);
+    --color-te-raised: var(--color-ink-200);
+    --color-te-line: var(--color-ink-300);
+    --color-te-accent: var(--color-signal-600, #059669);
+    --color-te-accent-soft: var(--color-signal-700, #047857);
+    --color-te-on-accent: var(--color-ink-50);
+    --color-te-chain: var(--color-signal-500, #10b981);
+    --color-te-deep: var(--color-ink-900);
+    --color-te-deep-soft: var(--color-ink-700);
+    --color-te-on-deep: var(--color-ink-50);
+    --color-te-deep-chain: var(--color-ink-400);
+    --color-te-ink: var(--color-ink-900);
+    --color-te-ink-muted: var(--color-ink-600);
+    --color-te-ink-faint: var(--color-ink-500);
+    /* The cortex mass the WebGL model is sculpted from: the plate's own
+       surface, published so the scene and the panel agree — porcelain on
+       paper rather than a studio blue that fights the light theme. */
+    --color-te-tissue: var(--color-ink-200);
+
+    /* Local aliases every child rule reads. These are references, not values,
+       so the dark variant below re-points the --color-te-* stops and these
+       follow along without being redeclared. */
+    --te-accent: var(--color-te-accent);
+    --te-accent-ink: var(--color-te-on-accent);
+    --te-accent-soft: var(--color-te-accent-soft);
+    --te-chain: var(--color-te-chain);
+    --te-hub: var(--color-te-accent);
+    --te-idle: var(--color-te-ink-faint);
+    --te-tissue: var(--color-te-tissue);
+    /* The one green in the band, and it is a status colour: a live
+       indicator, never a decoration. */
+    --te-status: #a3e635;
+
+    border: 1px solid color-mix(in srgb, var(--te-accent) 16%, var(--color-te-line));
+    background:
+        radial-gradient(46rem 18rem at 50% -6%, color-mix(in srgb, var(--te-accent) 10%, transparent), transparent 68%),
+        radial-gradient(34rem 18rem at 8% 108%, color-mix(in srgb, var(--te-accent) 6%, transparent), transparent 70%),
+        linear-gradient(180deg, color-mix(in srgb, var(--color-te-canvas) 85%, var(--color-te-panel)) 0%, var(--color-te-canvas) 45%, color-mix(in srgb, var(--color-te-canvas) 70%, var(--color-te-raised)) 100%);
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.06),
+        0 30px 70px -40px rgb(0 0 0 / 0.3);
+}
+
+/* --- Dark theme variant for the thinking stage --- */
+
+.dark .te-stage {
+    --color-te-canvas: var(--color-ink-950);
+    --color-te-panel: var(--color-ink-900);
+    --color-te-card: var(--color-ink-900);
+    --color-te-raised: var(--color-ink-800);
+    --color-te-line: var(--color-ink-800);
+    --color-te-accent: var(--color-signal-400, #34d399);
+    --color-te-accent-soft: var(--color-signal-300, #6ee7b7);
+    --color-te-on-accent: var(--color-ink-950);
+    --color-te-chain: var(--color-signal-300, #6ee7b7);
+    --color-te-deep: var(--color-ink-100);
+    --color-te-deep-soft: var(--color-ink-300);
+    --color-te-on-deep: var(--color-ink-950);
+    --color-te-deep-chain: var(--color-ink-400);
+    --color-te-ink: var(--color-ink-50);
+    --color-te-ink-muted: var(--color-ink-300);
+    --color-te-ink-faint: var(--color-ink-400);
+    --color-te-tissue: var(--color-ink-700);
+}
+
+/* Deep thinking swaps the accent for the ink: the deliberate system wears
+   the page's neutral, the fast one wears its colour. Same shape, different
+   value — the band never grows a second hue. */
+.te-stage--deep {
+    --te-accent: var(--color-te-deep);
+    --te-accent-ink: var(--color-te-on-deep);
+    --te-accent-soft: var(--color-te-deep-soft);
+    --te-chain: var(--color-te-deep-chain);
+    --te-hub: var(--color-te-deep);
+}
+
+/* The stage renders its canvas from the theme's own ink ladder — light in the
+   light theme, dark in the dark theme — so it adapts rather than forcing a
+   permanent instrument-panel treatment. The frame above is the only frame it
+   wears in either theme. */
+
+/* The floor of the instrument: a fine grid with a coarse grid laid over it,
+   the way an engineering drawing carries two scales at once. Both are
+   tinted with the accent rather than grey, and both dissolve towards the
+   edges so the panel never reads as a tablecloth. */
+.te-stage__grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--te-accent) 10%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--te-accent) 10%, transparent) 1px, transparent 1px),
+        linear-gradient(color-mix(in srgb, var(--te-accent) 6%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--te-accent) 6%, transparent) 1px, transparent 1px);
+    background-size:
+        28px 28px,
+        28px 28px,
+        140px 140px,
+        140px 140px;
+    -webkit-mask-image: radial-gradient(72% 72% at 50% 40%, #000 12%, transparent 100%);
+    mask-image: radial-gradient(72% 72% at 50% 40%, #000 12%, transparent 100%);
+}
+
+/* The instrument's frame: corner brackets and a ruler along the top edge.
+   Hairlines only — the frame has to be felt, not read. */
+.te-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0.75rem;
+    z-index: 2;
+    pointer-events: none;
+    border: 1px solid transparent;
+    background:
+        /* top-left bracket */
+        linear-gradient(var(--te-accent), var(--te-accent)) left top / 1.25rem 1px no-repeat,
+        linear-gradient(var(--te-accent), var(--te-accent)) left top / 1px 1.25rem no-repeat,
+        /* top-right bracket */
+        linear-gradient(var(--te-accent), var(--te-accent)) right top / 1.25rem 1px no-repeat,
+        linear-gradient(var(--te-accent), var(--te-accent)) right top / 1px 1.25rem no-repeat,
+        /* bottom-right bracket */
+        linear-gradient(var(--te-accent), var(--te-accent)) right bottom / 1.25rem 1px no-repeat,
+        linear-gradient(var(--te-accent), var(--te-accent)) right bottom / 1px 1.25rem no-repeat,
+        /* bottom-left bracket */
+        linear-gradient(var(--te-accent), var(--te-accent)) left bottom / 1.25rem 1px no-repeat,
+        linear-gradient(var(--te-accent), var(--te-accent)) left bottom / 1px 1.25rem no-repeat;
+    opacity: 0.45;
+}
+
+/* --- Mode toggle ---------------------------------------------------------- */
+
+.te-modes {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--color-te-line);
+    border-radius: 9999px;
+    background: var(--color-te-panel);
+}
+
+.te-mode {
+    padding: 0.45rem 1.15rem;
+    border-radius: 9999px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+    cursor: pointer;
+    transition: color 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.te-mode:hover {
+    color: var(--color-te-ink);
+}
+
+.te-mode.is-active {
+    color: var(--te-accent-ink);
+    background: var(--te-accent);
+    box-shadow: 0 1px 2px rgb(13 13 12 / 0.16);
+}
+
+/* --- The brain ------------------------------------------------------------- */
+
+.te-brain__fallback {
+    transition: opacity 0.4s ease;
+}
+
+/* The static SVG fallback yields once the canvas paints. */
+.te-brain__fallback.is-dimmed {
+    opacity: 0;
+}
+
+.te-brain__fallback .te-fallback__outline {
+    stroke: color-mix(in srgb, var(--te-accent) 65%, transparent);
+    stroke-width: 1.75;
+    fill: color-mix(in srgb, var(--te-accent) 6%, transparent);
+}
+
+.te-brain__fallback .te-fallback__fissure {
+    stroke: color-mix(in srgb, var(--te-chain) 70%, transparent);
+    stroke-width: 1.25;
+    stroke-dasharray: 3 5;
+}
+
+.te-brain__fallback .te-fallback__gyre {
+    stroke: color-mix(in srgb, var(--te-chain) 55%, transparent);
+    stroke-width: 1.25;
+    stroke-linecap: round;
+}
+
+.te-brain__fallback .te-fallback__platform {
+    stroke: color-mix(in srgb, var(--te-accent) 30%, transparent);
+    fill: color-mix(in srgb, var(--te-accent) 4%, transparent);
+}
+
+.te-brain__canvas {
+    cursor: crosshair;
+    touch-action: pan-y;
+}
+
+/* --- Category chips --------------------------------------------------------- */
+
+.te-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--color-te-line);
+    border-radius: 9999px;
+    background: var(--color-te-card);
+    box-shadow: 0 1px 2px rgb(13 13 12 / 0.04);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-te-ink-muted);
+    cursor: pointer;
+    transition:
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        color 0.25s ease,
+        background-color 0.25s ease,
+        transform 0.25s ease;
+}
+
+.te-chip__dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--te-accent);
+    transition: background-color 0.25s ease;
+}
+
+.te-chip:hover,
+.te-chip:focus-visible {
+    color: var(--color-te-ink);
+    border-color: color-mix(in srgb, var(--te-accent) 55%, transparent);
+    transform: translateY(-1px);
+}
+
+.te-chip.is-active {
+    color: var(--te-accent-ink);
+    background: var(--te-accent);
+    border-color: var(--te-accent);
+    box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--te-accent) 70%, transparent);
+}
+
+.te-chip.is-active .te-chip__dot {
+    background: var(--te-accent-ink);
+}
+
+/* Desktop orbit: the chips leave the flow and flank the brain along two
+   arcs, driven by the custom properties the Alpine state writes. */
+
+@media (min-width: 1024px) {
+    .te-chip {
+        position: absolute;
+        top: var(--chip-top, 50%);
+        left: var(--chip-left, auto);
+        right: var(--chip-right, auto);
+    }
+}
+
+/* From xl the console list takes over, so the orbiting pills step aside.
+   This rule is unlayered, which is what lets it outrank the utility that
+   turns the chip row into the desktop orbit. */
+@media (min-width: 1280px) {
+    .te-chips {
+        display: none;
+    }
+}
+
+/* --- The console list (the disciplines, from xl up) -------------------------- */
+
+/* The console column: the same six disciplines, scannable, beside the model. */
+.te-console {
+    display: none;
+}
+
+@media (min-width: 1280px) {
+    .te-console {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-self: center;
+    }
+}
+
+.te-console__label {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+}
+
+.te-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.te-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: 0.6rem;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.te-item:hover {
+    background: var(--color-te-raised);
+}
+
+.te-item__index {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-te-ink-faint);
+    transition: color 0.2s ease;
+}
+
+.te-item__name {
+    flex: 1;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-te-ink-muted);
+    transition: color 0.2s ease;
+}
+
+.te-item__dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--color-te-line);
+    transition: background-color 0.2s ease;
+}
+
+.te-item.is-active {
+    border-color: color-mix(in srgb, var(--te-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--te-accent) 10%, transparent);
+}
+
+.te-item.is-active .te-item__index {
+    color: var(--te-accent-soft);
+}
+
+.te-item.is-active .te-item__name {
+    color: var(--color-te-ink);
+}
+
+.te-item.is-active .te-item__dot {
+    background: var(--te-accent);
+}
+
+/* --- Readout strip ----------------------------------------------------------- */
+
+.te-readout {
+    min-height: 2.25rem;
+    color: var(--te-accent-soft);
+}
+
+/* --- Mind-map panel ----------------------------------------------------------- */
+
+.te-panel {
+    border: 1px solid var(--color-te-line);
+    background: var(--color-te-panel);
+    box-shadow: 0 1px 2px rgb(13 13 12 / 0.04);
+}
+
+.te-panel__title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-te-ink);
+}
+
+.te-panel__affinity {
+    margin-top: 0.15rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--te-accent-soft);
+}
+
+.te-panel__description {
+    color: var(--color-te-ink-muted);
+}
+
+.te-back {
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--color-te-line);
+    border-radius: 9999px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    color: var(--color-te-ink-muted);
+    cursor: pointer;
+    transition:
+        border-color 0.25s ease,
+        color 0.25s ease,
+        background-color 0.25s ease;
+}
+
+.te-back:hover {
+    color: var(--color-te-ink);
+    border-color: color-mix(in srgb, var(--te-accent) 55%, transparent);
+    background: var(--color-te-card);
+}
+
+.te-map {
+    touch-action: manipulation;
+}
+
+.te-map__edge {
+    stroke: color-mix(in srgb, var(--te-accent) 30%, transparent);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+    transition: stroke 0.25s ease, stroke-opacity 0.25s ease;
+}
+
+.te-map__edge.is-active {
+    stroke: var(--te-accent);
+    stroke-opacity: 0.9;
+}
+
+.te-map__core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 34%;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--te-accent) 45%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--te-accent) 10%, transparent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--te-accent-soft);
+}
+
+.te-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--color-te-line);
+    border-radius: 9999px;
+    background: var(--color-te-card);
+    box-shadow: 0 1px 2px rgb(13 13 12 / 0.05);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-te-ink-muted);
+    cursor: pointer;
+    transition:
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        color 0.25s ease,
+        background-color 0.25s ease;
+}
+
+.te-node:hover {
+    color: var(--color-te-ink);
+    border-color: color-mix(in srgb, var(--te-accent) 55%, transparent);
+}
+
+.te-node.is-active {
+    color: var(--te-accent-ink);
+    background: var(--te-accent);
+    border-color: var(--te-accent);
+}
+
+.te-explanation {
+    min-height: 3.5rem;
+    margin-top: 1.25rem;
+    padding: 0.85rem 1.1rem;
+    border: 1px dashed var(--color-te-line);
+    border-radius: 0.75rem;
+    background: var(--color-te-card);
+}
+
+.te-explanation__hint {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+}
+
+.te-explanation__text {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--color-te-ink);
+}
+
+/* --- Reduced motion: the canvas renders one still frame (the engine checks
+       the media query itself); only the CSS transitions remain to disable. */
+
+@media (prefers-reduced-motion: reduce) {
+    .te-mode,
+    .te-chip,
+    .te-item,
+    .te-node,
+    .te-back,
+    .te-map__edge,
+    .te-chip__dot {
+        transition: none;
+    }
+}
+
+/* --- The principles index (used by section 05's closing grid) -------------- */
+
+/* The six defaults under the band, as a colophon index: no box, no fill, just
+   a hairline over each cell doing the separating. The ghost numeral and the
+   accent hairline on hover are kept, because that pair is how the page marks
+   "this is a list you can read down" everywhere else. */
+.hiw-index > .principle-card {
+    border-top: 1px solid var(--color-ink-200);
+}
+
+.dark .hiw-index > .principle-card {
+    border-top-color: var(--color-ink-800);
+}
+
+.principle-card__num {
+    color: var(--color-ink-100);
+    transition: color 0.3s ease;
+}
+
+.dark .principle-card__num {
+    color: var(--color-ink-900);
+}
+
+.principle-card:hover .principle-card__num,
+.principle-card:focus-within .principle-card__num {
+    color: color-mix(in srgb, var(--color-signal-500) 16%, transparent);
+}
+
+.dark .principle-card:hover .principle-card__num,
+.dark .principle-card:focus-within .principle-card__num {
+    color: color-mix(in srgb, var(--color-signal-400) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .principle-card,
+    .principle-card__num,
+    .principle-card__bar {
+        transition: none;
+    }
+}
+
+/* ==========================================================================
+   How I work — section 05
+   --------------------------------------------------------------------------
+   A wide instrument panel between two rails: fast judgement on the left,
+   deliberate reasoning on the right, and the decision flow between them.
+
+   The panel wears the page's own ink ladder and signal accent: every colour
+   inside it reads a role from the `--color-hiw-*` set in app.css, the same
+   construction the Thinking Explorer and the CI/CD plate use. It therefore
+   follows the light/dark theme and the accent the visitor picked — the private
+   navy palette it shipped with could do neither — and nothing it declares
+   leaks into the page around it. The panel is geometry only; the palette
+   lives with the other role sets.
+   ========================================================================== */
+
+.hiw-panel {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-hiw-line);
+    border-radius: 1.25rem;
+    background:
+        radial-gradient(36rem 20rem at 50% -8%, color-mix(in srgb, var(--color-hiw-accent) 9%, transparent), transparent 72%),
+        var(--color-hiw-canvas);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--color-hiw-ink) 5%, transparent),
+        0 30px 70px -54px rgb(13 13 12 / 0.4);
+}
+
+/* The technical grid: fine lines, faded towards the edges so the panel reads
+   as a surface with a light on it rather than as graph paper. */
+.hiw-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(var(--color-hiw-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-hiw-grid) 1px, transparent 1px);
+    background-size: 32px 32px;
+    -webkit-mask-image: radial-gradient(72% 68% at 50% 38%, #000 18%, transparent 100%);
+    mask-image: radial-gradient(72% 68% at 50% 38%, #000 18%, transparent 100%);
+}
+
+/* The power-up sweep. One band of light crosses the surface as the panel
+   arrives, then is gone — a single pass, never a loop, so the panel reads as
+   an instrument that has just been switched on rather than one still loading.
+   The reveal observer drops `data-visible` when the panel leaves the viewport,
+   so this replays on re-entry exactly like `data-reveal` does page-wide. */
+.hiw-panel::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -30%;
+    width: 60%;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 40%, var(--color-hiw-sweep) 50%, transparent 60%);
+    opacity: 0;
+}
+
+.hiw-panel[data-visible='true']::after {
+    animation: hiw-sweep 1100ms var(--ease-out-quint) 160ms 1 both;
+}
+
+@keyframes hiw-sweep {
+    0% {
+        opacity: 1;
+        transform: translateX(-40%);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(240%);
+    }
+}
+
+.hiw-panel__grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem;
+    padding: 1.75rem;
+}
+
+/* --- The rails ----------------------------------------------------------- */
+
+.hiw-rail__head {
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--color-hiw-line);
+}
+
+.hiw-rail__tag {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-hiw-ink-faint);
+}
+
+.hiw-rail__title {
+    margin-top: 0.35rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: var(--color-hiw-ink);
+}
+
+.hiw-rail__count {
+    margin-top: 0.2rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-hiw-ink-faint);
+}
+
+.hiw-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding: 0;
+    list-style: none;
+}
+
+.hiw-card {
+    position: relative;
+    padding: 0.8rem 0.85rem;
+    border: 1px solid var(--color-hiw-line);
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--color-hiw-card) 86%, transparent);
+    transition:
+        border-color 0.25s ease,
+        background-color 0.25s ease,
+        transform 0.25s var(--ease-out-quint);
+}
+
+/* The card rises one at a time when the panel powers up, fast rail first and
+   deep rail 70ms behind it, so the two columns read as a pair being switched
+   on rather than a wall appearing at once. The stagger is carried per card as
+   `--hiw-rise-delay` from the view. */
+.hiw-card {
+    opacity: 0;
+}
+
+.hiw-panel[data-visible='true'] .hiw-card {
+    animation: hiw-rise 520ms var(--ease-out-quint) var(--hiw-rise-delay, 0ms) 1 both;
+}
+
+@keyframes hiw-rise {
+    from {
+        opacity: 0;
+        translate: 0 10px;
+    }
+
+    to {
+        opacity: 1;
+        translate: 0 0;
+    }
+}
+
+/* Left accent bar, drawn up from the bottom on hover. */
+.hiw-card::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 2px;
+    background: var(--color-hiw-accent);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 0.32s var(--ease-out-quint);
+}
+
+.hiw-card:hover,
+.hiw-rail:hover .hiw-card,
+.hiw-panel:has(.hiw-node--fast:hover) .hiw-rail--fast .hiw-card,
+.hiw-panel:has(.hiw-node--deep:hover) .hiw-rail--deep .hiw-card,
+.hiw-panel:has(.hiw-node--gate:hover) .hiw-card,
+.hiw-panel:has(.hiw-node--ship:hover) .hiw-card,
+.hiw-rail:focus-within .hiw-card {
+    border-color: color-mix(in srgb, var(--color-hiw-accent) 42%, var(--color-hiw-line));
+    background: color-mix(in srgb, var(--color-hiw-card) 100%, transparent);
+}
+
+.hiw-card:hover {
+    transform: translateY(-2px);
+}
+
+.hiw-card:hover::before,
+.hiw-rail:focus-within .hiw-card::before {
+    transform: scaleY(1);
+}
+
+.hiw-card:hover .hiw-card__icon {
+    transform: scale(1.08);
+}
+
+.hiw-card__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.hiw-card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    color: var(--color-hiw-accent);
+    transition: transform 0.25s var(--ease-out-quint);
+}
+
+.hiw-card__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.hiw-card__idx {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5rem;
+    letter-spacing: 0.14em;
+    color: var(--color-hiw-ink-faint);
+}
+
+.hiw-card__name {
+    margin-top: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+    color: var(--color-hiw-ink);
+}
+
+.hiw-card__text {
+    margin-top: 0.3rem;
+    font-size: 0.6875rem;
+    line-height: 1.55;
+    color: var(--color-hiw-ink-muted);
+}
+
+/* --- The decision flow --------------------------------------------------- */
+
+.hiw-flow {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.hiw-flow__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.hiw-flow__grid path {
+    stroke: var(--color-hiw-grid);
+    stroke-width: 1;
+}
+
+.hiw-edge {
+    fill: none;
+    stroke-width: 1;
+    stroke-linecap: round;
+}
+
+/* The two branches start fully offset and pull themselves to the gate in
+   reading order, so the diagram assembles rather than fades. Each segment is
+   one subpath because SVG dashing restarts per subpath — a multi-segment path
+   would draw all of its pieces at once, which is the sequential beat this is
+   for. `--hiw-draw-delay` is set per segment in the view. */
+.hiw-edge--fast,
+.hiw-edge--deep {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+}
+
+.hiw-edge--fast {
+    stroke: color-mix(in srgb, var(--color-hiw-ink-muted) 45%, transparent);
+}
+
+/* The deliberate branch is the accent from the moment it leaves the problem,
+   so the eye can follow one continuous method: model, schema, decide, gate,
+   ship. */
+.hiw-edge--deep {
+    stroke: color-mix(in srgb, var(--color-hiw-accent) 55%, transparent);
+}
+
+.hiw-panel[data-visible='true'] .hiw-edge--fast,
+.hiw-panel[data-visible='true'] .hiw-edge--deep {
+    animation: hiw-draw 700ms var(--ease-out-quint) var(--hiw-draw-delay, 0ms) 1 both;
+}
+
+@keyframes hiw-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* The converged spine. The solid trace draws last; the marching dash rides on
+   top of it and only fades in once the trace has arrived, because a dash
+   pattern and a draw-in cannot share one stroke-dasharray. */
+.hiw-edge--live {
+    stroke: var(--color-hiw-accent);
+    stroke-width: 1.4;
+    stroke-dasharray: 5 5;
+    opacity: 0;
+}
+
+.hiw-panel[data-visible='true'] .hiw-edge--live {
+    animation:
+        hiw-fade 400ms linear 1600ms 1 both,
+        hiw-march 9s linear 2000ms infinite;
+}
+
+@keyframes hiw-fade {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes hiw-march {
+    to {
+        stroke-dashoffset: -60;
+    }
+}
+
+.hiw-node {
+    opacity: 0;
+
+    /* Without this the scale below animates from the viewBox origin, not from
+       the node's own centre, and the effect looks like nothing at all. */
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+.hiw-panel[data-visible='true'] .hiw-node {
+    animation: hiw-node-in 380ms var(--ease-out-quint) 260ms 1 both;
+}
+
+/* The nodes appear in the order the method is argued in: the problem, the two
+   first moves, the two second moves, then the gate and the ship. Declared
+   after the shorthand above so the longhand delay wins. */
+.hiw-flow__nodes > .hiw-node:nth-child(2),
+.hiw-flow__nodes > .hiw-node:nth-child(3) {
+    animation-delay: 460ms;
+}
+
+.hiw-flow__nodes > .hiw-node:nth-child(4),
+.hiw-flow__nodes > .hiw-node:nth-child(5) {
+    animation-delay: 720ms;
+}
+
+.hiw-flow__nodes > .hiw-node:nth-child(6) {
+    animation-delay: 980ms;
+}
+
+.hiw-flow__nodes > .hiw-node:nth-child(7) {
+    animation-delay: 1180ms;
+}
+
+.hiw-flow__nodes > .hiw-node:nth-child(8) {
+    animation-delay: 1380ms;
+}
+
+@keyframes hiw-node-in {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* The second and last ambient beat, after the SHIP node has landed. */
+.hiw-panel[data-visible='true'] .hiw-node--ship {
+    animation:
+        hiw-node-in 380ms var(--ease-out-quint) 1380ms 1 both,
+        hiw-pulse 1.6s ease-in-out 2000ms infinite;
+}
+
+@keyframes hiw-pulse {
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+.hiw-node rect {
+    fill: color-mix(in srgb, var(--color-hiw-card) 92%, transparent);
+    stroke: var(--color-hiw-line);
+    stroke-width: 1;
+    transition: stroke 0.25s ease, fill 0.25s ease;
+}
+
+.hiw-node text {
+    fill: var(--color-hiw-ink-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+
+.hiw-node--start rect {
+    stroke: color-mix(in srgb, var(--color-hiw-ink) 25%, transparent);
+}
+
+.hiw-node--start text {
+    fill: var(--color-hiw-ink);
+}
+
+.hiw-node--fast text,
+.hiw-node--deep text {
+    fill: var(--color-hiw-ink);
+}
+
+.hiw-node--fast rect {
+    stroke: color-mix(in srgb, var(--color-hiw-ink-muted) 45%, transparent);
+}
+
+.hiw-node--deep rect {
+    stroke: color-mix(in srgb, var(--color-hiw-accent) 32%, var(--color-hiw-line));
+}
+
+.hiw-node--gate rect {
+    stroke: color-mix(in srgb, var(--color-hiw-accent) 55%, var(--color-hiw-line));
+}
+
+.hiw-node--gate text {
+    fill: var(--color-hiw-accent);
+}
+
+.hiw-node--ship rect {
+    fill: var(--color-hiw-accent);
+    stroke: var(--color-hiw-accent);
+}
+
+.hiw-node--ship text {
+    fill: var(--color-hiw-on-accent);
+    font-weight: 600;
+}
+
+.hiw-node:hover rect {
+    stroke: var(--color-hiw-accent);
+}
+
+/* --- Reading the diagram against the rails ---------------------------------
+   Hovering a node lights the rail that feeds it and lets the other recede;
+   hovering a rail lights the branch back. The converged nodes light both,
+   because that convergence is the section's claim. Written as additive
+   highlight rules, so where `:has()` is unsupported the panel is simply the
+   static diagram it always was. */
+.hiw-rail {
+    transition: opacity 0.3s ease;
+}
+
+.hiw-panel:has(.hiw-node--fast:hover) .hiw-rail--deep,
+.hiw-panel:has(.hiw-node--deep:hover) .hiw-rail--fast {
+    opacity: 0.55;
+}
+
+.hiw-panel:has(.hiw-rail--fast:hover) .hiw-edge--fast,
+.hiw-panel:has(.hiw-rail--deep:hover) .hiw-edge--deep,
+.hiw-panel:has(.hiw-node--fast:hover) .hiw-edge--fast,
+.hiw-panel:has(.hiw-node--deep:hover) .hiw-edge--deep,
+.hiw-panel:has(.hiw-node--gate:hover) .hiw-edge,
+.hiw-panel:has(.hiw-node--ship:hover) .hiw-edge {
+    stroke: var(--color-hiw-accent);
+    stroke-width: 1.4;
+}
+
+.hiw-flow__caption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-hiw-ink-faint);
+}
+
+.hiw-flow__swatch {
+    display: inline-block;
+    width: 1.1rem;
+    height: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-hiw-ink-muted) 60%, transparent);
+}
+
+.hiw-flow__swatch--fast {
+    margin-inline-end: 0.25rem;
+}
+
+.hiw-flow__swatch--deep {
+    margin-inline-start: 0.85rem;
+    margin-inline-end: 0.25rem;
+    border-top-width: 1.5px;
+    border-top-color: var(--color-hiw-accent);
+}
+
+/* --- The readout row -------------------------------------------------------
+   The technical summary lives inside the panel, on the panel's own palette, so
+   it stops being a fourth block under it and becomes the row the instrument
+   reads out. Hairlines come from a one-pixel grid gap over a line-coloured
+   ground, which stays correct at every column count without a rule per cell. */
+.hiw-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--color-hiw-line);
+    background: var(--color-hiw-line);
+    opacity: 0;
+}
+
+.hiw-panel[data-visible='true'] .hiw-facts {
+    animation: hiw-fade 500ms var(--ease-out-quint) 1500ms 1 both;
+}
+
+@media (min-width: 640px) {
+    .hiw-facts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .hiw-facts {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+.hiw-fact {
+    padding: 0.7rem 0.95rem;
+    background: color-mix(in srgb, var(--color-hiw-card) 72%, var(--color-hiw-canvas));
+}
+
+.hiw-fact__label {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-hiw-ink-faint);
+}
+
+.hiw-fact__value {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--color-hiw-ink);
+}
+
+/* --- Responsive ---------------------------------------------------------- */
+
+/* Below the rail breakpoint the panel becomes one column: fast rail, the
+   flow, then the deep rail — the order the argument is made in. */
+@media (max-width: 1023px) {
+    .hiw-panel__grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.25rem;
+        padding: 1.25rem;
+    }
+
+    .hiw-flow {
+        order: 2;
+    }
+
+    .hiw-rail--deep {
+        order: 3;
+    }
+
+    .hiw-flow__svg {
+        max-width: 22rem;
+        margin-inline: auto;
+    }
+
+    /* Two rails stacked read better as a pair of columns on a phone-width
+       tablet than as one long list. */
+    .hiw-cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 639px) {
+    .hiw-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hiw-panel__grid {
+        padding: 1rem;
+    }
+
+    .hiw-facts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Reduced motion ------------------------------------------------------ */
+
+/* Everything settles into the finished frame: the paths are drawn, the cards
+   and nodes are visible at full opacity, the sweep never fires, and the two
+   ambient loops are off. The `data-reveal` layer is neutralised separately in
+   app.css and app.js. */
+@media (prefers-reduced-motion: reduce) {
+    .hiw-panel[data-visible='true']::after,
+    .hiw-panel[data-visible='true'] .hiw-edge--fast,
+    .hiw-panel[data-visible='true'] .hiw-edge--deep,
+    .hiw-panel[data-visible='true'] .hiw-edge--live,
+    .hiw-panel[data-visible='true'] .hiw-node,
+    .hiw-panel[data-visible='true'] .hiw-node--ship,
+    .hiw-panel[data-visible='true'] .hiw-facts,
+    .hiw-panel[data-visible='true'] .hiw-card {
+        animation: none;
+    }
+
+    .hiw-card,
+    .hiw-node,
+    .hiw-facts {
+        opacity: 1;
+    }
+
+    .hiw-edge--live {
+        opacity: 1;
+    }
+
+    .hiw-edge--fast,
+    .hiw-edge--deep {
+        stroke-dashoffset: 0;
+    }
+
+    .hiw-card,
+    .hiw-card::before,
+    .hiw-card:hover,
+    .hiw-card__icon,
+    .hiw-node rect {
+        transition: none;
+        transform: none;
+    }
+}
+
+/* ==========================================================================
+   Thinking Explorer :: the annotated plate
+   --------------------------------------------------------------------------
+   Section 02 reads as a specimen plate, not a cockpit. Three things, in
+   order, and nothing else:
+
+       1. a control bar  — the mode switch, and the renderer badge opposite it
+       2. the plate      — the discipline rail, the model, the leader lines
+       3. the caption    — what the visitor is currently pointing at
+
+   Everything the band used to stack under the canvas (a centred readout in
+   nine-pixel mono, a card per system, a status pill, a pause chip) has been
+   folded into those three. The ornament budget is spent on the model: no
+   grid, no radar sweep, no corner brackets. The frame is the panel's own
+   hairline plus one soft light behind the brain.
+
+   The rail is the structural move. The disciplines used to float around the
+   cortex as six tiny uppercase tags at six different angles — hard to read,
+   hard to hit, impossible to scan. In a column they are a list: numbered,
+   evenly spaced, one line each, so the eye runs down them and the pointer
+   always lands on the same shape. The leader lines then make the pair read
+   as label → line → cluster, which is what turns the model from decoration
+   into a diagram.
+   ========================================================================== */
+
+.te-stage--explorer {
+    isolation: isolate;
+    /* The panel is a plate: one light behind the model, one ground. The
+       shared stage's two-scale grid and corner brackets are dropped here —
+       they were the loudest thing in the band and carried no information. */
+    background:
+        radial-gradient(42rem 26rem at 66% 40%, color-mix(in srgb, var(--te-accent) 9%, transparent), transparent 72%),
+        /* The vignette is built from the panel's own surface rather than a
+           fixed navy, so the plate shades instead of turning into a dark
+           band across a light page. */
+        linear-gradient(180deg, color-mix(in srgb, var(--color-te-canvas) 80%, var(--color-te-raised)) 0%, var(--color-te-canvas) 52%, color-mix(in srgb, var(--color-te-canvas) 68%, var(--color-te-raised)) 100%);
+}
+
+.te-stage--explorer::before {
+    content: none;
+}
+
+/* --- The control bar ----------------------------------------------------- */
+
+.te-topbar {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.75rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--te-accent) 12%, var(--color-te-line));
+}
+
+/* The switch keeps its pill shape but loses the lifted shadow: on a plate it
+   is a control, and a control does not need to float. */
+.te-stage--explorer .te-modes {
+    display: inline-flex;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    border: 1px solid color-mix(in srgb, var(--te-accent) 18%, var(--color-te-line));
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-te-ink) 7%, transparent);
+}
+
+.te-stage--explorer .te-mode {
+    padding: 0.35rem 0.95rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+/* A status dot per mode, so the two systems are told apart by value and by
+   mark rather than by colour alone. */
+.te-mode__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--te-idle);
+    transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.te-mode__dot[data-side="fast"] {
+    background: var(--color-te-accent);
+}
+
+.te-mode__dot[data-side="deep"] {
+    background: var(--color-te-deep);
+}
+
+.te-mode.is-active .te-mode__dot {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-accent) 22%, transparent);
+}
+
+.te-mode.is-active .te-mode__dot[data-side="deep"] {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-te-deep) 22%, transparent);
+}
+
+/* The renderer badge: honest instrumentation, set small and quiet enough to
+   ignore. The green dot is the band's only status colour. */
+.te-renderer {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+    white-space: nowrap;
+}
+
+.te-renderer__dot {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--te-status);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--te-status) 70%, transparent);
+    animation: te-status-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes te-status-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.35;
+    }
+}
+
+/* --- The plate ----------------------------------------------------------- */
+
+.te-body {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 16.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 2.5rem;
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding: 1.75rem 1.75rem 0.5rem;
+}
+
+/* --- The rail ------------------------------------------------------------ */
+
+/* The layer stays *positioned* (relative, not static): z-index is ignored on
+   a static element, and the leader lines are drawn in a positioned layer
+   above the scene. */
+.te-hubs {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-self: center;
+    min-width: 0;
+}
+
+.te-hubs__label {
+    margin-bottom: 0.7rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+}
+
+.te-hub {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.72rem 0.55rem 0.72rem 0.4rem;
+    border: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-te-line) 72%, transparent);
+    background: none;
+    color: var(--color-te-ink-muted);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        color 0.25s ease,
+        background-color 0.25s ease;
+}
+
+.te-hub:last-of-type {
+    border-bottom: 1px solid color-mix(in srgb, var(--color-te-line) 72%, transparent);
+}
+
+/* The accent bar is the selection mark. It grows from the centre rather than
+   sliding in, so hovering along the rail never looks like a race. */
+.te-hub::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 0;
+    transform: translateY(-50%);
+    background: var(--te-accent);
+    transition: height 0.25s ease;
+}
+
+.te-hub__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--te-hub) 45%, transparent);
+    transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.te-hub__index {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    color: var(--color-te-ink-faint);
+    transition: color 0.25s ease;
+}
+
+.te-hub__name {
+    min-width: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+}
+
+/* The territory tag. Three characters instead of a repeated sentence, so six
+   of them never read as noise — the caption spells it out in full. */
+.te-hub__badge {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--color-te-ink-faint);
+    transition: color 0.25s ease;
+}
+
+.te-hub__badge.is-fast {
+    color: color-mix(in srgb, var(--color-te-accent-soft) 55%, var(--color-te-ink-faint));
+}
+
+.te-hub__badge.is-deep {
+    color: color-mix(in srgb, var(--color-te-deep-soft) 55%, var(--color-te-ink-faint));
+}
+
+.te-hub:hover,
+.te-hub:focus-visible,
+.te-hub.is-active {
+    color: var(--color-te-ink);
+    background: color-mix(in srgb, var(--te-accent) 6%, transparent);
+}
+
+.te-hub:hover::before,
+.te-hub:focus-visible::before,
+.te-hub.is-active::before {
+    height: 62%;
+}
+
+.te-hub:hover .te-hub__dot,
+.te-hub:focus-visible .te-hub__dot,
+.te-hub.is-active .te-hub__dot {
+    background: var(--te-hub);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--te-hub) 75%, transparent);
+}
+
+.te-hub:hover .te-hub__index,
+.te-hub:focus-visible .te-hub__index,
+.te-hub.is-active .te-hub__index {
+    color: var(--te-accent-soft);
+}
+
+.te-hub.is-active .te-hub__badge {
+    color: var(--te-accent-soft);
+}
+
+/* --- The model ----------------------------------------------------------- */
+
+.te-scene {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 34rem;
+    min-height: 17rem;
+    aspect-ratio: 1 / 1;
+    margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+    .te-scene {
+        min-height: 24rem;
+    }
+}
+
+.te-scene .te-brain {
+    position: absolute;
+    inset: 0;
+}
+
+.te-scene .te-brain__canvas {
+    cursor: grab;
+    touch-action: pan-y;
+}
+
+.te-scene .te-brain__canvas:active {
+    cursor: grabbing;
+}
+
+/* The scene is focusable so the arrow keys can turn the model. The focus
+   ring belongs to the scene, not to any one label. */
+.te-scene:focus-visible {
+    outline: 2px solid var(--te-accent);
+    outline-offset: 6px;
+    border-radius: 0.5rem;
+}
+
+/* The static SVG underneath the canvas. It yields once WebGL paints. */
+.te-brain__fallback {
+    transition: opacity 0.4s ease;
+}
+
+.te-brain__fallback.is-dimmed {
+    opacity: 0;
+}
+
+.te-brain__fallback .te-fallback__outline {
+    stroke: color-mix(in srgb, var(--te-accent) 60%, transparent);
+    stroke-width: 1.5;
+    fill: color-mix(in srgb, var(--te-accent) 5%, transparent);
+}
+
+.te-brain__fallback .te-fallback__fissure {
+    stroke: color-mix(in srgb, var(--te-chain) 60%, transparent);
+    stroke-width: 1.25;
+    stroke-dasharray: 3 5;
+}
+
+.te-brain__fallback .te-fallback__gyre {
+    stroke: color-mix(in srgb, var(--te-chain) 45%, transparent);
+    stroke-width: 1.25;
+    stroke-linecap: round;
+}
+
+.te-brain__fallback .te-fallback__platform {
+    stroke: color-mix(in srgb, var(--te-accent) 26%, transparent);
+    fill: color-mix(in srgb, var(--te-accent) 3%, transparent);
+}
+
+/* --- The leader lines ---------------------------------------------------- */
+
+/* Each line ties a rail label to the cluster anchor that travels with the
+   geometry. The layer draws outside the scene box — the rail is not inside
+   it — hence `overflow: visible`. */
+.te-leads {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.te-lead {
+    stroke: var(--te-accent);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+    vector-effect: non-scaling-stroke;
+    /* Off until asked for. One live leader says "this row is that cluster";
+       six permanent ones said nothing and crossed the cortex on the way. */
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.te-lead.is-live {
+    opacity: 0.85;
+}
+
+/* A cluster that has rotated behind the cortex reports itself hidden, and a
+   line to nowhere is worse than no line. Declared last so it wins the tie
+   with `.is-live`. */
+.te-lead[data-hidden="true"] {
+    opacity: 0;
+}
+
+/* The anchor rides the projected 3D cluster and carries the rail's numeral.
+   It is the moving half of the pair, and it carries no interaction — the
+   rail row is the control. */
+.te-anchors {
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    pointer-events: none;
+}
+
+.te-anchor {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    margin: -0.6rem 0 0 -0.6rem;
+    border: 1px solid color-mix(in srgb, var(--te-hub) 42%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-te-canvas) 68%, transparent);
+    color: var(--color-te-ink-muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    backdrop-filter: blur(4px);
+    transition:
+        opacity 0.3s ease,
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.25s ease;
+}
+
+.te-anchor.is-live {
+    border-color: var(--te-accent);
+    background: var(--te-accent);
+    color: var(--te-accent-ink);
+}
+
+.te-anchor[data-hidden="true"] {
+    opacity: 0;
+}
+
+/* --- The caption --------------------------------------------------------- */
+
+/* The readout, set as editorial copy: which system is speaking, the name of
+   the thing, then its sentence. It replaces the nine-pixel centred mono
+   strip that used to sit under the canvas. */
+.te-caption {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding: 1.4rem 1.75rem 0;
+    border-top: 1px solid color-mix(in srgb, var(--te-accent) 14%, var(--color-te-line));
+}
+
+.te-caption__body {
+    min-width: 0;
+}
+
+.te-caption__eyebrow {
+    min-height: 0.95rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--te-accent-soft);
+}
+
+.te-caption__title {
+    margin-top: 0.45rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    color: var(--color-te-ink);
+}
+
+.te-stage--explorer .te-readout {
+    margin-top: 0.5rem;
+    /* Two lines of room, so the plate never jumps as the pointer moves. */
+    min-height: 3.1rem;
+    max-width: 56ch;
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    color: var(--color-te-ink-muted);
+}
+
+/* --- The motion switch ---------------------------------------------------- */
+
+/* The scene moves on its own, so it has to be stoppable (WCAG 2.2.2). A real
+   control with a pressed state, not a decorative chip — but quiet, because it
+   is housekeeping rather than content. */
+.te-motion {
+    flex: none;
+    padding-bottom: 0.2rem;
+}
+
+.te-motion__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--te-hub) 24%, transparent);
+    border-radius: 9999px;
+    background: none;
+    color: var(--color-te-ink-faint);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        border-color 0.25s ease,
+        color 0.25s ease;
+}
+
+.te-motion__toggle:hover,
+.te-motion__toggle:focus-visible {
+    border-color: color-mix(in srgb, var(--te-accent) 55%, transparent);
+    color: var(--te-accent-ink);
+}
+
+.te-motion__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: var(--te-hub);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--te-hub) 70%, transparent);
+    transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.te-motion__toggle[aria-pressed="true"] .te-motion__dot {
+    background: var(--color-te-ink-faint);
+    box-shadow: none;
+}
+
+.te-motion__note {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-te-ink-faint);
+}
+
+/* --- The mode legend ----------------------------------------------------- */
+
+/* The systems themselves are fixed; their names and descriptions are
+   operator copy, so they are rendered here — named, not paraphrased. The
+   active one is lit, the other present but dim: the page still says what the
+   model is. Typographic columns with a hairline rule, not cards — the caption
+   above already carries the live reading, so this is the footnote. */
+.te-mode-legend {
+    display: grid;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 64rem;
+    margin: 1.6rem auto 0;
+    padding: 0 1.75rem 1.75rem;
+    list-style: none;
+}
+
+@media (min-width: 768px) {
+    .te-mode-legend {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 2.5rem;
+    }
+}
+
+.te-mode-legend__item {
+    padding-left: 1rem;
+    border-left: 1px solid color-mix(in srgb, var(--color-te-line) 80%, transparent);
+    opacity: 0.45;
+    transition:
+        opacity 0.3s ease,
+        border-color 0.3s ease;
+}
+
+.te-mode-legend__item.is-active {
+    opacity: 1;
+    border-left-color: color-mix(in srgb, var(--te-accent) 50%, transparent);
+}
+
+.te-mode-legend__name {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-te-ink);
+}
+
+.te-mode-legend__item.is-active .te-mode-legend__name {
+    color: var(--te-accent-soft);
+}
+
+.te-mode-legend__text {
+    margin-top: 0.4rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--color-te-ink-muted);
+}
+
+/* --- The knowledge graph drawer ------------------------------------------- */
+
+/* The graph opens *over* the stage rather than under it, so the brain is
+   never pushed out of the frame — it stays lit behind the panel, which is
+   the point. */
+.te-drawer {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: color-mix(in srgb, var(--color-te-canvas) 76%, transparent);
+    backdrop-filter: blur(12px);
+}
+
+.dark .te-drawer {
+    background: color-mix(in srgb, var(--color-ink-950) 84%, transparent);
+}
+
+.te-drawer__inner {
+    width: 100%;
+    max-width: 40rem;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 1rem;
+    border: 1px solid var(--color-te-line);
+    background: var(--color-te-panel);
+    box-shadow: 0 40px 90px -50px rgb(0 0 0 / 0.9);
+}
+
+.te-graph {
+    padding: 1.25rem 1.25rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .te-graph {
+        padding: 1.75rem 2rem 2rem;
+    }
+}
+
+.te-graph__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    /* The back button belongs on the title line, not under it: wrapping it
+       pushed it to full width and made a dismissal look like a primary
+       action. The copy column shrinks instead. */
+    flex-wrap: nowrap;
+}
+
+.te-graph__eyebrow {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--te-accent-soft);
+}
+
+.te-graph__title {
+    margin-top: 0.35rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-te-ink);
+}
+
+.te-graph__description {
+    margin-top: 0.5rem;
+    max-width: 46ch;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--color-te-ink-faint);
+}
+
+/* The graph edges carry an arrow head, so the direction of each relationship
+   is readable without a legend. */
+.te-map__edge {
+    stroke: color-mix(in srgb, var(--te-accent) 34%, transparent);
+    stroke-width: 0.45;
+    color: color-mix(in srgb, var(--te-accent) 34%, transparent);
+    transition: stroke 0.3s ease, color 0.3s ease;
+}
+
+.te-map__edge.is-active {
+    stroke: var(--te-accent);
+    color: var(--te-accent);
+    stroke-width: 0.7;
+    stroke-dasharray: 4 3;
+    animation: te-map-flow 1.1s linear infinite;
+}
+
+@keyframes te-map-flow {
+    to {
+        stroke-dashoffset: -14;
+    }
+}
+
+/* The hint under the map is a sentence, not a label: sentence case, quiet. */
+.te-explanation {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border: 0;
+    border-left: 1px solid color-mix(in srgb, var(--te-accent) 35%, transparent);
+    border-radius: 0;
+    background: none;
+    min-height: 3.25rem;
+}
+
+.te-explanation__hint {
+    font-family: inherit;
+    font-size: 0.8125rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-te-ink-faint);
+}
+
+.te-map__core {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 9rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.5rem;
+    background: var(--te-accent);
+    color: var(--te-accent-ink);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: center;
+    box-shadow: 0 12px 30px -16px color-mix(in srgb, var(--te-accent) 80%, transparent);
+}
+
+/* --- Stacked layout ------------------------------------------------------- */
+
+/* Below the rail breakpoint the plate becomes a column: the model first, then
+   the list. The labels are in the flow here, so the leader lines would point
+   at nothing and the decorative layers step aside. */
+@media (max-width: 1023px) {
+    .te-body {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+        padding: 1.25rem 1.25rem 0.5rem;
+    }
+
+    .te-hubs {
+        order: 2;
+        align-self: stretch;
+    }
+
+    .te-scene {
+        order: 1;
+        max-width: 34rem;
+    }
+
+    .te-leads,
+    .te-anchors {
+        display: none;
+    }
+
+    .te-topbar {
+        padding: 0.8rem 1.25rem;
+    }
+
+    /* The renderer badge is instrumentation, not content: on a phone it would
+       steal the line the mode switch needs. */
+    .te-renderer {
+        display: none;
+    }
+
+    .te-caption {
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 1.25rem 1.25rem 0;
+    }
+
+    .te-stage--explorer .te-readout {
+        min-height: 0;
+    }
+
+    .te-mode-legend {
+        padding: 0 1.25rem 1.5rem;
+    }
+}
+
+/* --- Reduced motion -------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .te-map__edge.is-active {
+        animation: none;
+    }
+
+    .te-renderer__dot {
+        animation: none;
+    }
+
+    .te-hub,
+    .te-hub::before,
+    .te-hub__dot,
+    .te-hub__index,
+    .te-hub__badge,
+    .te-mode-legend__item {
+        transition: none;
+    }
+}
+
+/* ------------------------------------------------------------------------ */
+/* About section 02 :: "Why hire me" — the orbit stage                        */
+/*                                                                           */
+/* The pitch as a composition: the argument on the left, the engineer at the */
+/* centre of it on the right — the portrait standing in an emerald disc      */
+/* between two dotted orbits, the six claims riding the outer one, each      */
+/* wired back to the middle. Below lg the stage collapses to the portrait    */
+/* over a plain card grid: the orbit is a wide-viewport reading of the same  */
+/* content, never a second copy.                                             */
+/*                                                                           */
+/* Everything here is section-scoped. The page's own ink and signal tokens   */
+/* do the theming, and the portrait reuses the hero's two renders with the   */
+/* hero's own swap idiom — theme-scoped display rules, the hero's knockout    */
+/* filter on the light render, no second asset.                              */
+/* ------------------------------------------------------------------------ */
+
+.whm-stage {
+    position: relative;
+    /* One clock for the hub, the wires and the cards: they are three views of
+       the same revolution, so they share a duration and start together —
+       anything less and the claims drift off their own path. */
+    --whm-period: 72s;
+
+    /* The composition's proportions, measured in the stage's own inline size.
+       They are declared here and consumed only by descendants: a query
+       container's own styles cannot resolve its own cqw units — those read
+       against the nearest *ancestor* container — so anything sized on this
+       element itself has to inherit them. */
+    container-type: inline-size;
+    --whm-orbit: 32cqw;    /* the cards' radius */
+    --whm-hub-r: 16.5cqw;  /* the dotted ring the wires cross */
+    --whm-crown-r: 38cqw;  /* the outer marker */
+    --whm-card-w: 31cqw;
+    --whm-portrait-w: 24cqw;
+    --whm-icon: 7cqw;
+}
+
+/* --- The portrait --------------------------------------------------------- */
+
+.whm-portrait {
+    position: relative;
+    z-index: 2;
+    margin-inline: auto;
+    width: 11rem;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 9999px;
+    /* The emerald field the figure stands in. The light render's white studio
+       field is knocked out over it, so the disc reads as solid emerald with
+       the engineer inside it rather than a photograph pasted on top. */
+    background: var(--color-signal-500);
+    box-shadow: var(--shadow-raise);
+}
+
+/* Emitted light, just enough to seat the figure between the rings. */
+.whm-portrait__glow {
+    position: absolute;
+    inset: -14%;
+    z-index: -1;
+    border-radius: 9999px;
+    background: radial-gradient(
+        58% 58% at 50% 45%,
+        color-mix(in srgb, var(--color-signal-400) 20%, transparent),
+        transparent 72%
+    );
+    filter: blur(26px);
+    pointer-events: none;
+}
+
+.dark .whm-portrait__glow {
+    background: radial-gradient(
+        58% 58% at 50% 45%,
+        color-mix(in srgb, var(--color-signal-400) 24%, transparent),
+        transparent 74%
+    );
+}
+
+.whm-portrait__img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* One render, both themes. The reference design's disc is a single emerald
+   field with the engineer standing inside it, and `.whm-portrait` paints that
+   field with the same `--color-signal-500` in light and dark — so the light
+   render, whose white studio field is knocked out to alpha by the hero's
+   filter, drops onto the disc correctly in either mode. No theme swap.
+
+   The dark render stays in the markup (the feature test pins both assets, and
+   it is the asset of record for the hero), but it is hidden here on purpose:
+   it ships its alpha baked *including* the design's dotted orbit arc, which
+   sweeps across the upper-right of the disc. The arc spans source x 469–683
+   while the head spans x 220–600, so no window can be framed around the face
+   that also excludes it — zooming only rescales the arc with the head. Since
+   the light render is already the correct picture on the same emerald field,
+   the dark one has no job left and is taken out of both themes.
+
+   Framing. The source is a 1536×1024 full-figure landscape; the disc is a
+   head-and-shoulders bust. `object-fit: cover` on a square box scales the
+   picture to `k = B/1024` (content height = B) and centres it, so the content
+   is 1.5B wide and overflows by 0.5B on each side. With `transform-origin: 0 0`
+   the placement is plain arithmetic on the border-box size B — a source point
+   at content-fraction (u, v) lands at
+
+       fx/B = S · (1.5·u − 0.5·Xf + a)       fy/B = S · (v + b)
+
+   where S is the scale, (a, b) = (tx, ty)/100 of the border box, and Xf is the
+   x component of `object-position`. `object-position`'s y is a no-op under
+   `cover` here — the content height already equals B — so only Xf matters, and
+   Xf = 0 pins the picture's top-left onto the box's top-left, which is what
+   makes the arithmetic readable. Inverting the pair puts any source point on
+   any fraction of the disc:
+
+       a = 0.5/S − 1.5·u_c            b = 0.5/S − v_c
+
+   The scale is the only lever on *how much* of the source is inside the disc:
+   the visible window is `1024/S` source px wide and `1024/S` tall, centred on
+   whatever (u_c, v_c) was solved for. It is the head's width against that
+   window that fixes the framing — at S = 1.20 the 539 px head spans 63% of the
+   diameter, which is the reference's proportion; anything much smaller starves
+   the bust and anything much larger clips the hair at the rim.
+
+   Numbers. The head measures x[281,820] × y[60,540] in the source — nose to
+   hairline, the hair's blue low-poly accents ending at x ≈ 800. The reference
+   bust has the head spanning ~63% of the diameter, its top at ~3% and its chin
+   at ~62%, with the shoulders filling the bottom. At S = 1.20 the window is
+   853 source px — x[124, 977] × y[−6, 847] — and `translate(-12.09%, 0.60%)`
+   solves `a`/`b` so the head's *bounding box* lands dead on the centre line:
+   x[18.4%, 81.6%] × y[7.8%, 64.0%], centre (50.0%, 35.9%), 63% wide, chin
+   clear of the rim. The vertical is deliberately high, not centred: the bust
+   is a head-and-shoulders crop, so the head rides above the middle and the
+   shoulders own the bottom third — centring the head's bbox vertically would
+   drop the chin into the rim. The dispersion spray starts at source x ≈ 820,
+   immediately right of the hair, so no window wide enough to also carry the
+   shoulders can exclude it; its inner edge stays in the disc's right third,
+   which is the price of this asset and is left as designed. The element
+   carries no `data-reveal`, so the reveal's `transform: none` can never reach
+   in and cancel this. */
+.whm-portrait__img--light {
+    object-position: 0 0;
+    transform-origin: 0 0;
+    transform: scale(1.2) translate(-12.09%, 0.6%);
+    filter: url('#hero-portrait-knockout');
+}
+
+/* Kept out of both themes — see the note above. Its window numbers predate the
+   framing model above and were never re-derived against the dark source's own
+   head bbox, so they are a placeholder rather than a working framing: if this
+   render is ever brought back, re-solve `a`/`b` for it first. */
+.whm-portrait__img--dark {
+    display: none;
+    object-position: 8% 40%;
+    transform-origin: 0 0;
+    transform: scale(1.928) translate(-9.76%, 3.09%);
+}
+
+/* --- The orbits ----------------------------------------------------------- */
+
+.whm-rings {
+    display: none;
+}
+
+/* A ring is a square box, not a stretched viewBox: an ellipse drawn into a
+   non-uniform viewBox can only be a true circle at one stage size, and the
+   stage's height is fixed while its width is not. */
+.whm-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(var(--whm-ring-r) * 2);
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    overflow: visible;
+}
+
+.whm-ring circle {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-signal-500) 40%, transparent);
+    stroke-width: 1.5;
+    stroke-dasharray: 0.1 6;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.dark .whm-ring circle {
+    stroke: color-mix(in srgb, var(--color-signal-400) 46%, transparent);
+}
+
+/* The crown: the outer marker. It holds still — a dotted circle turned a full
+   turn reads exactly as it does at rest, so animating it would be motion
+   without meaning. */
+.whm-ring--a { --whm-ring-r: var(--whm-crown-r); }
+
+/* The hub: the ring the wires cross and the four nodes ride. It walks with
+   the cards, so the whole system turns as one rigid body. */
+.whm-ring--b {
+    --whm-ring-r: var(--whm-hub-r);
+    stroke-width: 2.5;
+}
+
+.whm-ring--b circle { stroke-dasharray: 0.1 9; }
+
+.whm-hub {
+    position: absolute;
+    inset: 0;
+    transform-origin: 50% 50%;
+}
+
+/* Four solid nodes on the hub, at the cardinals — the reference's way of
+   marking the ring as a hub rather than a decoration. */
+.whm-node {
+    position: absolute;
+    width: 0.75rem;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background: var(--color-signal-500);
+    translate: -50% -50%;
+}
+
+.dark .whm-node { background: var(--color-signal-400); }
+
+.whm-node--n { left: 50%; top: calc(50% - var(--whm-hub-r)); }
+.whm-node--e { left: calc(50% + var(--whm-hub-r)); top: 50%; }
+.whm-node--s { left: 50%; top: calc(50% + var(--whm-hub-r)); }
+.whm-node--w { left: calc(50% - var(--whm-hub-r)); top: 50%; }
+
+/* One revolution, two movers: the hub is the ring the wires cross, the cards
+   walk the circle — both pivot on the portrait's centre, so the system stays
+   concentric as it turns. */
+@keyframes whm-revolve {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* The counter-walk: a card inherits the stage's revolution and undoes it on
+   the same clock, so the claim stays upright while its station travels the
+   circle. It animates `transform` because the individual `rotate` property is
+   already spent undoing the station angle. */
+@keyframes whm-counter {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(-360deg); }
+}
+
+/* --- The claim cards ------------------------------------------------------ */
+
+/* Below lg: a plain grid under the portrait. */
+.whm-cards {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+}
+
+@media (min-width: 40rem) {
+    .whm-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* The card itself, at every breakpoint: a glyph disc beside the claim, the
+   qualifier under the title. */
+.whm-card__inner {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 1.125rem;
+    border: 1px solid var(--color-ink-200);
+    background: var(--color-white);
+    padding: 0.8125rem;
+    box-shadow: var(--shadow-lift);
+    transition: border-color 300ms, box-shadow 300ms;
+}
+
+.whm-card__inner:hover {
+    border-color: var(--color-signal-300);
+    box-shadow: var(--shadow-raise);
+}
+
+.dark .whm-card__inner {
+    border-color: var(--color-ink-800);
+    background: var(--color-ink-950);
+}
+
+.dark .whm-card__inner:hover { border-color: color-mix(in srgb, var(--color-signal-500) 60%, transparent); }
+
+.whm-card__icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--whm-icon);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background: var(--color-signal-100);
+    color: var(--color-signal-700);
+}
+
+.dark .whm-card__icon {
+    background: color-mix(in srgb, var(--color-signal-500) 18%, transparent);
+    color: var(--color-signal-400);
+}
+
+.whm-card__body {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.1875rem;
+}
+
+.whm-card__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--color-ink-900);
+}
+
+.dark .whm-card__title { color: var(--color-ink-50); }
+
+.whm-card__text {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-ink-500);
+}
+
+.dark .whm-card__text { color: var(--color-ink-400); }
+
+/* --- From lg: the orbit --------------------------------------------------- */
+
+@media (min-width: 64rem) {
+    .whm-stage {
+        min-height: 36rem;
+    }
+
+    .whm-rings {
+        display: block;
+        position: absolute;
+        inset: 0;
+    }
+
+    /* Centred with the independent `translate` property, not `transform`:
+       the page-wide `[data-reveal][data-visible='true']` rule sets
+       `transform: none` at a higher specificity than this one, so a
+       transform-based centring is silently dropped the moment the
+       portrait reveals — leaving it pinned to the stage's left edge. */
+    .whm-portrait {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: var(--whm-portrait-w);
+        margin: 0;
+        translate: -50% -50%;
+    }
+
+    .whm-cards {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        display: block;
+        margin-top: 0;
+        transform-origin: 50% 50%;
+        animation: whm-revolve var(--whm-period) linear infinite;
+        /* Promote the moving layers so the counter-rotated text is composited,
+           not re-rasterised, each frame: a claim that sits still inside a
+           turning frame should render as crisply as it does at rest. */
+        will-change: transform;
+    }
+
+    .whm-hub {
+        animation: whm-revolve var(--whm-period) linear infinite;
+        will-change: transform;
+    }
+
+    /* The station. `transform-origin: 0 0` puts the pivot on the stage's
+       centre (the card's own left/top are both 50%), so `rotate(a)` swings the
+       frame onto the station's bearing and `translate(r)` walks the card out
+       along it. The closing `translate(-50%,-50%)` centres the box on that
+       point inside the rotated frame, which is why the card is positioned
+       without ever being rotated itself. */
+    .whm-card {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: var(--whm-card-w);
+        transform-origin: 0 0;
+        transform: rotate(var(--whm-a)) translate(var(--whm-orbit)) translate(-50%, -50%);
+    }
+
+    /* The wire, drawn in the card's own rotated frame: it starts at the card's
+       centre and runs back toward the middle, stopping at the portrait's rim.
+       Half of it passes behind the card's opaque inner, so what reads is the
+       stub between the card and the disc — exactly the lead-in the reference
+       draws. */
+    .whm-card::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: 50%;
+        width: calc(var(--whm-orbit) - var(--whm-portrait-w) / 2);
+        height: 1px;
+        background: repeating-linear-gradient(
+            to left,
+            color-mix(in srgb, var(--color-signal-500) 42%, transparent) 0 3px,
+            transparent 3px 7px
+        );
+    }
+
+    .dark .whm-card::before {
+        background: repeating-linear-gradient(
+            to left,
+            color-mix(in srgb, var(--color-signal-400) 48%, transparent) 0 3px,
+            transparent 3px 7px
+        );
+    }
+
+    /* Upright again: the station angle is undone by the individual `rotate`
+       property and the orbit's live rotation by the animation. They compose
+       (rotate is applied before transform) and the animation only ever touches
+       `transform`, so the reveal on the inner card keeps its own. */
+    .whm-card__up {
+        rotate: calc(-1 * var(--whm-a));
+        transform-origin: 50% 50%;
+        animation: whm-counter var(--whm-period) linear infinite;
+        will-change: transform;
+    }
+}
+
+/* --- The audience panels -------------------------------------------------- */
+
+/* A dotted echo of the orbit, parked off the panel's top-right corner. */
+.whm-panel::after {
+    content: '';
+    position: absolute;
+    right: -3rem;
+    top: -3rem;
+    width: 11rem;
+    height: 11rem;
+    border-radius: 9999px;
+    border: 1.5px dashed color-mix(in srgb, var(--color-signal-500) 30%, transparent);
+    pointer-events: none;
+}
+
+.dark .whm-panel::after {
+    border-color: color-mix(in srgb, var(--color-signal-400) 26%, transparent);
+}
+
+/* --- The heading's swash -------------------------------------------------- */
+
+.whm-accent {
+    position: relative;
+    display: inline-block;
+}
+
+.whm-swash {
+    position: absolute;
+    left: 0;
+    bottom: -0.22em;
+    width: 100%;
+    height: 0.3em;
+    overflow: visible;
+}
+
+.whm-swash path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.45s;
+}
+
+[data-reveal][data-visible='true'] .whm-swash path {
+    stroke-dashoffset: 0;
+}
+
+/* --- Reduced motion -------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .whm-cards,
+    .whm-hub,
+    .whm-card__up {
+        animation: none;
+    }
+
+    .whm-swash path {
+        transition: none;
+        stroke-dashoffset: 0;
+    }
 }

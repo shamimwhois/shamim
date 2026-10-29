@@ -34,7 +34,7 @@ use Laravel\Dusk\Browser;
 
 it('tracks the reader through a published idea and lights the section in view', function () {
     /** @var User $author */
-    $author = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $author = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     // Written here rather than seeded: the corpus this suite rebuilds has no
     // published idea tall enough to scroll, and a progress bar measured on a

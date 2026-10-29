@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Data\AuthorProfile;
 use App\Data\PostMetrics;
@@ -21,14 +21,15 @@ use Livewire\Component;
  *
  * Structure:
  *   01 The short version  — the bio, unadorned; renders no section marker
- *   02 Why hire me        — the pitch, as claims you can hold the author to
- *   03 AI Workflow        — the autonomous-delivery dashboard band
- *   04 How I work         — the principles that show up in the decisions
- *   05 Expertise          — where the years went
- *   06 Experience         — the career timeline, newest employer first
- *   07 Selected work      — the same outcome-first summaries as the landing page
- *   08 Recent writing     — proof the thinking happens in public
- *   09 Get in touch       — one action
+ *   02 Why hire me        — the pitch as a document: status, spec, terms
+ *   03 How this mind works— the model, as the demonstration behind the sheet
+ *   04 AI Workflow        — the autonomous-delivery dashboard band
+ *   05 How I work         — the principles that show up in the decisions
+ *   06 Expertise          — where the years went
+ *   07 Experience         — the career timeline, newest employer first
+ *   08 Selected work      — the same outcome-first summaries as the landing page
+ *   09 Recent writing     — proof the thinking happens in public
+ *   10 Get in touch       — one action
  */
 new #[Title('About')] class extends Component
 {
@@ -113,6 +114,29 @@ new #[Title('About')] class extends Component
     public function reasons(): array
     {
         return $this->about()->reasons();
+    }
+
+    /**
+     * The Thinking Explorer payload: modes, categories and their mind-map
+     * nodes, with stored rows overlaid on the built-in taxonomy.
+     *
+     * @return array{modes: array<string, array{key: string, name: string, description: string}>, categories: array<int, array{key: string, name: string, description: string, affinity: string, nodes: array<int, array{label: string, text: string}>}>}
+     */
+    public function thinkingExplorer(): array
+    {
+        return $this->about()->thinkingExplorer();
+    }
+
+    /**
+     * The section 04 thinking-modes payload: the two hemispheres, each with
+     * the ability cards on its side and each card's mind-map nodes, with
+     * stored rows overlaid on the built-in taxonomy.
+     *
+     * @return array{modes: array<int, array{key: string, name: string, description: string, accent: string, side: string, cards: array<int, array{key: string, name: string, description: string, icon: string|null, tags: array<int, string>, nodes: array<int, array{label: string, text: string}>}>}>}
+     */
+    public function thinkingModes(): array
+    {
+        return $this->about()->thinkingModes();
     }
 
     /**
@@ -327,6 +351,7 @@ new #[Title('About')] class extends Component
             @foreach ([
                 ['id' => 'about-intro', 'label' => 'Intro', 'type' => 'hero', 'icon' => 'M3 11.5l9-8 9 8M5.5 10v9.5h13V10'],
                 ['id' => 'about-why', 'label' => 'Why me', 'type' => 'reasons', 'icon' => 'M12 15a4.5 4.5 0 100-9 4.5 4.5 0 000 9zM8.5 13.5L7 21l5-2.5L17 21l-1.5-7.5'],
+                ['id' => 'about-mind', 'label' => 'How I think', 'type' => null, 'icon' => 'M12 4.5a3.5 3.5 0 013.5 3.5c1.4.7 2.5 2 2.5 3.7a3.6 3.6 0 01-3.6 3.6H9.6A3.6 3.6 0 016 11.7c0-1.7 1.1-3 2.5-3.7A3.5 3.5 0 0112 4.5zM12 4.5v10.8'],
                 ['id' => 'ai-workflow', 'label' => 'AI Workflow', 'type' => 'ai_workflow', 'icon' => 'M4 5.5h4v4H4zM16 5.5h4v4h-4zM4 14.5h4v4H4zM16 14.5h4v4h-4zM8 7.5h8M8 16.5h8M6 9.5v5M18 9.5v5'],
                 ['id' => 'about-principles', 'label' => 'How I work', 'type' => 'principles', 'icon' => 'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.3 1 2.1h5c0-.8.4-1.6 1-2.1A6 6 0 0012 3z'],
                 ['id' => 'about-capabilities', 'label' => 'Capabilities', 'type' => 'expertise', 'icon' => 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z'],
@@ -371,8 +396,14 @@ new #[Title('About')] class extends Component
      |      Renders no section marker — the first numbered marker below
      |      opens the ribcage.
      --}}
-    <section id="about-intro" class="relative scroll-mt-28 overflow-hidden border-b border-ink-200 dark:border-ink-800">
+    <section id="about-intro" class="relative isolate scroll-mt-28 overflow-hidden border-b border-ink-200 dark:border-ink-800">
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
+
+        {{-- Ambient accent wash behind the hero copy: a whisper of the signal
+             accent so the display type has something to refract in both themes.
+             Same idiom as the AI Workflow band below — weather, not decoration,
+             and faint enough that the portrait and the drawn name stay on top. --}}
+        <div aria-hidden="true" class="about-hero__glow pointer-events-none absolute inset-x-0 top-0 -z-10 h-[20rem] opacity-35 blur-3xl dark:opacity-70"></div>
 
         {{-- The portraits are shot on a white studio field (≈45-47% of each
              source is min(R,G,B) > 240). This filter maps whiteness to alpha:
@@ -443,7 +474,7 @@ new #[Title('About')] class extends Component
                     </p>
 
                     <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
-                        @foreach ([['Selected work', '#work-heading'], ['Writing', '#recent-heading'], ['Get in touch', '#contact-heading']] as [$anchorLabel, $anchorHref])
+                        @foreach ([['Download CV', '#work-heading'], ['Writing', '#recent-heading'], ['Get in touch', '#contact-heading']] as [$anchorLabel, $anchorHref])
                             <a href="{{ $anchorHref }}" class="text-signal-700 underline-offset-4 transition-colors hover:underline dark:text-signal-400">
                                 {{ $anchorLabel }}
                             </a>
@@ -458,7 +489,7 @@ new #[Title('About')] class extends Component
                         <span class="inline-block will-change-transform" data-magnetic>
                             <a
                                 href="#work-heading"
-                                class="btn-push relative inline-flex cursor-pointer items-center gap-2 rounded-full bg-signal-600 px-7 py-3.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 dark:bg-signal-500"
+                                class="btn-push relative inline-flex cursor-pointer items-center gap-2 rounded-full bg-signal-700 px-7 py-3.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 dark:bg-signal-500 dark:text-ink-950"
                             >
                                 <span class="pointer-events-none absolute inset-0" aria-hidden="true">
                                     <span class="hero-cta-ring"></span>
@@ -470,15 +501,22 @@ new #[Title('About')] class extends Component
                                 </svg>
                             </a>
                         </span>
-                        @if ($email = $this->profile()->link('email'))
+                        {{-- The CV pill takes its href from config (the `cv`
+                             link, published from PORTFOLIO_AUTHOR_CV_URL) rather
+                             than a hardcoded path. It renders only when one is
+                             configured: a button labelled "Download CV" that
+                             just reloads the page is worse than no button, which
+                             is the same rule config/portfolio.php states for the
+                             link itself. --}}
+                        @if ($cv = $this->profile()->link('cv'))
                             <span class="inline-block will-change-transform" data-magnetic>
                                 <a
-                                    href="{{ $email['url'] }}?subject={{ rawurlencode('CV request — '.$this->profile()->name) }}"
+                                    href="{{ $cv['url'] }}"
                                     class="btn-push inline-flex items-center gap-2 rounded-full border border-ink-300 px-7 py-3.5 text-sm font-semibold text-ink-800 transition-colors hover:border-ink-900 dark:border-ink-700 dark:text-ink-100 dark:hover:border-ink-300"
                                 >
                                     Download CV
                                     <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m5-3 4 5 4-5M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
                                     </svg>
                                 </a>
                             </span>
@@ -561,18 +599,28 @@ new #[Title('About')] class extends Component
     <x-app.ui.stat-band :stats="$this->profile()->stats" />
 
     {{-- ================================================================== --
-     | 02 — Thinking Explorer: the interactive rework of the pitch band.
-     |      The procedural neural brain is the focal point; the value claims
-     |      render as the rank-ordered rail beneath it, and every mode,
-     |      category and node is operator-managed through the reasons
-     |      section's rows. The wrapper owns the band's closing hairline.
+     | 02 — Why hire me: the value argument.
+     |      Six claims as cards, the same set read twice — once for the
+     |      engineering team that has to maintain the work, once for the
+     |      client who has to live with it — and one pair of actions. The
+     |      copy is specified line by line, so it lives as prop defaults in
+     |      the component instead of in the Reasons section.
      --}}
     <div id="about-why" class="scroll-mt-28 border-b border-ink-200 dark:border-ink-800">
+        <x-app.ui.why-hire-me :number="2" :claims="$this->reasons()" />
+    </div>
+
+    {{-- ================================================================== --
+     | 03 — How this mind works: the thinking explorer.
+     |      The demonstration that follows the document. The procedural
+     |      neural brain is the focal point; the six disciplines sit in a
+     |      rail beside it and every mode, category and node is
+     |      operator-managed through the Reasons section's rows.
+     --}}
+    <div id="about-mind" class="scroll-mt-28 border-b border-ink-200 dark:border-ink-800">
         <x-app.ui.thinking-explorer
-            :number="2"
+            :number="3"
             :explorer="$this->thinkingExplorer()"
-            :reasons="$this->reasons()"
-            :ctaHref="($email = $this->profile()->link('email')) ? $email['url'] : null"
         />
     </div>
 
@@ -599,8 +647,8 @@ new #[Title('About')] class extends Component
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
                     <span class="sec-ordinal relative inline-block shrink-0 select-none">
-                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">03</span>
-                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">03</span>
+                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">04</span>
+                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">04</span>
                     </span>
 
                     <div class="inline-block">
@@ -630,125 +678,34 @@ new #[Title('About')] class extends Component
     </section>
 
     {{-- ================================================================== --
-     | 04 — How I work : framed portrait on the left, the about-me details
-     |      (at-a-glance facts) and the operating principles on the right.
-     |      The left panel echoes the hero — same two theme renders, same
-     |      knockout mechanism — but framed as a bordered card instead of
-     |      bleeding off the page.
+     | 05 — How I work : one panel, one argument — two speeds, one gate.
+     |      Fast judgement and deliberate reasoning as two rails, with the
+     |      engineering decision flow between them. The flow is now wired to
+     |      the rails through `:has()`, so hovering a node lights the branch
+     |      and the rail behind it and the panel reads as one instrument
+     |      instead of three columns of text.
+     |
+     |      The band used to run about 1.5 viewports: the five technical facts
+     |      are folded into the panel's readout row (they are still the only
+     |      renderer for the `focus` section, so they stay), and the six
+     |      operating principles close the section as a hairline index rather
+     |      than six boxes.
      --}}
-    <section id="about-principles" class="relative scroll-mt-28 overflow-hidden py-20 sm:py-24" aria-labelledby="principles-heading">
+    <div id="about-principles" class="relative scroll-mt-28 overflow-hidden py-20 sm:py-24">
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
 
-        <div class="shell relative">
-            <x-app.ui.section-marker :number="4" :label="$this->sectionLabel('principles', 'How I work')" />
-
-            <div class="mt-10 grid items-stretch gap-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,7fr)] lg:gap-16">
-                {{-- Left: the portrait, framed. Own natural height — an aspect-locked
-                     frame (4/5 beside the details, 16/10 when stacked below lg)
-                     instead of stretching to the full column: the landscape
-                     render can feed a portrait-ratio window, not a tower.
-                     Centered in the grid row — the right column runs much taller,
-                     and a top-anchored frame leaves a dead gap under the art.
-                     Hidden on phones (below md) where the stacked frame pushed
-                     the content too far down --}}
-                <div data-reveal class="about-how relative hidden self-center md:block">
-                    <div class="about-how__glow"></div>
-
-                    <div class="relative min-h-96 overflow-hidden rounded-2xl border border-ink-200 bg-white/60 shadow-soft-2 dark:border-ink-800 dark:bg-ink-950/60 sm:min-h-[26rem] md:aspect-[16/10] md:min-h-0 lg:aspect-[4/5]">
-                        <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
-
-                        {{-- Both theme renders live in one positional stack, same
-                            mechanism as the hero: CSS on <html class="dark">
-                            decides which one shows. Light reuses the shared
-                            `#hero-portrait-knockout` filter declared in the
-                            hero section; dark ships the baked-alpha WebP and
-                            takes no filter at all. --}}
-                        <div class="absolute inset-0">
-                            <img
-                                class="about-how__img about-how__img--light"
-                                src="{{ asset('images/hero-portrait-light.jpg') }}"
-                                alt=""
-                                width="1536"
-                                height="1024"
-                                loading="lazy"
-                                decoding="async"
-                            />
-                            <img
-                                class="about-how__img about-how__img--dark"
-                                src="{{ asset('images/darkmode.webp') }}"
-                                alt=""
-                                width="1502"
-                                height="1047"
-                                loading="lazy"
-                                decoding="async"
-                            />
-                        </div>
-
-                        <span class="hero-portrait__orbit hero-portrait__orbit--a"></span>
-                        <span class="hero-portrait__orbit hero-portrait__orbit--b"></span>
-                    </div>
-
-                    {{-- Floating stat chips straddling the frame's bottom edge. --}}
-                    <div class="absolute -bottom-5 left-5 flex flex-wrap gap-3">
-                        <span class="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-4 py-2 text-xs font-medium shadow-lift dark:border-ink-700 dark:bg-ink-900">
-                            <span class="h-1.5 w-1.5 rounded-full bg-signal-500 animate-pulse"></span>
-                            <span class="tabular-nums text-ink-900 dark:text-ink-50">150+</span>
-                            <span class="text-ink-500 dark:text-ink-400">projects shipped</span>
-                        </span>
-                        <span class="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-4 py-2 text-xs font-medium shadow-lift dark:border-ink-700 dark:bg-ink-900">
-                            <span class="h-1.5 w-1.5 rounded-full bg-signal-500 animate-pulse"></span>
-                            <span class="tabular-nums text-ink-900 dark:text-ink-50">8+</span>
-                            <span class="text-ink-500 dark:text-ink-400">years online</span>
-                        </span>
-                    </div>
-                </div>
-
-                {{-- Right: heading, about-me lead, at-a-glance facts, principles. --}}
-                <div data-reveal>
-                    <h2 id="principles-heading" class="max-w-2xl text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
-                        {{ $this->sectionHeading('principles', 'The things I keep coming back to') }}
-                    </h2>
-
-                    <p class="mt-4 max-w-2xl text-base leading-relaxed text-ink-500 dark:text-ink-400">
-                        I am a {{ strtolower($this->profile()->role) }}. {{ $this->sectionLead('principles', 'These are the six defaults learned the expensive way — when a decision is hard, they are what break the tie.') }}
-                    </p>
-
-                    <dl class="mt-7 grid gap-x-8 gap-y-4 rounded-xl border border-ink-200 bg-white/50 p-5 sm:grid-cols-2 dark:border-ink-800 dark:bg-ink-950/50">
-                        @foreach ($this->focus() as $fact)
-                            <div class="flex flex-col gap-0.5">
-                                <dt class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                                    {{ $fact['label'] }}
-                                </dt>
-                                <dd class="text-sm font-medium text-ink-800 dark:text-ink-200">
-                                    {{ $fact['value'] }}
-                                </dd>
-                            </div>
-                        @endforeach
-                    </dl>
-
-                    <ol class="mt-8 grid gap-px overflow-hidden rounded-lg border border-ink-200 bg-ink-200 sm:grid-cols-2 dark:border-ink-800 dark:bg-ink-800">
-                        @foreach ($this->principles() as $index => $principle)
-                            <li
-                                data-reveal
-                                style="transition-delay: {{ min($index * 60, 240) }}ms"
-                                class="group bg-white p-6 transition-colors hover:bg-ink-50/80 dark:bg-ink-950 dark:hover:bg-ink-900/60"
-                            >
-                                <span class="font-mono text-2xs tabular-nums text-signal-600 dark:text-signal-400">
-                                    {{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}
-                                </span>
-                                <h3 class="mt-3 text-base font-semibold tracking-tight text-ink-900 transition-colors group-hover:text-signal-700 dark:text-ink-50 dark:group-hover:text-signal-400">
-                                    {{ $principle['title'] }}
-                                </h3>
-                                <p class="mt-2.5 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
-                                    {{ $principle['body'] }}
-                                </p>
-                            </li>
-                        @endforeach
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </section>
+        {{-- The panel brings its own ground, so this wrapper only supplies
+             the positioning context for the ambient grid. --}}
+        <x-app.ui.how-i-work
+            :number="5"
+            :label="$this->sectionLabel('principles', 'How I work')"
+            :heading="$this->sectionHeading('principles', 'Two Speeds, One Gate')"
+            :lead="$this->sectionLead('principles', 'Quick judgement when the problem is familiar, deliberate analysis when it is not — and the same six defaults breaking the tie either way.')"
+            :modes="$this->thinkingModes()['modes']"
+            :principles="$this->principles()"
+            :facts="array_slice($this->focus(), 0, 5)"
+        />
+    </div>
 
     {{-- ================================================================== --
      | 05 — Capabilities : the reference #skills panel — doubled stroke
@@ -769,8 +726,8 @@ new #[Title('About')] class extends Component
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
                     <span class="sec-ordinal relative inline-block shrink-0 select-none">
-                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">05</span>
-                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">05</span>
+                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">06</span>
+                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">06</span>
                     </span>
 
                     <div class="inline-block">
@@ -850,7 +807,7 @@ new #[Title('About')] class extends Component
                     centred, horizontally scrollable below ~920px like
                     the reference's overflow panel. --}}
                 <div class="relative hidden lg:block">
-                    <p class="mb-4 flex items-center gap-3 font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
+                    <p class="mb-4 flex items-center gap-3 font-mono text-2xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
                         <span class="h-px w-8 bg-ink-300 dark:bg-ink-700"></span>
                         Click a capability to trace its branch
                     </p>
@@ -915,8 +872,8 @@ new #[Title('About')] class extends Component
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
                     <span class="sec-ordinal relative inline-block shrink-0 select-none">
-                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">06</span>
-                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">06</span>
+                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">07</span>
+                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">07</span>
                     </span>
 
                     <div class="inline-block">
@@ -962,7 +919,7 @@ new #[Title('About')] class extends Component
                         {{-- Company row — label + display name against the date pill. --}}
                         <div class="relative mb-9 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <p class="mb-1.5 font-mono text-sm uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                                <p class="mb-1.5 font-mono text-sm uppercase tracking-wide text-ink-500 dark:text-ink-400">
                                     Company
                                 </p>
                                 <h3 class="text-3xl font-extrabold leading-none tracking-tight text-signal-700 dark:text-signal-400 md:text-[2.6rem]">
@@ -1030,8 +987,8 @@ new #[Title('About')] class extends Component
             <div class="mb-12 md:mb-16" data-reveal>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6">
                     <span class="sec-ordinal relative inline-block shrink-0 select-none">
-                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">07</span>
-                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">07</span>
+                        <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">08</span>
+                        <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">08</span>
                     </span>
 
                     <div class="inline-block">
@@ -1135,8 +1092,8 @@ new #[Title('About')] class extends Component
                     <div>
                         <div class="flex flex-wrap items-center gap-4 md:gap-6">
                             <span class="sec-ordinal relative inline-block shrink-0 select-none">
-                                <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">08</span>
-                                <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">08</span>
+                                <span class="exp-ordinal-stroke block text-5xl font-extrabold leading-none md:text-6xl">09</span>
+                                <span aria-hidden="true" class="absolute inset-0 block text-5xl font-extrabold leading-none text-signal-600 md:text-6xl dark:text-signal-400">09</span>
                             </span>
 
                             <div class="inline-block">
@@ -1203,7 +1160,7 @@ new #[Title('About')] class extends Component
                                         {{ $post->category->name }}
                                     </span>
                                 @endif
-                                <time datetime="{{ $post->published_at->toDateString() }}" class="ml-auto flex items-center gap-1.5 font-mono text-2xs text-ink-400 dark:text-ink-500">
+                                <time datetime="{{ $post->published_at->toDateString() }}" class="ml-auto flex items-center gap-1.5 font-mono text-2xs text-ink-500 dark:text-ink-400">
                                     <flux:icon icon="calendar" class="size-3" />
                                     {{ $post->published_at->isoFormat('ll') }}
                                 </time>
@@ -1243,7 +1200,7 @@ new #[Title('About')] class extends Component
      --}}
     <section id="about-contact" class="scroll-mt-28 border-t border-ink-200 py-20 dark:border-ink-800" aria-labelledby="contact-heading">
         <div class="shell max-w-3xl">
-            <x-app.ui.section-marker :number="9" :label="$this->sectionLabel('contact', 'Get in touch')" />
+            <x-app.ui.section-marker :number="10" :label="$this->sectionLabel('contact', 'Get in touch')" />
             <h2 id="contact-heading" class="mt-5 text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
                 {{ $this->profile()->availability }}
             </h2>
@@ -1256,6 +1213,12 @@ new #[Title('About')] class extends Component
                 @if ($email = $this->profile()->link('email'))
                     <flux:button variant="primary" :href="$email['url']" icon="envelope">
                         {{ str_replace('mailto:', '', $email['url']) }}
+                    </flux:button>
+                @endif
+
+                @if ($phone = $this->profile()->link('phone'))
+                    <flux:button variant="filled" :href="$phone['url']" icon="phone">
+                        {{ str_replace('tel:', '', $phone['url']) }}
                     </flux:button>
                 @endif
 

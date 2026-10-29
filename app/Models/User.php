@@ -9,6 +9,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -49,6 +51,9 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      */
     protected $attributes = [
         'role' => AccountRole::User->value,
+        'remote_pull_receipts' => true,
+        'remote_requests' => true,
+        'remotes_enabled' => true,
     ];
 
     /**
@@ -63,6 +68,9 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'password' => 'hashed',
             'role' => AccountRole::class,
             'two_factor_confirmed_at' => 'datetime',
+            'remote_pull_receipts' => 'boolean',
+            'remote_requests' => 'boolean',
+            'remotes_enabled' => 'boolean',
         ];
     }
 
@@ -107,5 +115,102 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             ->all();
 
         return $this->joinedCommunityIdCache = $ids;
+    }
+
+    /**
+     * The commits this account wrote.
+     *
+     * @return HasMany<FeedPost, $this>
+     */
+    public function feedPosts(): HasMany
+    {
+        return $this->hasMany(FeedPost::class);
+    }
+
+    /**
+     * The commits this account starred.
+     *
+     * @return HasMany<FeedStar, $this>
+     */
+    public function feedStars(): HasMany
+    {
+        return $this->hasMany(FeedStar::class);
+    }
+
+    /**
+     * The inbox rows addressed to this account.
+     *
+     * @return HasMany<LogNotification, $this>
+     */
+    public function logNotifications(): HasMany
+    {
+        return $this->hasMany(LogNotification::class);
+    }
+
+    /**
+     * The conversations this account is part of.
+     *
+     * @return BelongsToMany<Remote, $this>
+     */
+    public function remotes(): BelongsToMany
+    {
+        return $this->belongsToMany(Remote::class, 'remote_participants')
+            ->withPivot(['last_read_at', 'muted_until_at', 'pinned_at', 'archived_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * The keys that may push as this account.
+     *
+     * @return HasMany<SshKey, $this>
+     */
+    public function sshKeys(): HasMany
+    {
+        return $this->hasMany(SshKey::class)->latest();
+    }
+
+    /**
+     * The accounts this one has blocked or muted.
+     *
+     * @return HasMany<UserBlock, $this>
+     */
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(UserBlock::class);
+    }
+
+    /**
+     * Whether this account has blocked the other one.
+     *
+     * A block is one direction of a pair, so this answers "do I stop them
+     * reaching me" — the reverse direction is a different row and a different
+     * question. A mute is the same row with `muted` set and is deliberately not
+     * counted here: a mute quiets the log, it does not close a remote.
+     */
+    public function hasBlocked(User $other): bool
+    {
+        return $this->blocks()
+            ->where('blocked_id', $other->id)
+            ->where('muted', false)
+            ->exists();
+    }
+
+    /**
+     * The ids of the accounts this one has blocked.
+     *
+     * The inbox asks this about every row it draws, so it is one query for the
+     * whole page rather than one per conversation.
+     *
+     * @return list<int>
+     */
+    public function blockedIds(): array
+    {
+        /** @var list<int> $ids */
+        $ids = $this->blocks()
+            ->where('muted', false)
+            ->pluck('blocked_id')
+            ->all();
+
+        return $ids;
     }
 }

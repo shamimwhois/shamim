@@ -38,7 +38,9 @@ return new class extends Migration
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
-            $table->index(['marketplace_product_id', 'sort_order']);
+            // Named explicitly: the generated name would exceed MySQL's
+            // 64-character identifier limit.
+            $table->index(['marketplace_product_id', 'sort_order'], 'mpm_product_sort_index');
         });
     }
 

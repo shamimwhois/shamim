@@ -52,7 +52,7 @@ const COMPOSER_DIALOG = 'dialog[data-modal=feed-composer-modal]';
 
 it('carries an author from the composer prompt to a published card in the feed', function () {
     /** @var User $author */
-    $author = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $author = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     $token = Str::lower(Str::random(12));
     $body = "Dusk composer {$token}: what I learned shipping a Livewire feed";
@@ -141,7 +141,7 @@ it('carries an author from the composer prompt to a published card in the feed',
 
 it('docks the composer near full screen with a sticky publish bar on a phone', function () {
     /** @var User $author */
-    $author = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $author = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     // Long enough that the sheet cannot fit its own editor, which is the only
     // condition under which "sticky" means anything at all.

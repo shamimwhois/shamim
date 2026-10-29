@@ -14,12 +14,14 @@ return [
 
     'author' => [
 
-        'name' => env('PORTFOLIO_AUTHOR_NAME', 'Shamim Hossain'),
+        'name' => env('PORTFOLIO_AUTHOR_NAME', 'Md Shamim Hossain'),
 
         /*
-        | Short form used in the header wordmark and page titles.
+        | Short form used in the header wordmark and page titles. It is the
+        | owner's username everywhere the site is published, so the wordmark,
+        | the GitHub account and the feed handle all read the same.
         */
-        'short_name' => env('PORTFOLIO_AUTHOR_SHORT_NAME', 'shamim'),
+        'short_name' => env('PORTFOLIO_AUTHOR_SHORT_NAME', 'shamimstack'),
 
         'role' => env('PORTFOLIO_AUTHOR_ROLE', 'Full Stack Developer'),
 
@@ -571,27 +573,42 @@ I write here because writing is how I find out whether I actually understand som
         'links' => [
             'email' => [
                 'label' => 'Email',
-                'url' => env('PORTFOLIO_AUTHOR_EMAIL', 'mailto:hello@example.com'),
+                'url' => env('PORTFOLIO_AUTHOR_EMAIL', 'mailto:shamimstack@gmail.com'),
+                'handle' => null,
+            ],
+            'phone' => [
+                'label' => 'Phone',
+                'url' => env('PORTFOLIO_AUTHOR_PHONE', 'tel:+8801871366812'),
                 'handle' => null,
             ],
             'github' => [
                 'label' => 'GitHub',
-                'url' => env('PORTFOLIO_AUTHOR_GITHUB', 'https://github.com/example'),
-                'handle' => env('PORTFOLIO_AUTHOR_GITHUB_HANDLE', 'example'),
+                'url' => env('PORTFOLIO_AUTHOR_GITHUB', 'https://github.com/shamimwhois'),
+                'handle' => env('PORTFOLIO_AUTHOR_GITHUB_HANDLE', 'shamimwhois'),
             ],
             'linkedin' => [
                 'label' => 'LinkedIn',
-                'url' => env('PORTFOLIO_AUTHOR_LINKEDIN', 'https://linkedin.com/in/example'),
+                'url' => env('PORTFOLIO_AUTHOR_LINKEDIN', 'https://linkedin.com/in/shamimstack'),
                 'handle' => null,
             ],
             'x' => [
                 'label' => 'X',
-                'url' => env('PORTFOLIO_AUTHOR_X', 'https://x.com/example'),
-                'handle' => env('PORTFOLIO_AUTHOR_X_HANDLE', '@example'),
+                'url' => env('PORTFOLIO_AUTHOR_X', 'https://x.com/shamimstack'),
+                'handle' => env('PORTFOLIO_AUTHOR_X_HANDLE', '@shamimstack'),
             ],
             'rss' => [
                 'label' => 'RSS',
                 'url' => '/feed.xml',
+                'handle' => null,
+            ],
+            /*
+            | Unpublished until there is a real file behind it: a null url is
+            | filtered out of every renderer, which is better than shipping a
+            | CV button that opens a placeholder host.
+            */
+            'cv' => [
+                'label' => 'CV',
+                'url' => env('PORTFOLIO_AUTHOR_CV_URL'),
                 'handle' => null,
             ],
         ],

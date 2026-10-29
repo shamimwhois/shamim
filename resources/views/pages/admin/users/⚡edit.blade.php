@@ -225,7 +225,7 @@ new #[Layout('layouts::admin.dashboard')] #[Title('Users')] class extends Compon
                         id="user-handle"
                         type="text"
                         wire:model="handle"
-                        placeholder="@shamim"
+                        placeholder="@shamimstack"
                         autocomplete="off"
                         class="sui-control mt-2 w-full"
                     />

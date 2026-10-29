@@ -6,6 +6,7 @@ use App\Models\Community;
 use App\Support\Seo;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -21,7 +22,7 @@ use Illuminate\Validation\UnauthorizedException;
  * leaving run through {@see ToggleCommunityMembership}, so the directory and
  * the community page can never disagree about what a membership means.
  */
-new #[Title('Communities')] class extends Component
+new #[Title('Communities')] #[Layout('layouts::feed')] class extends Component
 {
     /** Search across name and description. Bound to `?q=`. */
     #[Url]
@@ -112,48 +113,105 @@ new #[Title('Communities')] class extends Component
         return $counts;
     }
 }; ?>
-
-<div class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6" data-test="communities-index">
-    <p class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-signal-600 dark:text-signal-400">
-        {{ __('Community · directory') }}
-    </p>
-    <h1 class="mt-3 text-3xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-        {{ __('Find your people') }}
-    </h1>
-    <p class="mt-2 max-w-[70ch] text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-        {{ __('Topic-based circles built on the same feed. Joining is one click and leaving takes the same — open communities are public, invite-only circles stay members-only.') }}
-    </p>
-
-    {{-- Filter bar --}}
-    <div class="mt-6 flex flex-wrap items-center gap-3">
-        <flux:input wire:model.live.debounce.350ms="q" icon="magnifying-glass" :placeholder="__('Search communities…')" class="max-w-xs" />
-
-        <flux:button.group>
-            @foreach (['all' => __('All'), 'open' => __('Open'), 'invite-only' => __('Invite only')] as $value => $label)
-                <flux:button
-                    wire:click="$set('kind', '{{ $value }}')"
-                    :variant="$kind === $value ? 'primary' : 'ghost'"
-                    size="sm"
-                >
-                    {{ $label }}
-                    <span class="font-mono text-[10px] tabular-nums opacity-70">{{ $this->kindCounts[$value] ?? 0 }}</span>
-                </flux:button>
-            @endforeach
-        </flux:button.group>
-    </div>
-
-    {{-- Directory grid --}}
-    <div class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        @forelse ($this->communities as $community)
-            <x-communities.card :community="$community" :member="$community->memberships->isNotEmpty()" />
-        @empty
-            <div class="col-span-full rounded-lg border border-ink-200 bg-white px-6 py-16 text-center dark:border-ink-800 dark:bg-ink-900">
-                <p class="font-mono text-[10px] uppercase tracking-wider text-ink-500 dark:text-ink-400">{{ __('No matching communities') }}</p>
-                <p class="mt-3 max-w-sm text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                    {{ __('No community matches that search. Loosen the term or browse another kind.') }}
-                </p>
-                <flux:button wire:click="$set('q', '')" variant="outline" class="mt-6">{{ __('Clear search') }}</flux:button>
+<x-log.module
+    active="communities"
+    data-test="communities-index"
+    :title="__('Communities')"
+    :meta="trans_choice(':count circle|:count circles', $this->kindCounts['all'], ['count' => $this->kindCounts['all']])"
+    :note="__('Topic-based circles built on the same feed. Joining is one click and leaving takes the same — open communities are public, invite-only circles stay members-only.')"
+>
+    <x-slot:filters>
+        <div class="dn-module-tools">
+            <div class="dn-search-field">
+                <x-feed.icon name="search" :size="16" />
+                <label for="community-search" class="sr-only">{{ __('Search communities') }}</label>
+                <input
+                    id="community-search"
+                    type="search"
+                    wire:model.live.debounce.350ms="q"
+                    placeholder="{{ __('Search communities…') }}"
+                    autocomplete="off"
+                />
             </div>
-        @endforelse
-    </div>
-</div>
+
+            <div class="dn-filters" style="border-bottom: 0; padding: 0; margin-left: auto;">
+                @foreach (['all' => __('All'), 'open' => __('Open'), 'invite-only' => __('Invite only')] as $value => $label)
+                    <button
+                        type="button"
+                        class="dn-filter {{ $kind === $value ? 'is-active' : '' }}"
+                        wire:click="$set('kind', '{{ $value }}')"
+                        @if ($kind === $value) aria-current="true" @endif
+                    >
+                        {{ $label }}
+                        <span class="dn-filter-count">{{ $this->kindCounts[$value] ?? 0 }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    </x-slot:filters>
+
+    @if ($this->communities->isEmpty())
+        <div class="dn-module-empty" data-test="communities-empty">
+            <p class="dn-empty-command">fatal: no matching communities</p>
+            <p class="dn-empty-text">
+                {{ __('No community matches that search. Loosen the term or browse another kind.') }}
+            </p>
+            <button type="button" class="dn-btn dn-btn-outline dn-btn-sm" wire:click="$set('q', '')" style="margin-top: 16px;">
+                {{ __('Clear search') }}
+            </button>
+        </div>
+    @else
+        <div class="dn-entries">
+            @foreach ($this->communities as $community)
+                @php $member = $community->memberships->isNotEmpty(); @endphp
+
+                <article class="dn-entry" data-test="community-card">
+                    <span class="dn-entry-glyph" aria-hidden="true">{{ $community->glyph }}</span>
+
+                    <span class="dn-entry-main">
+                        <span class="dn-entry-head">
+                            <a href="{{ route('feed.index', ['category' => $community->topic]) }}" wire:navigate class="dn-entry-title">
+                                {{ $community->name }}
+                            </a>
+
+                            @if ($community->kind === \App\Enums\CommunityKind::InviteOnly)
+                                <span class="dn-status-chip">{{ __('invite only') }}</span>
+                            @endif
+                        </span>
+
+                        <span class="dn-entry-desc">{{ $community->description }}</span>
+
+                        <span class="dn-entry-meta">
+                            <span>{{ trans_choice(':count member|:count members', $community->memberships_count, ['count' => $community->memberships_count]) }}</span>
+                            <span>{{ $community->topic }}</span>
+                        </span>
+                    </span>
+
+                    <span style="flex: none; align-self: center;">
+                        @auth
+                            @if ($member)
+                                <button type="button" class="dn-btn dn-btn-outline dn-btn-sm" wire:click="toggleMembership('{{ $community->slug }}')" wire:loading.attr="disabled">
+                                    {{ __('Leave') }}
+                                </button>
+                            @elseif ($community->kind === \App\Enums\CommunityKind::Open)
+                                <button type="button" class="dn-btn dn-btn-sm" wire:click="toggleMembership('{{ $community->slug }}')" wire:loading.attr="disabled">
+                                    {{ __('Join') }}
+                                </button>
+                            @else
+                                <button type="button" class="dn-btn dn-btn-outline dn-btn-sm" disabled>
+                                    {{ __('By invitation') }}
+                                </button>
+                            @endif
+                        @else
+                            <a
+                                href="{{ route('login') }}"
+                                x-on:click="$flux.modal('login').show(); $event.preventDefault()"
+                                class="dn-btn dn-btn-sm"
+                            >{{ __('Sign in to join') }}</a>
+                        @endauth
+                    </span>
+                </article>
+            @endforeach
+        </div>
+    @endif
+</x-log.module>

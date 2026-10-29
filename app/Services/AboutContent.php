@@ -31,10 +31,12 @@ use Illuminate\Support\Str;
  *     agents: array<int, array{name: string, description: string, status: string, statusLabel: string, statusTone: string}>,
  *     metrics: array{header: array<int, array{label: string, value: string, tone: string}>, telemetry: array<int, array{label: string, value: string, tone: string}>}
  * }
- *
  * @phpstan-type ThinkingPayload array{
  *     modes: array<string, array{key: string, name: string, description: string}>,
  *     categories: array<int, array{key: string, name: string, description: string, affinity: string, nodes: array<int, array{label: string, text: string}>}>
+ * }
+ * @phpstan-type ThinkingModesPayload array{
+ *     modes: array<int, array{key: string, name: string, description: string, accent: string, side: string, cards: array<int, array{key: string, name: string, description: string, icon: string|null, tags: array<int, string>, nodes: array<int, array{label: string, text: string}>}>}>
  * }
  */
 class AboutContent
@@ -61,6 +63,13 @@ class AboutContent
      * @var ThinkingPayload|null
      */
     protected ?array $thinking = null;
+
+    /**
+     * Memoised section 04 thinking-modes payload.
+     *
+     * @var ThinkingModesPayload|null
+     */
+    protected ?array $thinkingModes = null;
 
     /**
      * The author profile as the page should render it: config values with any
@@ -122,6 +131,40 @@ class AboutContent
     {
         return $this->thinking ??= $this->buildThinkingExplorer();
     }
+
+    /**
+     * The section 04 thinking-modes payload: the two halves of the model, each
+     * carrying the ability cards that sit on it and the mind-map nodes behind
+     * every card.
+     *
+     * This is the *second* reader of the thinking vocabulary, and it reads a
+     * different section from the first. Section 02 asks "what is this mind
+     * made of" and reads the disciplines off the reasons section; section 04
+     * asks "what does it actually do" and reads the abilities off the
+     * principles section. Sharing one section would put the same six cards
+     * on the page twice, so the two read their own rows.
+     *
+     * The row types are the same three the section 02 cockpit teaches:
+     *
+     * - ThinkingMode: subtitle = mode key ('system_1' | 'system_2'),
+     *   title = display name, body = description.
+     * - ThinkingCategory: subtitle = key slug, title = name, body =
+     *   description, url_label = affinity ('fast' | 'deep' | 'both'),
+     *   tags = comma-delimited labels, icon = a Flux glyph name.
+     * - ThinkingNode: subtitle = parent category key, title = label,
+     *   body = explanation.
+     *
+     * A category with no stored nodes keeps its built-in ones, and a section
+     * with no stored rows at all renders the built-in vocabulary, so the band
+     * is meaningful before an operator opens the console.
+     *
+     * @return ThinkingModesPayload
+     */
+    public function thinkingModes(): array
+    {
+        return $this->thinkingModes ??= $this->buildThinkingModes();
+    }
+
     /**
      * Current focus areas as label/value pairs.
      *
@@ -319,6 +362,138 @@ class AboutContent
 
         /** @var ThinkingPayload $payload */
         $payload = ['modes' => $modes, 'categories' => $categories];
+
+        return $payload;
+    }
+
+    /**
+     * Overlay the section 04 thinking rows on the built-in ability vocabulary.
+     *
+     * Every key passes through {@see ThinkingTaxonomy} first, so a stored
+     * typo degrades to a safe default instead of orphaning a card or
+     * stranding a mode.
+     *
+     * @return ThinkingModesPayload
+     */
+    protected function buildThinkingModes(): array
+    {
+        $modes = ThinkingTaxonomy::modes();
+
+        /** @var array<string, array{key: string, name: string, description: string, affinity: string, nodes: array<int, array{label: string, text: string}>}> $categoryByKey */
+        $categoryByKey = [];
+
+        foreach (ThinkingTaxonomy::workCategories() as $category) {
+            $categoryByKey[$category['key']] = $category;
+        }
+
+        $storedModes = [];
+        $storedCategories = [];
+        $storedNodes = [];
+
+        foreach ($this->itemsFor(AboutSectionType::Principles) as $item) {
+            match ($item->type) {
+                AboutItemType::ThinkingMode => $storedModes[] = $item,
+                AboutItemType::ThinkingCategory => $storedCategories[] = $item,
+                AboutItemType::ThinkingNode => $storedNodes[] = $item,
+                default => null,
+            };
+        }
+
+        foreach ($storedModes as $item) {
+            $key = ThinkingTaxonomy::normalizeModeKey($item->subtitle);
+
+            $modes[$key] = [
+                'key' => $key,
+                'name' => $item->title,
+                'description' => (string) ($item->body ?? ''),
+            ];
+        }
+
+        // Stored categories replace the built-in set entirely, the same contract
+        // the section 02 presenter keeps: an operator's rows are the truth.
+        if ($storedCategories !== []) {
+            $categoryByKey = [];
+
+            foreach ($storedCategories as $index => $item) {
+                $key = ThinkingTaxonomy::normalizeCategoryKey($item->subtitle, $index);
+
+                $categoryByKey[$key] = [
+                    'key' => $key,
+                    'name' => $item->title,
+                    'description' => (string) ($item->body ?? ''),
+                    'affinity' => ThinkingTaxonomy::normalizeAffinity($item->url_label),
+                    'icon' => $item->icon,
+                    'tags' => $item->tagList(),
+                    'nodes' => [],
+                ];
+            }
+        }
+
+        $storedNodesByKey = [];
+
+        foreach ($storedNodes as $item) {
+            $key = ThinkingTaxonomy::normalizeCategoryKey($item->subtitle, 0);
+
+            $storedNodesByKey[$key][] = [
+                'label' => $item->title,
+                'text' => (string) ($item->body ?? ''),
+            ];
+        }
+
+        $categories = array_values(array_map(
+            function (array $category) use ($storedNodesByKey): array {
+                $category['nodes'] = $storedNodesByKey[$category['key']] ?? $category['nodes'];
+
+                return $category;
+            },
+            $categoryByKey,
+        ));
+
+        // A card sits on the hemisphere its affinity names. A card with no
+        // affinity belongs to neither, so it is not shown on either — an
+        // operator who has not chosen a side yet should see that, not have
+        // the card silently appear on the fast side.
+        $cardsByMode = ['system_1' => [], 'system_2' => []];
+
+        foreach ($categories as $category) {
+            $modeKey = match ($category['affinity']) {
+                'fast' => 'system_1',
+                'deep' => 'system_2',
+                default => null,
+            };
+
+            if ($modeKey === null) {
+                continue;
+            }
+
+            $cardsByMode[$modeKey][] = [
+                'key' => $category['key'],
+                'name' => $category['name'],
+                'description' => $category['description'],
+                'icon' => $category['icon'] ?? null,
+                'tags' => $category['tags'] ?? [],
+                'nodes' => $category['nodes'],
+            ];
+        }
+
+        $modesOut = [];
+
+        foreach (['system_1', 'system_2'] as $modeKey) {
+            $mode = $modes[$modeKey];
+            $chrome = ThinkingTaxonomy::modeChrome($modeKey);
+
+            $modesOut[] = [
+                'key' => $modeKey,
+                'name' => $mode['name'],
+                'description' => $mode['description'],
+                'accent' => $chrome['accent'],
+                'side' => $chrome['side'],
+                'cards' => $cardsByMode[$modeKey],
+            ];
+        }
+
+        /** @var ThinkingModesPayload $payload */
+        $payload = ['modes' => $modesOut];
 
         return $payload;
     }
@@ -700,6 +875,69 @@ class AboutContent
     }
 
     /**
+     * The section 04 ability cards flattened into persistable rows, for the
+     * console's "seed defaults" action.
+     *
+     * The same contract as {@see self::thinkingDefaultRows()}: seeding writes
+     * exactly what a fresh install renders, so the built-in fallback and the
+     * database can never drift into two different copies.
+     *
+     * @return array<int, array{type: AboutItemType, title: string, subtitle: string|null, body: string|null, value: string|null, period: string|null, url: string|null, url_label: string|null, tags: string|null, sort_order: int}>
+     */
+    public function thinkingWorkDefaultRows(): array
+    {
+        $rows = [];
+        $order = 0;
+
+        foreach (ThinkingTaxonomy::modes() as $mode) {
+            $rows[] = [
+                'type' => AboutItemType::ThinkingMode,
+                'title' => $mode['name'],
+                'subtitle' => $mode['key'],
+                'body' => $mode['description'],
+                'value' => null,
+                'period' => null,
+                'url' => null,
+                'url_label' => null,
+                'tags' => null,
+                'sort_order' => $order++,
+            ];
+        }
+
+        foreach (ThinkingTaxonomy::workCategories() as $category) {
+            $rows[] = [
+                'type' => AboutItemType::ThinkingCategory,
+                'title' => $category['name'],
+                'subtitle' => $category['key'],
+                'body' => $category['description'],
+                'value' => null,
+                'period' => null,
+                'url' => null,
+                'url_label' => $category['affinity'],
+                'tags' => null,
+                'sort_order' => $order++,
+            ];
+
+            foreach ($category['nodes'] as $node) {
+                $rows[] = [
+                    'type' => AboutItemType::ThinkingNode,
+                    'title' => $node['label'],
+                    'subtitle' => $category['key'],
+                    'body' => $node['text'],
+                    'value' => null,
+                    'period' => null,
+                    'url' => null,
+                    'url_label' => null,
+                    'tags' => null,
+                    'sort_order' => $order++,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
      * The built-in board flattened into persistable rows, for the console's
      * "seed from defaults" action.
      * The mapping from the demo shape onto the generic item columns lives here,
@@ -872,34 +1110,39 @@ class AboutContent
     /**
      * The built-in "why hire me" prose, used until an operator manages it.
      *
+     * The six claims double as the capability cards floating around the
+     * portrait in section 02's orbit stage, so each body is a short phrase
+     * rather than a paragraph: the card has one line of room and the fuller
+     * argument lives in the two audience panels beneath it.
+     *
      * @return array<int, array{title: string, body: string}>
      */
     protected function defaultReasons(): array
     {
         return [
             [
-                'title' => 'I close loops',
-                'body' => 'Most teams do not lack talent; they lack someone who finishes. Feature, tests, docs, deploy, monitor — the work is done when the pager stays quiet, not when the pull request merges.',
+                'title' => 'Backend Engineering',
+                'body' => 'Clean, secure & maintainable code',
             ],
             [
-                'title' => 'Hiring for year two, not the launch',
-                'body' => 'Almost everything that makes a system expensive later was a reasonable decision in month one. You get the migrations, dashboards and runbooks that still read well when the original author is on holiday.',
+                'title' => 'API Development',
+                'body' => 'Integrations & third-party services',
             ],
             [
-                'title' => 'Backend depth where it fails at 3am',
-                'body' => 'Postgres query plans, Redis semantics, queue backpressure, cache invalidation — the parts of an application that break overnight are the parts I have spent eight-plus years specialising in.',
+                'title' => 'Scalable Architecture',
+                'body' => 'Modular & future-ready applications',
             ],
             [
-                'title' => 'Breadth at the edges, on purpose',
-                'body' => 'TypeScript, Go, Kubernetes and Terraform where the job needs them — enough to own a problem from model to ingress without pretending to be a specialist in six stacks at once.',
+                'title' => 'Automation & Tools',
+                'body' => 'Save time with efficient workflows',
             ],
             [
-                'title' => 'Writes like an engineer',
-                'body' => 'Design docs, decision records and incident reviews the next engineer can follow without a walkthrough. The writing on this site is the same habit, not a performance of it.',
+                'title' => 'Quality & Reliability',
+                'body' => 'Testing, validation & clean structure',
             ],
             [
-                'title' => 'Honest by default',
-                'body' => 'If a feature should not exist, I say so before you pay for it. The most expensive consultant in the room is the one whose answer is always yes.',
+                'title' => 'Client & Team Focus',
+                'body' => 'Clear communication and real solutions',
             ],
         ];
     }

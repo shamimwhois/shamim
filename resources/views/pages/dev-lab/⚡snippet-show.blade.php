@@ -8,6 +8,7 @@ use App\Support\Seo;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -43,7 +44,7 @@ use Livewire\Component;
  * posts to `/livewire/update` and the route group's middleware is not in that path. A
  * guest reads the page with no button on it and no way to make the request.
  */
-new #[Title('Snippet')] class extends Component
+new #[Title('Snippet')] #[Layout('layouts::feed')] class extends Component
 {
     /**
      * The snippet being read. Locked so a crafted request cannot swap the model out
@@ -290,295 +291,189 @@ new #[Title('Snippet')] class extends Component
         $this->snippet->view_count++;
     }
 }; ?>
-
-<div
+<x-log.reader
+    active="dev-lab"
     data-test="dev-lab-snippet"
-    @if ($this->previewPanes !== null)
-        x-data="labSandbox({
-            maxLineChars: {{ (int) config('dev_lab.max_log_line_chars') }},
-            panes: @js($this->previewPanes),
-        })"
-    @endif
+    :title="$snippet->title"
+    :eyebrow="$snippet->language->label()"
+    :back="route('dev-lab.gallery')"
+    :back-label="__('Gallery')"
+    :meta="array_filter([
+        trans_choice(':count line|:count lines', $snippet->lineCount(), ['count' => $snippet->lineCount()]),
+        trans_choice(':count view|:count views', $snippet->view_count, ['count' => $snippet->view_count]),
+        __('by :author · published :date', [
+            'author' => $snippet->user?->name ?? __('Someone'),
+            'date' => $snippet->published_at?->translatedFormat('j M Y') ?? __('undated'),
+        ]),
+    ])"
 >
-    {{-- ================================================================== --
-     | Header
-     --}}
-    <section class="relative overflow-hidden border-b border-ink-200 dark:border-ink-800">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
+    <div class="dn-reader-body">
+        @if (filled($snippet->description))
+            <p class="dn-reader-lead">{{ $snippet->description }}</p>
+        @endif
 
-        <div class="shell relative py-12 lg:py-16">
-            <nav aria-label="{{ __('Breadcrumb') }}">
-                <ol class="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400 dark:text-ink-500">
-                    <li>
-                        <a href="{{ route('home') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('Home') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li>
-                        <a href="{{ route('dev-lab.index') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('Developer Lab') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li>
-                        <a href="{{ route('dev-lab.gallery') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('Gallery') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li class="truncate text-ink-600 dark:text-ink-300">{{ $snippet->title }}</li>
-                </ol>
-            </nav>
-
-            <div class="mt-6 flex flex-wrap items-center gap-3">
-                <flux:badge :color="$snippet->language->badgeColor()">
-                    {{ $snippet->language->label() }}
-                </flux:badge>
-
-                <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                    {{ trans_choice(':count line|:count lines', $snippet->lineCount(), ['count' => $snippet->lineCount()]) }}
-                    &middot;
-                    {{ trans_choice(':count view|:count views', $snippet->view_count, ['count' => $snippet->view_count]) }}
-                </span>
-            </div>
-
-            <h1 class="mt-4 max-w-3xl text-[clamp(1.75rem,4vw,2.75rem)] font-semibold leading-[1.08] tracking-tightest text-ink-900 dark:text-ink-50">
-                {{ $snippet->title }}
-            </h1>
-
-            @if (filled($snippet->description))
-                <p class="mt-4 max-w-2xl text-base leading-relaxed text-ink-600 dark:text-ink-300">
-                    {{ $snippet->description }}
-                </p>
-            @endif
-
-            <p class="mt-4 font-mono text-2xs text-ink-400 dark:text-ink-500">
-                {{ __('by :author · published :date', [
-                    'author' => $snippet->user?->name ?? __('Someone'),
-                    'date' => $snippet->published_at?->translatedFormat('j M Y') ?? __('undated'),
-                ]) }}
-            </p>
-        </div>
-    </section>
-
-    {{-- ================================================================== --
-     | The code, as text
-     --}}
-    <section class="shell py-12 lg:py-14">
-        <div class="overflow-hidden rounded-xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-950">
-            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-ink-200 px-5 py-3 dark:border-ink-800">
-                <h2 class="font-mono text-2xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
-                    .{{ $snippet->language->fileExtension() }}
-                </h2>
+        {{-- The code, as text. A snippet page shows source the way a published
+             page shows prose: escaped, in a `<pre>`, never as nodes. --}}
+        <div class="dn-code">
+            <header class="dn-code-head">
+                <h2 class="dn-lab-pane-label">.{{ $snippet->language->fileExtension() }}</h2>
 
                 <button
                     type="button"
+                    class="dn-lab-link"
                     x-data="{ copied: false }"
                     x-on:click="$copy(@js($snippet->code)); copied = true; setTimeout(() => copied = false, 1800)"
-                    class="focus-ring inline-flex min-h-8 items-center gap-2 rounded-full border border-ink-200 px-3 font-mono text-2xs uppercase tracking-widest text-ink-600 transition-colors hover:border-signal-400 hover:text-signal-700 dark:border-ink-800 dark:text-ink-300"
                 >
                     <span x-text="copied ? '{{ __('Copied') }}' : '{{ __('Copy') }}'"></span>
                 </button>
             </header>
 
-            <div class="max-h-[36rem] overflow-auto bg-ink-950 px-5 py-4">
-                <pre class="font-mono text-xs leading-relaxed text-ink-100"><code>{{ $snippet->code }}</code></pre>
-            </div>
+            <pre class="dn-lab-code" style="max-height: 36rem; margin: 0; border-radius: 0;"><code>{{ $snippet->code }}</code></pre>
         </div>
 
-        {{-- ============================================================= --
-         | The preview, or the reason there isn't one
-         -- ============================================================= --}}
+        {{-- The preview, or the reason there isn't one --}}
         @if ($this->previewPanes !== null)
-            <div x-data="{ opened: false }" class="mt-6">
-                <div x-show="! opened" class="rounded-xl border border-ink-200 bg-white p-5 dark:border-ink-800 dark:bg-ink-950">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div class="max-w-xl">
-                            <h2 class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                                {{ __('Run this in a sandbox') }}
-                            </h2>
-                            <p class="mt-1.5 text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                                {{ __('This is somebody else’s code. The frame it runs in has no access to this site, your session, or this page, and nothing happens until you press the button. It can still loop, so Stop replaces it.') }}
-                            </p>
-                        </div>
+            <div x-data="{ opened: false }" class="dn-preview">
+                <div x-show="! opened" class="dn-band" style="border-bottom: 0;">
+                    <span class="dn-band-body">
+                        <span class="dn-band-title">{{ __('Run this in a sandbox') }}</span>
+                        <span class="dn-band-text">
+                            {{ __('This is somebody else’s code. The frame it runs in has no access to this site, your session, or this page, and nothing happens until you press the button. It can still loop, so Stop replaces it.') }}
+                        </span>
+                    </span>
 
-                        <flux:button
-                            x-on:click="opened = true; $nextTick(() => runStored())"
-                            variant="primary"
-                            icon="play"
-                        >
+                    <span class="dn-band-actions">
+                        <button type="button" class="dn-btn dn-btn-sm" x-on:click="opened = true; $nextTick(() => runStored())">
                             {{ __('Preview this snippet') }}
-                        </flux:button>
-                    </div>
+                        </button>
+                    </span>
                 </div>
 
-                <div x-show="opened" x-cloak class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-                    <section class="overflow-hidden rounded-xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-950">
-                        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-ink-200 px-5 py-3 dark:border-ink-800">
-                            <h2 class="font-mono text-2xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
-                                {{ __('Preview') }}
-                            </h2>
+                {{-- The factory is mounted here rather than on the outer div, so
+                     the offer and the frame keep separate scopes: `opened` belongs
+                     to the page, the sandbox's own state belongs to the frame. --}}
+                <div
+                    x-show="opened"
+                    x-cloak
+                    x-data="labSandbox({
+                        maxLineChars: {{ (int) config('dev_lab.max_log_line_chars') }},
+                        panes: @js($this->previewPanes),
+                    })"
+                    class="dn-lab-running"
+                >
+                    <div class="dn-lab-frame-column">
+                        <div class="dn-lab-pane-head">
+                            <span class="dn-lab-pane-label">{{ __('Preview') }}</span>
 
-                            <div class="flex items-center gap-3">
-                                <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                                    {{ __('allow-scripts only') }}
-                                </span>
-                                <button
-                                    type="button"
-                                    x-on:click="runStored()"
-                                    class="focus-ring rounded-full px-2 font-mono text-2xs uppercase tracking-widest text-signal-700 transition-colors hover:bg-signal-50 dark:text-signal-400 dark:hover:bg-signal-950/40"
-                                >
-                                    {{ __('Run again') }}
-                                </button>
-                                <button
-                                    type="button"
-                                    x-on:click="stop()"
-                                    class="focus-ring rounded-full px-2 font-mono text-2xs uppercase tracking-widest text-ink-500 transition-colors hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-900"
-                                >
-                                    {{ __('Stop') }}
-                                </button>
-                            </div>
-                        </header>
+                            <span class="dn-lab-pane-actions">
+                                <span class="dn-lab-pane-label">{{ __('allow-scripts only') }}</span>
+                                <button type="button" class="dn-lab-link" x-on:click="runStored()">{{ __('Run again') }}</button>
+                                <button type="button" class="dn-lab-link" x-on:click="stop()">{{ __('Stop') }}</button>
+                            </span>
+                        </div>
 
-                        <div class="bg-ink-100 p-3 dark:bg-ink-900">
+                        <div class="dn-lab-frame">
                             <iframe
                                 x-ref="preview"
                                 wire:ignore
                                 :srcdoc="frame"
                                 sandbox="allow-scripts"
                                 title="{{ __('Sandboxed preview of this snippet') }}"
-                                class="h-[24rem] w-full rounded-lg border border-ink-200 bg-white dark:border-ink-800"
+                                class="dn-lab-iframe"
+                                style="height: 24rem;"
                             ></iframe>
                         </div>
-                    </section>
+                    </div>
 
-                    <section class="overflow-hidden rounded-xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-950">
-                        <header class="flex items-center justify-between gap-3 border-b border-ink-200 px-5 py-3 dark:border-ink-800">
-                            <h2 class="font-mono text-2xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
-                                {{ __('Console') }}
-                            </h2>
+                    <div class="dn-lab-console-column">
+                        <div class="dn-lab-pane-head">
+                            <span class="dn-lab-pane-label">{{ __('Console') }}</span>
 
-                            <button
-                                type="button"
-                                x-on:click="clear()"
-                                class="focus-ring rounded-full px-2 font-mono text-2xs uppercase tracking-widest text-ink-500 transition-colors hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-900"
-                            >
-                                {{ __('Clear') }}
-                            </button>
-                        </header>
+                            <span class="dn-lab-pane-actions">
+                                <button type="button" class="dn-lab-link" x-on:click="clear()">{{ __('Clear') }}</button>
+                            </span>
+                        </div>
 
-                        <div wire:ignore class="max-h-60 overflow-y-auto bg-ink-950 px-4 py-3">
-                            <p x-show="lines.length === 0" class="font-mono text-2xs leading-relaxed text-ink-500">
+                        <div wire:ignore class="dn-lab-console" style="max-height: 15rem;">
+                            <p x-show="lines.length === 0" class="dn-lab-note">
                                 {{ __('Nothing logged yet. console.log, console.warn and uncaught errors from the frame arrive here. alert() is blocked and says so.') }}
                             </p>
 
-                            <ul class="space-y-1.5">
+                            <ul class="dn-lab-console-list">
                                 <template x-for="(line, index) in lines" :key="index">
-                                    <li class="font-mono text-2xs leading-relaxed">
-                                        <span class="text-ink-600" x-text="line.at"></span>
+                                    <li class="dn-lab-console-line">
+                                        <span class="dn-lab-console-at" x-text="line.at"></span>
                                         <span
-                                            :class="line.level === 'error' ? 'text-sui-danger' : (line.level === 'warn' ? 'text-sui-attention-ink' : 'text-ink-100')"
+                                            :class="line.level === 'error' ? 'is-error' : (line.level === 'warn' ? 'is-warn' : 'is-log')"
                                             x-text="line.text"
                                         ></span>
                                     </li>
                                 </template>
                             </ul>
                         </div>
-                    </section>
+                    </div>
                 </div>
             </div>
         @else
-            <div class="mt-6 rounded-xl border border-ink-200 bg-white p-5 dark:border-ink-800 dark:bg-ink-950">
-                <div class="flex items-start gap-3">
-                    <span aria-hidden="true" class="mt-0.5 text-ink-400 dark:text-ink-500">
-                        <flux:icon name="code-bracket" class="size-5" />
+            <div class="dn-band" style="border-bottom: 0; margin-top: 16px;">
+                <span class="dn-band-body">
+                    <span class="dn-band-title">{{ __('There is no Run button for PHP') }}</span>
+                    <span class="dn-band-text">
+                        {{ $snippet->language->runExplanation() }}
+                        {{ __('Copy it and run it where a PHP interpreter lives. There is no PHP pane in the sandbox either, so this has no Run button and no way to open it in an editor: the lab stores this code, lists it, and shows it as text.') }}
                     </span>
-                    <div>
-                        <h2 class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                            {{ __('There is no Run button for PHP') }}
-                        </h2>
-                        <p class="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                            {{ $snippet->language->runExplanation() }}
-                            {{ __('Copy it and run it where a PHP interpreter lives. There is no PHP pane in the sandbox either, so this has no Run button and no way to open it in an editor: the lab stores this code, lists it, and shows it as text.') }}
-                        </p>
-                    </div>
-                </div>
+                </span>
             </div>
         @endif
-    </section>
 
-    {{-- ================================================================== --
-     | More in the same language
-     --}}
-    @if ($this->alsoPublished->isNotEmpty())
-        <section class="shell border-t border-ink-200 py-12 dark:border-ink-800 lg:py-14">
-            <h2 class="text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                {{ __('More :language in the gallery', ['language' => $snippet->language->label()]) }}
-            </h2>
-
-            <ul class="mt-5 divide-y divide-ink-200 dark:divide-ink-800">
-                @foreach ($this->alsoPublished as $other)
-                    <li wire:key="also-{{ $other->id }}">
-                        <a
-                            href="{{ route('dev-lab.snippets.show', ['snippet' => $other->slug]) }}"
-                            wire:navigate
-                            class="focus-ring group flex flex-wrap items-baseline justify-between gap-3 py-3"
-                        >
-                            <span class="text-sm font-medium text-ink-800 transition-colors group-hover:text-signal-700 dark:text-ink-100 dark:group-hover:text-signal-400">
-                                {{ $other->title }}
-                            </span>
-                            <span class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">
-                                {{ $other->published_at?->translatedFormat('j M Y') }}
-                            </span>
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
-
-            <a
-                href="{{ route('dev-lab.gallery', ['lang' => $snippet->language->value]) }}"
-                wire:navigate
-                class="mt-6 inline-flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-signal-700 transition-colors hover:text-signal-800 dark:text-signal-400"
+        @if ($this->alsoPublished->isNotEmpty())
+            <x-log.section
+                :title="__('More :language in the gallery', ['language' => $snippet->language->label()])"
+                :count="trans_choice(':count snippet|:count snippets', $this->alsoPublished->count(), ['count' => $this->alsoPublished->count()])"
             >
-                {{ __('See the whole gallery') }}
-                <flux:icon name="arrow-long-right" class="size-3.5" />
-            </a>
-        </section>
-    @endif
+                <div class="dn-entries">
+                    @foreach ($this->alsoPublished as $other)
+                        <x-log.entry
+                            :href="route('dev-lab.snippets.show', ['snippet' => $other->slug])"
+                            :title="$other->title"
+                            :eyebrow="$other->language->label()"
+                            :description="$other->excerpt(120)"
+                            :meta="[$other->published_at?->translatedFormat('j M Y')]"
+                            :wire:key="'also-'.$other->id"
+                        />
+                    @endforeach
+                </div>
+            </x-log.section>
+        @endif
 
-    @if (auth()->check())
-        <section class="shell pb-14" data-test="snippet-sandbox-offer">
-            <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-ink-200 bg-white p-5 dark:border-ink-800 dark:bg-ink-950">
-                <p class="max-w-xl text-sm leading-relaxed text-ink-600 dark:text-ink-300">
+        @auth
+            <div class="dn-band" data-test="snippet-sandbox-offer" style="border-bottom: 0; margin-top: 24px;">
+                <span class="dn-band-body">
+                    <span class="dn-band-text">
+                        @if ($this->canClone)
+                            {{ __('Copy this into a workspace of your own and change it there. It lands in the pane its language names, the two others are emptied, and your copy stays private until you publish it. Pressing this twice re-opens the same buffer rather than filling your shelf with copies.') }}
+                        @else
+                            {{ __('The sandbox is the same editor this came out of, with a Save button and a byte counter. Your own work stays private until you publish it.') }}
+                        @endif
+                    </span>
+                </span>
+
+                <span class="dn-band-actions">
                     @if ($this->canClone)
-                        {{ __('Copy this into a workspace of your own and change it there. It lands in the pane its language names, the two others are emptied, and your copy stays private until you publish it. Pressing this twice re-opens the same buffer rather than filling your shelf with copies.') }}
-                    @else
-                        {{ __('The sandbox is the same editor this came out of, with a Save button and a byte counter. Your own work stays private until you publish it.') }}
-                    @endif
-                </p>
-
-                @if ($this->canClone)
-                    <div class="flex flex-wrap items-center gap-2">
-                        <flux:button
-                            wire:click="openInSandbox"
-                            data-test="clone-to-workspace"
-                            variant="primary"
-                            icon="arrow-long-right"
-                        >
+                        <button type="button" class="dn-btn dn-btn-sm" wire:click="openInSandbox" data-test="clone-to-workspace">
                             {{ __('Open in your sandbox') }}
-                        </flux:button>
+                        </button>
 
-                        <flux:button :href="route('dev-lab.sandbox')" wire:navigate size="sm" variant="ghost">
+                        <a href="{{ route('dev-lab.sandbox') }}" wire:navigate class="dn-btn dn-btn-outline dn-btn-sm">
                             {{ __('Or start a clean buffer') }}
-                        </flux:button>
-                    </div>
-                @else
-                    <flux:button :href="route('dev-lab.sandbox')" wire:navigate variant="primary">
-                        {{ __('Open the sandbox') }}
-                    </flux:button>
-                @endif
+                        </a>
+                    @else
+                        <a href="{{ route('dev-lab.sandbox') }}" wire:navigate class="dn-btn dn-btn-sm">
+                            {{ __('Open the sandbox') }}
+                        </a>
+                    @endif
+                </span>
             </div>
-        </section>
-    @endif
-</div>
+        @endauth
+    </div>
+</x-log.reader>

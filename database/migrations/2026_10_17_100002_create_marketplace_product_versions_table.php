@@ -26,8 +26,10 @@ return new class extends Migration
             $table->timestamp('released_at');
             $table->timestamps();
 
-            $table->unique(['marketplace_product_id', 'version']);
-            $table->index(['marketplace_product_id', 'released_at']);
+            // Index names are given explicitly: the generated names would exceed
+            // MySQL's 64-character identifier limit.
+            $table->unique(['marketplace_product_id', 'version'], 'mpv_product_version_unique');
+            $table->index(['marketplace_product_id', 'released_at'], 'mpv_product_released_index');
         });
     }
 

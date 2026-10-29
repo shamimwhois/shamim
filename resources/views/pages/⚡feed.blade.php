@@ -1,56 +1,76 @@
 <?php
 
-use App\Actions\Communities\ToggleCommunityMembership;
-use App\Enums\CommunityKind;
-use App\Models\Community;
+use App\Actions\Feed\AttachFeedMedia;
+use App\Actions\Feed\ComposeFeedPost;
+use App\Actions\Feed\DetachFeedMedia;
+use App\Actions\Feed\ScheduleFeedPost;
+use App\Concerns\ReportsCommits;
+use App\Concerns\VotesInPolls;
+use App\Enums\FeedPostAudience;
 use App\Models\FeedPost;
-use App\Models\MarketplaceProduct;
+use App\Models\FeedReply;
+use App\Models\FeedStar;
 use App\Models\User;
+use App\Support\CommitBody;
 use App\Support\Seo;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Collection as BaseCollection;
-use Illuminate\Validation\UnauthorizedException;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
- * The community feed — social + forum hybrid.
+ * The Log — the /feed surface, drawn as a git log.
+ *
+ * A post is a **commit**, the timeline is a **log**, and the only engagement
+ * verb is a **star**. The surface reads one collection ({@see commits()}) and
+ * every widget on the page derives from it: the rail's lanes, the day markers,
+ * the root node, the aside's active developers and the search palette all come
+ * from the rows this component already loaded, so a render costs one query
+ * regardless of how many widgets paint.
+ *
+ * Three logs, one URL: `?log=following|latest|trending`. The tab is URL state
+ * rather than a second page, so a log is linkable and the back button moves
+ * between logs the way the tabs do.
+ *
+ * Everything that writes is gated. A guest reads every public commit; starring,
+ * replying and committing each check for an account and send the visitor to the
+ * sign-in dialog instead of failing silently.
  */
-new #[Title('Feed')] class extends Component
+new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
 {
-    /** Cards shown per page; Load more raises it. */
-    private const PAGE_SIZE = 3;
+    use ReportsCommits;
+    use VotesInPolls;
+    use WithFileUploads;
 
-    /** Renderable content types; `all` is the unfiltered view. */
-    private const TYPES = ['all', 'question', 'discussion', 'showcase', 'snippet', 'article', 'poll'];
+    /** How many authors share the six lane colours. */
+    private const LANES = 6;
 
-    /** Orderings, in the order the rail and the segment render them. */
-    private const SORTS = ['for-you', 'following', 'latest', 'trending', 'unanswered', 'solved'];
+    /** Commits rendered before "Load older commits" is offered. */
+    private const PAGE_SIZE = 12;
 
-    /** The canonical topic rail, in corpus order. */
-    private const TOPIC_LABELS = [
-        'backend' => 'Backend',
-        'frontend' => 'Frontend',
-        'tooling' => 'Tooling',
-        'community' => 'Community',
-    ];
+    /** The three logs, in tab order. */
+    private const LOGS = ['following', 'latest', 'trending'];
 
-    /** Active topic slug; null = all topics. Bound to `?category=`. */
-    #[Url]
-    public ?string $category = null;
+    /** A commit's body limit, in characters. */
+    private const MAX_BODY = 4000;
 
-    /** Feed ordering: for-you | following | latest | trending | unanswered. Bound to `?sort=`. */
-    #[Url]
-    public string $sort = 'for-you';
+    /** A reply's body limit, in characters. */
+    private const MAX_REPLY = 1000;
 
-    /** Content-type filter. Bound to `?type=`. */
-    #[Url]
-    public string $type = 'all';
+    /** After how many commits the "who to follow" interlude is placed. */
+    private const INTERLUDE_AFTER = 5;
 
-    /** Full-text filter across author, body, title and tags. Bound to `?q=`. */
+    /** Which log is showing. Bound to `?log=`. */
+    #[Url(as: 'log')]
+    public string $log = 'latest';
+
+    /** Full-text filter across author, handle, body and tags. Bound to `?q=`. */
     #[Url]
     public string $q = '';
 
@@ -58,67 +78,133 @@ new #[Title('Feed')] class extends Component
     #[Url]
     public ?string $tag = null;
 
-    /** How many filtered cards the feed currently renders. */
+    /** Commit type filter; `all` = every type. Bound to `?type=`. */
+    #[Url(as: 'type')]
+    public string $type = 'all';
+
+    /** Topic filter; `all` = every topic. Bound to `?topic=`. */
+    #[Url(as: 'topic')]
+    public string $topic = 'all';
+
+    /** The composer's unsent body. */
+    public string $draft = '';
+
+    /**
+     * The images the composer is holding, still in Livewire's staging area.
+     *
+     * @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile>|\Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null
+     */
+    public $uploads = null;
+
+    /** Ownership key for images staged before the commit exists. */
+    public string $tempKey = '';
+
+    /** The composer is set to hand the commit to the scheduler, not to the log. */
+    public bool $scheduling = false;
+
+    /** The moment a scheduled commit goes live. */
+    public string $scheduledAt = '';
+
+    /** The composer is writing a poll instead of a plain commit. */
+    public bool $askingPoll = false;
+
+    /** The choices the poll offers, as the author typed them. */
+    public array $pollOptions = ['', ''];
+
+    /** When the poll closes, in whatever words the author chose. */
+    public string $pollCloses = '';
+
+    /** The commit whose thread is expanded, if any. */
+    public ?int $threadId = null;
+
+    /** The commit whose reply composer is open, if any. */
+    public ?int $replyTo = null;
+
+    /** The reply being written. */
+    public string $replyDraft = '';
+
+    /** How many commits the stream currently renders. */
     public int $visible = self::PAGE_SIZE;
 
-    /**
-     * The newest post id the stream has already shown.
-     *
-     * The live feed's cursor: anything above this arrived after the page was
-     * opened and is announced by the pill instead of being inserted under the
-     * reader's scroll position.
-     */
-    public int $seenThroughId = 0;
+    /** The palette's query. */
+    public string $search = '';
 
-    /** Posts waiting behind the "new posts" pill. */
-    public int $pendingNew = 0;
+    /** Whether the palette is open. */
+    public bool $searchOpen = false;
 
-    /**
-     * Ids revealed by the last "show new posts" click, so their cards can
-     * animate in once instead of appearing mid-morph.
-     *
-     * @var array<int, int>
-     */
+    /** A transient mono status line, printed the way `git commit` reports. */
+    public ?string $toast = null;
+
+    /** Ids of commits that arrived from the live poll, so they can animate once. */
     public array $freshIds = [];
 
-    /** The community whose invite-only gate refused the last join attempt. */
-    public ?string $refusedSlug = null;
+    /** The newest commit id the stream has already shown. */
+    public int $seenThroughId = 0;
+
+    /** Commits waiting behind the "new commits" pill. */
+    public int $pendingNew = 0;
+
+    /** The commit this reader last saw, so the log can print `HEAD@{last visit}`. */
+    public ?int $lastVisitId = null;
+
+    /** The commit the last delete removed, while it can still be restored. */
+    public ?int $undoableId = null;
 
     public function mount(): void
     {
         // The head partial reads its metadata from the per-request Seo
         // singleton; the #[Title] attribute alone never reaches it.
         app(Seo::class)->set([
-            'title' => 'Community Feed',
-            'description' => __('Compare notes with the community: discussions, diffs and answers across the stack.'),
+            'title' => 'The Log',
+            'description' => __('The community log: what developers shipped, in the order they shipped it.'),
         ]);
 
-        if ($this->category !== null && ! in_array($this->category, array_keys(self::TOPIC_LABELS), true)) {
-            $this->category = null;
+        if (! in_array($this->log, self::LOGS, true)) {
+            $this->log = 'latest';
         }
 
-        if (! in_array($this->sort, self::SORTS, true)) {
-            $this->sort = 'for-you';
-        }
+        /*
+         * A filter that no longer matches anything is a dead URL somebody
+         * bookmarked, not an error: it falls back to `all` rather than
+         * rendering an empty log with no explanation. The vocabulary is read
+         * from the corpus, so a new commit type needs no code change here.
+         */
+        $this->type = $this->known($this->type, 'type');
+        $this->topic = $this->known($this->topic, 'topic');
 
-        if (! in_array($this->type, self::TYPES, true)) {
-            $this->type = 'all';
-        }
+        // The stream starts caught up: everything already in the corpus is
+        // visible, and only commits arriving from here on are held back.
+        $this->seenThroughId = (int) FeedPost::query()->visible()->max('id');
 
-        // A crafted tag degrades to the untagged view, exactly like the other
-        // URL-bound filters: the tag must exist in the corpus to mean anything.
-        if ($this->tag !== null && ! collect($this->trendingTags)->contains(fn (array $trend): bool => $trend['tag'] === $this->tag)) {
-            $this->tag = null;
-        }
+        // Where the reader left off last time, then remember where they are
+        // now. Reading the marker before writing it is what makes the line
+        // mean "since you were last here" rather than "since this render".
+        $seen = (int) session()->get('feed.last_visit_id', 0);
+        $this->lastVisitId = $seen > 0 && $seen < $this->seenThroughId ? $seen : null;
 
-        // The stream starts "caught up": everything already in the corpus is
-        // visible, and only posts arriving from here on are held back. Reading
-        // the cursor off the memoised collection keeps the page at its one
-        // corpus query — a separate MAX(id) would be a second round trip for
-        // the same rows.
-        $this->seenThroughId = (int) $this->posts->max('id');
+        session()->put('feed.last_visit_id', $this->seenThroughId);
     }
 
+    /**
+     * Narrow a URL filter to a value the corpus actually carries.
+     */
+    private function known(string $value, string $column): string
+    {
+        if ($value === 'all') {
+            return 'all';
+        }
+
+        $exists = FeedPost::query()->visible()->where($column, $value)->exists();
+
+        return $exists ? $value : 'all';
+    }
+
+    /**
+     * Poll for commits that arrived since the page opened.
+     *
+     * They are counted, not inserted: a stream that moves under the reader's
+     * scroll position is worse than one that is a few seconds stale.
+     */
     public function syncFeed(): void
     {
         $latest = (int) FeedPost::query()->visible()->max('id');
@@ -129,879 +215,1190 @@ new #[Title('Feed')] class extends Component
             return;
         }
 
-        // Count only what the current view would actually show: a pill that
-        // announces posts the active filter excludes would empty itself when
-        // clicked. `posts()` is memoised, so this is an in-memory pass.
-        $this->pendingNew = $this->posts
-            ->filter(fn (FeedPost $post): bool => $post->id > $this->seenThroughId && $this->matchesFilters($post))
+        $this->pendingNew = $this->commits
+            ->filter(fn (FeedPost $post): bool => $post->id > $this->seenThroughId)
             ->count();
     }
 
     /**
-     * Fold the announced posts into the stream, once, with an entry animation.
+     * Fold the announced commits into the stream, once, with an entry animation.
      */
-    public function showNewPosts(): void
+    public function showNewCommits(): void
     {
-        $fresh = FeedPost::query()
+        $this->freshIds = FeedPost::query()
             ->visible()
             ->where('id', '>', $this->seenThroughId)
             ->pluck('id')
+            ->map(fn (int|string $id): int => (int) $id)
             ->all();
 
-        $this->freshIds = array_map(intval(...), $fresh);
         $this->seenThroughId = (int) FeedPost::query()->visible()->max('id');
         $this->pendingNew = 0;
-
-        // Reveal every arrived post on top of what was already rendered, so
-        // the click never hides cards the reader was looking at.
         $this->visible += count($this->freshIds);
+
+        unset($this->commits, $this->starredIds);
     }
 
     /**
-     * A post the reader just published joins the stream at once.
+     * A commit the reader just published joins the stream at once.
      *
-     * It is not held behind the live pill: the author pressed Publish, so the
-     * card appearing at the top of the stream is the confirmation. Every
-     * memoised widget is dropped rather than patched, because the new row can
-     * change the topic counts, the trending tags, the bounty card and the pulse
-     * total all at once — the corpus re-reads in the single query `posts()`
-     * already costs, which is the same fold the pill's own reveal uses.
+     * The author pressed Commit, so the row appearing at the top is the
+     * confirmation — it is not held behind the pill.
      */
     #[On('feed-post-published')]
-    public function onPostPublished(int $id): void
+    public function onCommitPublished(int $id): void
     {
-        unset(
-            $this->posts,
-            $this->topics,
-            $this->filteredPosts,
-            $this->visiblePosts,
-            $this->hasMore,
-            $this->bounties,
-            $this->joinedCommunityIds,
-            $this->followingTopics,
-            $this->typeCounts,
-            $this->trendingTags,
-            $this->contributors,
-        );
+        unset($this->commits, $this->starredIds, $this->activeAuthors, $this->stats);
 
         $this->freshIds = [$id];
         $this->seenThroughId = max($this->seenThroughId, $id);
         $this->pendingNew = 0;
         $this->visible += 1;
+        $this->draft = '';
+        $this->log = 'latest';
     }
 
     /**
-     * Any filter change restarts paging from the top of the new set. The five
-     * URL-bound filters share one body, so the rule lives in a single place.
+     * Any filter change restarts paging from the top of the new set.
      */
     public function updated(string $property): void
     {
-        if (in_array($property, ['category', 'sort', 'q', 'type', 'tag'], true)) {
+        if (in_array($property, ['log', 'q', 'tag', 'type', 'topic'], true)) {
             $this->visible = self::PAGE_SIZE;
         }
     }
 
+    /** Reveal the next page of commits. */
     public function loadMore(): void
     {
         $this->visible += self::PAGE_SIZE;
     }
 
-    /** Reset every filter at once; used by the empty state. */
-    public function clearFilters(): void
-    {
-        $this->category = null;
-        $this->sort = 'for-you';
-        $this->type = 'all';
-        $this->tag = null;
-        $this->q = '';
-        $this->visible = self::PAGE_SIZE;
-    }
-
     /**
-     * Every visible post, in curated order — the one query the page runs.
+     * Publish the composer's body as a commit.
      *
-     * Curated order (pinned, then featured, then newest) is the `for-you`
-     * ordering; the rail and every widget derive from this collection, so a
-     * render costs one SQL statement no matter how many widgets paint.
+     * The write goes through {@see ComposeFeedPost} — the same action the
+     * composer dialog uses — so the rate limit, the publish gate and the
+     * byline snapshot are identical no matter which composer started it.
+     * When the composer is holding images, their staging key travels with
+     * the write and the action claims them for the row it creates.
      *
-     * @return Collection<int, FeedPost>
+     * When the composer is set to schedule instead, the commit goes to the
+     * scheduler: the same content write, then a publication moment. The
+     * staged images are claimed afterwards, because the scheduler returns
+     * the row rather than taking a key.
      */
-    #[Computed]
-    public function posts(): Collection
+    public function push(): void
     {
-        // `with('attachments')` is the one query the composer's published media
-        // costs the stream. It replaces a query rather than adding one: the
-        // bounty card used to run its own, and it now reads this collection.
-        return FeedPost::query()->visible()->with('attachments')->curated()->get();
-    }
+        $reader = $this->reader();
 
-    /**
-     * Feed topics with live counts, plus the totals the chrome needs.
-     *
-     * @return array{items: array<int, array{slug: string, label: string, count: int}>, total: int, unansweredCount: int, questionCount: int}
-     */
-    #[Computed]
-    public function topics(): array
-    {
-        $counts = [];
-        $unanswered = 0;
 
-        foreach ($this->posts as $post) {
-            $counts[$post->topic] = ($counts[$post->topic] ?? 0) + 1;
-
-            if ($post->isQuestion() && ! $post->answered) {
-                $unanswered++;
-            }
-        }
-
-        $items = array_map(function (string $slug, string $label) use ($counts): array {
-            return ['slug' => $slug, 'label' => $label, 'count' => $counts[$slug] ?? 0];
-        }, array_keys(self::TOPIC_LABELS), self::TOPIC_LABELS);
-
-        return [
-            'items' => $items,
-            'total' => $this->posts->count(),
-            'unansweredCount' => $unanswered,
-            'questionCount' => $this->posts->filter(fn ($post) => $post->isQuestion())->count(),
-        ];
-    }
-
-    /**
-     * The stream filtered by the URL-bound topic, search and ordering.
-     *
-     * Filters run in memory over the memoised collection rather than as extra
-     * SQL: the rail needs the unfiltered set anyway, so a second query would
-     * pay twice for the same ten rows on every keystroke.
-     *
-     * @return BaseCollection<int, FeedPost>
-     */
-    #[Computed]
-    public function filteredPosts(): BaseCollection
-    {
-        // Posts that arrived after the page opened wait behind the pill. They
-        // are still counted by the masthead and the pulse card — the stream is
-        // the one surface that must not move under the reader.
-        $posts = $this->posts
-            ->filter(fn (FeedPost $post): bool => $post->id <= $this->seenThroughId && $this->matchesFilters($post))
-            ->values();
-
-        // Curated order (pinned, then featured, then newest) already holds
-        // for `for-you` and degrades to the same order for `latest`.
-        if ($this->sort === 'following') {
-            // The following view is the content of the circles the reader
-            // actually joined — their topics, in the same curated order.
-            // Guests and non-members get the honest empty state, not a
-            // hardcoded list of demo handles.
-            $topics = $this->followingTopics;
-            $posts = $posts->filter(fn (FeedPost $post): bool => in_array($post->topic, $topics, true))->values();
-        } elseif ($this->sort === 'trending') {
-            $posts = $posts->sortByDesc(fn (FeedPost $post): int => $post->reactionSum())->values();
-        } elseif ($this->sort === 'unanswered') {
-            $posts = $posts->filter(fn (FeedPost $post): bool => $post->isQuestion() && ! $post->answered)->values();
-        } elseif ($this->sort === 'solved') {
-            $posts = $posts->filter(fn (FeedPost $post): bool => $post->isQuestion() && $post->answered)->values();
-        }
-
-        return $posts;
-    }
-
-    /**
-     * The topic / type / search / audience predicate, shared by the stream and
-     * the live poll so the pill and the view can never disagree about what is
-     * new.
-     *
-     * Audience is decided here rather than in SQL on purpose. `visible()` is the
-     * corpus-wide definition of publicly readable and every widget derives from
-     * that one collection; pushing a per-reader predicate into it would give the
-     * rail, the pulse counts and the stream three different answers to "how many
-     * posts are there". The reader's memberships are already in memory.
-     */
-    private function matchesFilters(FeedPost $post): bool
-    {
-        if (! $post->isVisibleTo($this->reader, $this->joinedCommunityIds)) {
-            return false;
-        }
-        if ($this->category !== null && $post->topic !== $this->category) {
-            return false;
-        }
-
-        if ($this->type !== 'all' && $post->type !== $this->type) {
-            return false;
-        }
-
-        if ($this->tag !== null && ! in_array($this->tag, $post->tags, true)) {
-            return false;
-        }
-
-        $needle = mb_strtolower(trim($this->q));
-
-        if ($needle === '') {
-            return true;
-        }
-
-        return str_contains(
-            mb_strtolower($post->title.' '.$post->body.' '.$post->author.' '.implode(' ', $post->tags)),
-            $needle,
-        );
-    }
-
-    /**
-     * The slice of filtered posts the feed currently renders.
-     *
-     * @return BaseCollection<int, FeedPost>
-     */
-    #[Computed]
-    public function visiblePosts(): BaseCollection
-    {
-        return $this->filteredPosts->take($this->visible);
-    }
-
-    /** How many cards are rendered versus how many match, for the count line. */
-    #[Computed]
-    public function hasMore(): bool
-    {
-        return $this->filteredPosts->count() > $this->visible;
-    }
-
-    /**
-     * Questions still waiting on an answer, hottest first.
-     *
-     * An in-memory projection over the memoised corpus, not a second query.
-     * This is provably the same set the old `visible()->unanswered()` builder
-     * returned: `posts()` is the unfiltered visible corpus, and "is a question
-     * and is unanswered" — the `unanswered()` scope — is a subset of its
-     * conditions. Dropping the round trip here is what pays for the attachment
-     * eager load, so the page's pinned four-query budget is unchanged.
-     *
-     * @return Collection<int, FeedPost>
-     */
-    #[Computed]
-    public function bounties(): Collection
-    {
-        return $this->posts
-            ->filter(fn (FeedPost $post): bool => $post->isQuestion() && ! $post->answered)
-            ->sortByDesc('score')
-            ->take(2)
-            ->values();
-    }
-
-    /**
-     * The community ids the signed-in reader belongs to.
-     *
-     * Read off the memoised directory rather than the pivot: `communities()`
-     * already eager-loads this reader's membership rows, so answering "did they
-     * join?" for a post's audience costs nothing it was not already paying for.
-     *
-     * @return array<int, int>
-     */
-    #[Computed]
-    public function joinedCommunityIds(): array
-    {
-        return array_column(
-            array_filter($this->communities, fn (array $community): bool => $community['joined']),
-            'id',
-        );
-    }
-
-    /**
-     * The topics of the communities the signed-in reader joined — what the
-     * `following` sort renders. Empty for guests and non-members.
-     *
-     * @return array<int, string>
-     */
-    #[Computed]
-    public function followingTopics(): array
-    {
-        $user = auth()->user();
-
-        if ($user === null) {
-            return [];
-        }
-
-        return Community::query()
-            ->whereHas('memberships', fn ($query) => $query->where('user_id', $user->id))
-            ->pluck('topic')
-            ->all();
-    }
-
-    /**
-     * The whole community directory, busiest first, with the reader's state.
-     *
-     * Real directory rows, not curated demo entries: member counts derive
-     * from the pivot rows with `withCount` (a counter column cannot drift),
-     * and `joined` reflects the signed-in account's own membership.
-     *
-     * The list is NOT limited: the rail wants six rows and the inspector a
-     * bounded sample, but the "All communities" row wants the true total,
-     * and a second `count()` query for that number would be the fifth round
-     * trip the page's budget does not have. Consumers slice.
-     *
-     * @return array<int, array{slug: string, label: string, topic: string, glyph: string, members: int, joined: bool, invite_only: bool}>
-     */
-    #[Computed]
-    public function communities(): array
-    {
-        $user = auth()->user();
-
-        return Community::query()
-            ->withCount('memberships')
-            ->when($user !== null, fn ($query) => $query->with(['memberships' => fn ($member) => $member->where('user_id', $user->id)]))
-            ->orderByDesc('memberships_count')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (Community $community): array => [
-                'id' => $community->id,
-                'slug' => $community->slug,
-                'label' => $community->name,
-                'topic' => $community->topic,
-                'glyph' => $community->glyph,
-                'members' => $community->memberships_count,
-                // Never touch the relation when it was not loaded: a guest's
-                // render would lazy-load one query per community.
-                'joined' => $user !== null && $community->memberships->isNotEmpty(),
-                'invite_only' => $community->kind === CommunityKind::InviteOnly,
-            ])
-            ->all();
-    }
-
-    /**
-     * How many communities the directory holds — the rail's "All
-     * communities" row count and the section header's badge.
-     *
-     * Derived from the memoised directory collection rather than a second
-     * query: the page's four-query budget has no room for a fifth, and the
-     * rows it counts are already in memory.
-     */
-    #[Computed]
-    public function communityCount(): int
-    {
-        return count($this->communities);
-    }
-
-    /**
-     * Live counts for the forum section of the navigation rail.
-     *
-     * Every figure is a pass over the memoised corpus — no query, and no
-     * number the corpus cannot back. Each renderable type is counted, plus
-     * the `solved` pseudo-count (answered questions) the forum rows show.
-     *
-     * @return array{question: int, discussion: int, article: int, snippet: int, showcase: int, poll: int, solved: int}
-     */
-    #[Computed]
-    public function typeCounts(): array
-    {
-        $counts = ['question' => 0, 'discussion' => 0, 'article' => 0, 'snippet' => 0, 'showcase' => 0, 'poll' => 0, 'solved' => 0];
-
-        foreach ($this->posts as $post) {
-            if (isset($counts[$post->type])) {
-                $counts[$post->type]++;
-            }
-
-            if ($post->isQuestion() && $post->answered) {
-                $counts['solved']++;
-            }
-        }
-
-        return $counts;
-    }
-
-    /**
-     * The marketplace's front page, for the inspector's Featured projects.
-     *
-     * The documented ranking rule is the platform's own: featured first, then
-     * most recently published. An empty directory renders an empty state, not
-     * invented listings.
-     *
-     * @return Collection<int, MarketplaceProduct>
-     */
-    #[Computed]
-    public function featuredProducts(): Collection
-    {
-        return MarketplaceProduct::query()
-            ->published()
-            ->featured()
-            ->latest('published_at')
-            ->limit(2)
-            ->get();
-    }
-
-    /**
-     * Join or leave a community as the signed-in reader — the same toggle the
-     * directory page uses, so both surfaces agree on what membership means.
-     */
-    public function toggleMembership(string $slug): void
-    {
-        $user = auth()->user();
-
-        if ($user === null) {
-            // Stay on the feed with the login dialog open rather than walking
-            // the reader to a separate screen mid-scroll. The flag is what the
-            // dialog reads to open itself; the route's own guard still refuses
-            // a guest who reaches the destination any other way.
+        if ($reader === null) {
             $this->redirectRoute('feed.index', ['signin' => 'required']);
 
             return;
         }
 
-        $community = Community::query()->where('slug', $slug)->first();
+        $this->validate([
+            'draft' => ['required', 'string', 'max:'.self::MAX_BODY],
+        ], attributes: ['draft' => __('commit')]);
 
-        if ($community === null) {
-            return;
+        $data = [
+            'body' => trim($this->draft),
+            'title' => null,
+            'type' => $this->askingPoll ? 'poll' : 'discussion',
+            'topic' => 'community',
+            'tags' => [],
+            'audience' => FeedPostAudience::Public,
+            'community_id' => null,
+            'ai_label' => null,
+            'code' => null,
+            'code_file' => null,
+            // The write path shapes the poll (two distinct choices minimum,
+            // votes re-summed, empties dropped), so the composer hands over
+            // what the author typed and lets the action decide what survives.
+            'poll' => $this->askingPoll ? [
+                'options' => $this->pollOptions,
+                'closes' => trim($this->pollCloses),
+            ] : null,
+            'activity' => null,
+        ];
+
+        if ($this->scheduling) {
+            $this->validate([
+                'scheduledAt' => ['required', 'date', 'after:now'],
+            ], attributes: ['scheduledAt' => __('schedule')]);
         }
 
         try {
-            app(ToggleCommunityMembership::class)->handle($user, $community);
-        } catch (UnauthorizedException) {
-            // Visible refusal at the widget, never a hidden button.
-            $this->refusedSlug = $slug;
+            $post = $this->scheduling
+                ? app(ScheduleFeedPost::class)->handle($reader, $data, $this->scheduledAt)
+                : app(ComposeFeedPost::class)->handle($reader, $data, null, $this->tempKey);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            // The scheduler refuses a moment in the past under its own key, so
+            // the message is relayed rather than lost to a validator nobody
+            // asked about.
+            if ($exception->errors()['scheduled_at'] ?? false) {
+                $this->addError('scheduledAt', $exception->errors()['scheduled_at'][0]);
+            }
+
+            throw $exception;
+        }
+
+        if ($this->scheduling && $this->tempKey !== '') {
+            app(AttachFeedMedia::class)->claim($post, $this->tempKey, $reader);
+        }
+
+        $this->resetComposer();
+
+        if (! $this->scheduling) {
+            // A scheduled commit is not in the log yet — no fresh row to
+            // animate, no pill to raise. `commit-published` still goes out:
+            // it only clears the composer's client-side draft.
+            $this->onCommitPublished($post->id);
+        }
+
+        $this->toast = $this->scheduling
+            ? '[scheduled] '.Str::limit(Str::squish($post->body), 48)
+            : '[log '.CommitBody::shortHash($post->slug).'] '.Str::limit(
+                Str::squish($post->body),
+                48,
+            );
+
+        $this->dispatch('commit-published');
+    }
+
+    /**
+     * Put the composer away after a write.
+     *
+     * The words and the images are spent; the schedule choice is a preference
+     * about the *next* commit and stays where the reader left it.
+     */
+    private function resetComposer(): void
+    {
+        $this->draft = '';
+        $this->uploads = null;
+        $this->tempKey = '';
+        $this->scheduledAt = '';
+        $this->pollOptions = ['', ''];
+        $this->pollCloses = '';
+
+        unset($this->stagedMedia);
+    }
+
+    /**
+     * The images staged under this composer's key.
+     *
+     * Only evaluated once the composer is holding something: a reader who
+     * never opens the picker pays nothing for the grid.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\FeedAttachment>
+     */
+    #[Computed]
+    public function stagedMedia(): \Illuminate\Support\Collection
+    {
+        $reader = $this->reader();
+
+        if ($reader === null || $this->tempKey === '') {
+            return \Illuminate\Support\Collection::make();
+        }
+
+        return \App\Models\FeedAttachment::query()
+            ->where('user_id', $reader->id)
+            ->where('temp_key', $this->tempKey)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Store what Livewire has just finished transferring.
+     *
+     * Files are staged before any row exists — that is what the temp key is
+     * for — and claimed by the write. A file the disk refuses is reported by
+     * the action and never reaches the grid.
+     */
+    public function updatedUploads(): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            $this->uploads = null;
 
             return;
         }
 
-        $this->refusedSlug = null;
+        $files = collect($this->uploads ?? [])->filter()->values()->all();
 
-        // Drop both memoised properties so member counts and the `following`
-        // sort re-read the pivot state instead of serving the pre-toggle set.
-        unset($this->communities, $this->followingTopics);
-    }
+        if ($files === []) {
+            return;
+        }
 
-    /** The signed-in reader, or null when the feed is browsed anonymously. */
-    #[Computed]
-    public function reader(): ?User
-    {
-        /** @var User|null $reader */
-        $reader = auth()->user();
+        /** @var int $cap */
+        $cap = (int) config('feed.composer.max_attachments', 8);
 
-        return $reader;
-    }
+        $this->validate([
+            'uploads' => ['array', 'max:'.$cap],
+            'uploads.*' => [
+                'image',
+                'mimes:jpg,jpeg,png,webp,gif',
+                'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
+            ],
+        ], [
+            'uploads.*.image' => __('Only image files can be attached to a commit.'),
+        ]);
 
-    /** Up to two initials for the reader's avatar fallback. */
-    #[Computed]
-    public function readerInitials(): string
-    {
-        $name = trim((string) $this->reader?->name);
+        if ($this->tempKey === '') {
+            $this->tempKey = (string) Str::uuid();
+        }
 
-        return collect(preg_split('/\s+/', $name) ?: [])
-            ->filter()
-            ->map(fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)))
-            ->take(2)
-            ->implode('');
+        app(AttachFeedMedia::class)->handle(null, $reader, $files, $this->tempKey);
+
+        $this->uploads = null;
+
+        unset($this->stagedMedia);
     }
 
     /**
-     * Tag frequencies across the whole corpus, hottest first.
-     *
-     * @return array<int, array{tag: string, count: int}>
+     * Delete one staged image and the bytes under it.
      */
-    #[Computed]
-    public function trendingTags(): array
+    public function removeMedia(int $id): void
     {
-        $counts = [];
-        foreach ($this->posts as $post) {
-            foreach ($post->tags as $tag) {
-                $counts[$tag] = ($counts[$tag] ?? 0) + 1;
+        $reader = $this->reader();
+
+        if ($reader === null || $this->tempKey === '') {
+            return;
+        }
+
+        $attachment = \App\Models\FeedAttachment::query()
+            ->where('user_id', $reader->id)
+            ->where('temp_key', $this->tempKey)
+            ->find($id);
+
+        if ($attachment === null) {
+            return;
+        }
+
+        app(DetachFeedMedia::class)->handle($attachment);
+
+        unset($this->stagedMedia);
+    }
+
+    /**
+     * Flip the composer between committing now and handing the commit to the
+     * scheduler.
+     */
+    public function toggleScheduling(): void
+    {
+        $this->scheduling = ! $this->scheduling;
+    }
+
+    /** How many choices a poll may offer. */
+    #[Computed]
+    public function pollMaxOptions(): int
+    {
+        return (int) config('feed.composer.poll_max_options', 6);
+    }
+
+    /**
+     * Open or close the poll editor.
+     *
+     * Closing throws the choices away: a poll half-written is not a draft of
+     * anything, and a reopen that resurrected yesterday's options would be a
+     * surprise, not a convenience.
+     */
+    public function togglePoll(): void
+    {
+        $this->askingPoll = ! $this->askingPoll;
+
+        if (! $this->askingPoll) {
+            $this->pollOptions = ['', ''];
+            $this->pollCloses = '';
+        }
+    }
+
+    /** Offer one more choice, up to the poll's ceiling. */
+    public function addPollOption(): void
+    {
+        if (count($this->pollOptions) >= $this->pollMaxOptions) {
+            return;
+        }
+
+        $this->pollOptions[] = '';
+    }
+
+    /** Take a choice back, but never below the two that make a poll a poll. */
+    public function removePollOption(int $index): void
+    {
+        if (count($this->pollOptions) <= 2 || ! isset($this->pollOptions[$index])) {
+            return;
+        }
+
+        unset($this->pollOptions[$index]);
+
+        $this->pollOptions = array_values($this->pollOptions);
+    }
+
+    /**
+     * Star or unstar a commit.
+     *
+     * The row is the state, so toggling is a delete or an insert against the
+     * unique pair; the count follows from it and cannot drift.
+     */
+    public function toggleStar(int $id): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            $this->redirectRoute('feed.index', ['signin' => 'required']);
+
+            return;
+        }
+
+        if (! FeedPost::query()->visible()->whereKey($id)->exists()) {
+            return;
+        }
+
+        $star = FeedStar::query()
+            ->where('feed_post_id', $id)
+            ->where('user_id', $reader->id)
+            ->first();
+
+        if ($star !== null) {
+            $star->delete();
+        } else {
+            FeedStar::query()->create([
+                'feed_post_id' => $id,
+                'user_id' => $reader->id,
+            ]);
+
+            $post = FeedPost::query()->find($id);
+
+            if ($post !== null) {
+                app(\App\Actions\Feed\NotifyCommitActivity::class)->starred($post, $reader);
             }
         }
 
-        arsort($counts);
+        unset($this->commits, $this->starredIds, $this->stats);
+    }
 
-        return array_map(
-            fn (string $tag, int $count): array => ['tag' => $tag, 'count' => $count],
-            array_keys($counts),
-            $counts,
+    /** Expand or collapse a commit's thread. */
+    public function toggleThread(int $id): void
+    {
+        $this->threadId = $this->threadId === $id ? null : $id;
+        $this->replyTo = null;
+    }
+
+    /** Open the inline reply composer under a commit. */
+    public function openReply(int $id): void
+    {
+        $this->threadId = $id;
+        $this->replyTo = $id;
+        $this->replyDraft = '';
+    }
+
+    /** Close the reply composer without discarding the thread. */
+    public function cancelReply(): void
+    {
+        $this->replyTo = null;
+        $this->replyDraft = '';
+    }
+
+    /** Add a reply to a commit's thread. */
+    public function postReply(int $id): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            $this->redirectRoute('feed.index', ['signin' => 'required']);
+
+            return;
+        }
+
+        $this->validate([
+            'replyDraft' => ['required', 'string', 'max:'.self::MAX_REPLY],
+        ], attributes: ['replyDraft' => __('reply')]);
+
+        $post = FeedPost::query()->visible()->find($id);
+
+        if ($post === null) {
+            return;
+        }
+
+        $reply = FeedReply::query()->create([
+            'feed_post_id' => $post->id,
+            'user_id' => $reader->id,
+            'body' => trim($this->replyDraft),
+        ]);
+
+        app(\App\Actions\Feed\NotifyCommitActivity::class)->replied($post, $reply, $reader);
+
+        $this->threadId = $post->id;
+        $this->replyTo = null;
+        $this->replyDraft = '';
+
+        unset($this->commits, $this->stats);
+    }
+
+    /**
+     * Delete a commit the reader wrote.
+     *
+     * Deletion is a tombstone, not a row disappearing: the conversation under
+     * the commit has to survive. The row stays in the stream, authorless.
+     */
+    public function deleteCommit(int $id): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            return;
+        }
+
+        $post = FeedPost::query()->visible()->where('user_id', $reader->id)->find($id);
+
+        if ($post === null) {
+            return;
+        }
+
+        $post->forceFill(['deleted' => true])->save();
+
+        unset($this->commits, $this->starredIds, $this->stats);
+
+        $this->undoableId = $post->id;
+        $this->toast = 'rm '.CommitBody::shortHash($post->slug).' → /dev/null';
+    }
+
+    /**
+     * Put back the commit the last delete removed.
+     *
+     * A delete is the one irreversible-looking action on the page, so it is
+     * reversible for as long as the toast stands. The row is restored rather
+     * than re-created, which keeps its stars, its thread and its id — the
+     * conversation under it never knew it was gone.
+     */
+    public function undoDelete(): void
+    {
+        $reader = $this->reader();
+
+        if ($this->undoableId === null || $reader === null) {
+            return;
+        }
+
+        $post = FeedPost::query()
+            ->where('user_id', $reader->id)
+            ->find($this->undoableId);
+
+        $this->undoableId = null;
+        $this->toast = null;
+
+        if ($post === null) {
+            return;
+        }
+
+        $post->forceFill(['deleted' => false])->save();
+
+        unset($this->commits, $this->starredIds, $this->stats);
+
+        $this->toast = 'restore '.CommitBody::shortHash($post->slug).' → HEAD';
+    }
+
+    /**
+     * The URL for a filtered view of the log.
+     *
+     * Filters compose, so a chip cannot build its own link by hand: changing
+     * the type has to keep the topic, the tag and the query, and clearing one
+     * has to leave the others alone. One builder means every chip agrees about
+     * which parameters are live and which are simply `all`.
+     *
+     * @param  array<string, string|null>  $overrides
+     */
+    public function filterUrl(array $overrides = []): string
+    {
+        $params = array_filter([
+            'log' => $this->log,
+            'type' => $this->type,
+            'topic' => $this->topic,
+            'tag' => $this->tag,
+            'q' => trim($this->q),
+        ], fn (?string $value): bool => $value !== null && $value !== '' && $value !== 'all');
+
+        foreach ($overrides as $key => $value) {
+            if ($value === null || $value === '' || $value === 'all') {
+                unset($params[$key]);
+
+                continue;
+            }
+
+            $params[$key] = $value;
+        }
+
+        return route('feed.index', $params);
+    }
+
+    /** Open the palette. */
+    public function openSearch(): void
+    {
+        $this->searchOpen = true;
+    }
+
+    /** Close the palette and forget its query. */
+    public function closeSearch(): void
+    {
+        $this->searchOpen = false;
+        $this->search = '';
+    }
+
+    /**
+     * Every commit the current log shows, in order.
+     *
+     * One query: the visible corpus with its star and reply counts. Ordering,
+     * the `following` filter and the text filter all run in memory over those
+     * rows, because the aside and the rail need the same set and a second query
+     * would pay twice for the same page of commits.
+     *
+     * @return Collection<int, FeedPost>
+     */
+    #[Computed]
+    public function commits(): Collection
+    {
+        $reader = $this->reader();
+
+        $posts = FeedPost::query()
+            ->visible()
+            ->withCount(['stars', 'replies'])
+            ->with(['replies.user', 'attachments'])
+            ->get()
+            ->filter(fn (FeedPost $post): bool => $post->isVisibleTo($reader))
+            ->values();
+
+        if ($this->log === 'following') {
+            $topics = $this->followedTopics();
+
+            $posts = $posts->filter(
+                fn (FeedPost $post): bool => in_array($post->topic, $topics, true),
+            )->values();
+        }
+
+        if ($this->tag !== null) {
+            $posts = $posts->filter(
+                fn (FeedPost $post): bool => in_array($this->tag, $post->tags, true),
+            )->values();
+        }
+
+        // The two category axes. Type is what the commit *is* — a question, a
+        // showcase, a poll — and topic is the part of the stack it belongs to.
+        // They compose with the tag and text filters rather than replacing
+        // them, so `?type=question&tag=Laravel` is a real question.
+        if ($this->type !== 'all') {
+            $posts = $posts->filter(
+                fn (FeedPost $post): bool => $post->type === $this->type,
+            )->values();
+        }
+
+        if ($this->topic !== 'all') {
+            $posts = $posts->filter(
+                fn (FeedPost $post): bool => $post->topic === $this->topic,
+            )->values();
+        }
+
+        $needle = mb_strtolower(trim($this->q));
+
+        if ($needle !== '') {
+            $posts = $posts->filter(
+                fn (FeedPost $post): bool => str_contains(
+                    mb_strtolower((string) $post->title.' '.$post->body.' '.$post->author.' '.$post->handle.' '.implode(' ', $post->tags)),
+                    $needle,
+                ),
+            )->values();
+        }
+
+        return match ($this->log) {
+            'trending' => $posts->sortByDesc(
+                fn (FeedPost $post): int => ((int) $post->getAttribute('stars_count')) * 3
+                    + $post->reactionSum()
+                    + ((int) $post->getAttribute('replies_count')) * 2,
+            )->values(),
+            default => $posts->sortByDesc(
+                fn (FeedPost $post): int => ($post->posted_at ?? $post->created_at)?->getTimestamp() ?? 0,
+            )->values(),
+        };
+    }
+
+    /**
+     * The slice of commits the stream renders.
+     *
+     * @return Collection<int, FeedPost>
+     */
+    #[Computed]
+    public function rendered(): Collection
+    {
+        return $this->commits->take($this->visible)->values();
+    }
+
+    /** Whether more commits exist below the rendered slice. */
+    #[Computed]
+    public function hasMore(): bool
+    {
+        return $this->commits->count() > $this->visible;
+    }
+
+    /**
+     * The commits the reader has starred, as a lookup.
+     *
+     * @return array<int, true>
+     */
+    #[Computed]
+    public function starredIds(): array
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            return [];
+        }
+
+        return FeedStar::query()
+            ->where('user_id', $reader->id)
+            ->pluck('feed_post_id')
+            ->mapWithKeys(fn (int|string $id): array => [(int) $id => true])
+            ->all();
+    }
+
+    /**
+     * The developers the palette offers, filtered by the query.
+     *
+     * Developers, not commits: the palette answers "who", the log answers
+     * "what". One row per author, busiest first.
+     *
+     * @return array<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null}>
+     */
+    #[Computed]
+    public function results(): array
+    {
+        $needle = mb_strtolower(trim($this->search));
+
+        return $this->activeAuthors
+            ->filter(fn (array $author): bool => $needle === ''
+                || str_contains(mb_strtolower($author['name'].' '.$author['handle']), $needle))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Every author in the corpus, busiest first.
+     *
+     * @return \Illuminate\Support\Collection<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null}>
+     */
+    #[Computed]
+    public function activeAuthors(): \Illuminate\Support\Collection
+    {
+        $authors = [];
+
+        foreach ($this->commits as $post) {
+            $key = mb_strtolower(ltrim($post->handle, '@'));
+
+            if (! isset($authors[$key])) {
+                $authors[$key] = [
+                    'name' => $post->author,
+                    'handle' => ltrim($post->handle, '@'),
+                    'initials' => $post->avatar,
+                    'lane' => $this->lane($post->handle),
+                    'commits' => 0,
+                    'role' => $post->role,
+                ];
+            }
+
+            $authors[$key]['commits']++;
+        }
+
+        return collect($authors)
+            ->sortByDesc('commits')
+            ->values();
+    }
+
+    /**
+     * The three developers the aside suggests, excluding the reader.
+     *
+     * @return array<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null}>
+     */
+    #[Computed]
+    public function whoToFollow(): array
+    {
+        $reader = $this->reader();
+
+        return $this->activeAuthors
+            ->reject(fn (array $author): bool => $reader !== null
+                && mb_strtolower($author['handle']) === mb_strtolower((string) $reader->handle))
+            ->take(3)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The aside's three counts: commits in the log, developers in it, and the
+     * reader's own stars.
+     *
+     * @return array{commits: int, developers: int, stars: int}
+     */
+    #[Computed]
+    public function stats(): array
+    {
+        $reader = $this->reader();
+
+        return [
+            'commits' => $this->commits->count(),
+            'developers' => $this->activeAuthors->count(),
+            'stars' => $reader === null
+                ? 0
+                : FeedStar::query()->where('user_id', $reader->id)->count(),
+        ];
+    }
+
+    /**
+     * The topics of the communities the reader joined — what `following` shows.
+     *
+     * Empty for guests and non-members, which is why that log has an honest
+     * empty state rather than a list of demo handles.
+     *
+     * @return array<int, string>
+     */
+    private function followedTopics(): array
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            return [];
+        }
+
+        return \App\Models\Community::query()
+            ->whereIn('id', $reader->joinedCommunityIds())
+            ->pluck('topic')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** The signed-in reader, if there is one. */
+    private function reader(): ?User
+    {
+        $reader = auth()->user();
+
+        return $reader instanceof User ? $reader : null;
+    }
+
+    /**
+     * Forget the collections a write invalidated.
+     *
+     * The shared commit actions ({@see ReportsCommits}) cannot know which of
+     * this page's computed properties went stale, so they call this instead.
+     */
+    protected function commitStateChanged(): void
+    {
+        unset($this->commits, $this->rendered, $this->starredIds, $this->stats, $this->rows);
+    }
+
+    /**
+     * The lane colour a handle is assigned.
+     *
+     * Stable per author and derived from the handle, so the same developer is
+     * the same colour on every row and every visit. Returned as a `var()`
+     * reference because the value has to flip with the theme.
+     */
+    private function lane(string $handle): string
+    {
+        $index = crc32(mb_strtolower(ltrim($handle, '@'))) % self::LANES;
+
+        return 'var(--dn-lane-'.$index.')';
+    }
+
+    /**
+     * The rows the template renders: a commit, its rail, and its thread.
+     *
+     * Built by {@see \App\Support\LogRow}, the same presenter a profile and the
+     * starred list use, so a row cannot look different on another surface.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function rows(): array
+    {
+        return \App\Support\LogRow::rows(
+            $this->rendered,
+            $this->starredIds,
+            $this->threadId,
+            $this->replyTo,
+            $this->reader(),
+            $this->freshIds,
+            // The marker only means something in chronological order: a ranked
+            // log has no "above" for a visit line to sit under.
+            $this->log === 'latest' ? $this->lastVisitId : null,
+            // Who to follow goes after the fifth commit, the way the reference
+            // places it — far enough down to be a suggestion, not a banner.
+            self::INTERLUDE_AFTER,
+            // The commits this reader has already reported.
+            $this->reportedCommitIds,
+            // The votes cast on this install, by poll and by option.
+            $this->pollVotes,
         );
     }
 
     /**
-     * Contributor leaderboard: cards published and score earned, top four.
+     * The commit types the corpus carries, with how many of each.
      *
-     * @return array<int, array{author: string, handle: string, avatar: string, posts: int, score: int}>
+     * Read from the data rather than a constant: a type nobody has filed yet is
+     * a filter that would open an empty log, and a chip with no count is a chip
+     * the reader has to guess at.
+     *
+     * @return array<string, int>
      */
     #[Computed]
-    public function contributors(): array
+    public function typeOptions(): array
     {
-        $totals = [];
-        foreach ($this->posts as $post) {
-            if (! isset($totals[$post->handle])) {
-                $totals[$post->handle] = [
-                    'author' => $post->author, 'handle' => $post->handle,
-                    'avatar' => $post->avatar, 'posts' => 0, 'score' => 0,
-                ];
-            }
-            $totals[$post->handle]['posts']++;
-            $totals[$post->handle]['score'] += $post->score;
+        return FeedPost::query()
+            ->visible()
+            ->selectRaw('type, count(*) as total')
+            ->groupBy('type')
+            ->orderByDesc('total')
+            ->pluck('total', 'type')
+            ->map(fn (int|string $total): int => (int) $total)
+            ->all();
+    }
+
+    /**
+     * The topics the corpus carries, with how many of each.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function topicOptions(): array
+    {
+        return FeedPost::query()
+            ->visible()
+            ->selectRaw('topic, count(*) as total')
+            ->groupBy('topic')
+            ->orderByDesc('total')
+            ->pluck('total', 'topic')
+            ->map(fn (int|string $total): int => (int) $total)
+            ->all();
+    }
+
+    /** Whether any filter is narrowing the log right now. */
+    #[Computed]
+    public function filtered(): bool
+    {
+        return $this->type !== 'all'
+            || $this->topic !== 'all'
+            || $this->tag !== null
+            || trim($this->q) !== '';
+    }
+
+    /**
+     * The authors behind the commits waiting in the pill.
+     *
+     * Avatars, not a number: "3 new commits" is a count, "three people you
+     * follow shipped something" is a reason to scroll up.
+     *
+     * @return array<int, array{initials: string, lane: string, name: string}>
+     */
+    #[Computed]
+    public function pendingAuthors(): array
+    {
+        if ($this->pendingNew === 0) {
+            return [];
         }
 
-        usort($totals, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
-
-        return array_slice($totals, 0, 4);
+        return FeedPost::query()
+            ->visible()
+            ->where('id', '>', $this->seenThroughId)
+            ->selectRaw('author, handle, avatar')
+            ->distinct()
+            ->limit(3)
+            ->get()
+            ->map(fn (FeedPost $post): array => [
+                'name' => $post->author,
+                'initials' => $post->avatar,
+                'lane' => $this->lane($post->handle),
+            ])
+            ->all();
     }
 }; ?>
 
-{{-- The feed surface. It renders inside the public guest shell
-     (`layouts::guest.home`), so the shared header, footer and auth dialogs
-     are the site's own; every feed filter is URL-bound state on this
-     component, and the 15s poll re-renders the stream in place.
-
-     The canvas is the feed module's own surface, drawn here rather than by
-     the layout: the shell body is the site's white, and the module's cards,
-     wells and raised panels are all mixed against the canvas. `4rem` is the
-     shell header's height, so the fill reaches the footer. --}}
-<div
-    class="min-h-[calc(100vh-4rem)] w-full bg-feed-canvas"
-    data-test="feed-index"
-    wire:poll.15s="syncFeed"
-    x-data="{ folding: false }"
-    x-init="setInterval(() => { if (! folding && window.scrollY < 80 && $wire.pendingNew > 0) { folding = true; $wire.showNewPosts().finally(() => folding = false) } }, 1200)"
-    x-on:scroll.window.throttle.300ms="if (! folding && window.scrollY < 80 && $wire.pendingNew > 0) { folding = true; $wire.showNewPosts().finally(() => folding = false) }"
+<x-log.frame
+    active="log"
+    data-test="log"
+    wire:poll.30s="syncFeed"
+    x-on:log:star.window="$wire.toggleStar($event.detail.id)"
+    x-on:log:reply.window="$wire.openReply($event.detail.id)"
+    x-on:log:thread.window="$wire.toggleThread($event.detail.id)"
 >
-    {{-- ================================================================== --}}
-    {{-- The broadcast band — the page's one hero moment.                     --}}
-    {{--                                                                       --}}
-    {{-- The band states the platform's promise at the largest scale the       --}}
-    {{-- layout allows, then proves it with the corpus' own numbers: posts,    --}}
-    {{-- people, questions solved, questions still waiting. Every figure is    --}}
-    {{-- derived from the collections the stream already holds — no query is   --}}
-    {{-- spent here and no number is a screenshot.                             --}}
-    {{--                                                                       --}}
-    {{-- The right-hand panel is the instrument: the live topic meters. It is   --}}
-    {{-- always dark (a lamp, not wallpaper — docs/themes.md §7) so it reads   --}}
-    {{-- the same in both themes, and its bars ride the accent so it follows   --}}
-    {{-- the visitor's chosen signal.                                          --}}
-    {{-- ================================================================== --}}
-    @php
-        $coverInitials = $this->readerInitials !== ''
-            ? $this->readerInitials
-            : collect(preg_split('/\s+/', (string) config('portfolio.author.short_name', config('app.name'))) ?: [])
-                ->filter()
-                ->map(fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)))
-                ->take(2)
-                ->implode('');
-        $coverName = $this->reader?->name ?? config('portfolio.author.name');
-        $coverRole = $this->reader?->role->label();
-        $coverSince = $this->reader?->created_at?->translatedFormat('F Y');
-        $coverVerified = $this->reader !== null && $this->reader->email_verified_at !== null;
-
-        // The readout: four figures, all derived from what the page already
-        // loaded. No query, no screenshot, no number the corpus cannot back.
-        $heroPosts = $this->posts->count();
-        $heroPeople = $this->posts->pluck('handle')->unique()->count();
-        $heroSolved = $this->typeCounts['solved'];
-        $heroOpen = $this->topics['unansweredCount'];
-        $heroMeters = $this->topics['items'];
-        $heroMeterMax = max(1, max(array_column($heroMeters, 'count')));
-        $heroTicker = array_slice($this->trendingTags, 0, 8);
-
-        // The corpus by type — the same six types the composer offers, with
-        // the real counts. Read from the memoised typeCounts, no extra query.
-        $heroTypes = collect([
-            'question' => __('Question'),
-            'discussion' => __('Discussion'),
-            'showcase' => __('Showcase'),
-            'snippet' => __('Snippet'),
-            'article' => __('Article'),
-            'poll' => __('Poll'),
-        ])
-            ->map(fn (string $label, string $key): array => [
-                'label' => $label,
-                'count' => $this->typeCounts[$key] ?? 0,
-            ])
-            ->values()
-            ->all();
-    @endphp
-    <section class="feed-hero" aria-labelledby="feed-cover-heading">
-        <div class="mx-auto w-full max-w-[1920px] px-4 pt-7 sm:px-6 xl:px-8">
-            <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
-                {{-- The lead: promise, proof, and who is reading. --}}
-                <div class="min-w-0">
-                    <div class="feed-rise feed-rise-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-                        <p class="feed-hero-eyebrow">
-                            <span class="feed-live-dot size-1.5 rounded-full bg-feed-mint"></span>
-                            {{ __('Live feed · every 15s') }}
-                        </p>
-
-                        {{-- Identity: the reader's own account record; a guest
-                             gets the platform's author identity, never a
-                             fabricated member. --}}
-                        <div class="flex min-w-0 items-center gap-2.5">
-                            <x-feed.avatar :initials="$coverInitials" tone="mint" />
-                            <div class="min-w-0">
-                                <p class="truncate text-[13px] font-semibold text-feed-ink">{{ $coverName }}</p>
-                                <p class="feed-meta truncate">
-                                    @if ($this->reader !== null)
-                                        {{ $coverRole ?? __('Member') }}@if ($coverSince) · {{ $coverSince }}@endif
-                                    @else
-                                        {{ config('portfolio.author.role') }}
-                                    @endif
-                                </p>
-                            </div>
-                            @if ($coverVerified)
-                                <span class="feed-chip is-mint shrink-0" title="{{ __('Verified email address') }}">
-                                    <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4.5 12.75l6 6 9-13.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    {{ __('Verified') }}
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-
-                    <h1
-                        id="feed-cover-heading"
-                        class="feed-hero-title feed-rise feed-rise-2 mt-6 max-w-[15ch] text-[clamp(2.15rem,5.6vw,4.5rem)]"
-                    >
-                        {{ __('Where the people who build things') }}
-                        <span class="feed-hero-mark">{!! __('compare&nbsp;notes') !!}</span>.
-                    </h1>
-
-                    <p class="feed-hero-sub feed-rise feed-rise-3 mt-5">
-                        {{ __('Wins worth shipping, questions worth solving and threads worth following — the rhythm of a social timeline, the structure of a forum.') }}
-                    </p>
-
-                    {{-- The readout: the promise, measured. --}}
-                    <dl class="feed-hero-stats feed-rise feed-rise-4 mt-7">
-                        <div class="feed-hero-stat">
-                            <dt class="feed-hero-stat-label">{{ __('Posts live') }}</dt>
-                            <dd class="feed-hero-stat-value">{{ $heroPosts }}</dd>
-                        </div>
-                        <div class="feed-hero-stat">
-                            <dt class="feed-hero-stat-label">{{ __('People') }}</dt>
-                            <dd class="feed-hero-stat-value">{{ $heroPeople }}</dd>
-                        </div>
-                        <div class="feed-hero-stat">
-                            <dt class="feed-hero-stat-label">{{ __('Solved') }}</dt>
-                            <dd class="feed-hero-stat-value text-feed-mint">{{ $heroSolved }}</dd>
-                        </div>
-                        <div class="feed-hero-stat">
-                            <dt class="feed-hero-stat-label">{{ __('Need answers') }}</dt>
-                            <dd class="feed-hero-stat-value">{{ $heroOpen }}</dd>
-                        </div>
-                    </dl>
-                </div>
-
-                {{-- The instrument: live topic meters. --}}
-                <aside class="feed-hero-panel feed-rise feed-rise-4 hidden self-start lg:block" aria-label="{{ __('Live topic signal') }}">
-                    <p class="feed-hero-panel-title">
-                        <span>{{ __('Topic signal') }}</span>
-                        <span class="text-signal-400">{{ __('live') }}</span>
-                    </p>
-                    <div class="mt-1">
-                        @foreach ($heroMeters as $meter)
-                            <div class="feed-meter">
-                                <span class="truncate">{{ $meter['label'] }}</span>
-                                <span class="tabular-nums">{{ $meter['count'] }}</span>
-                                <span class="feed-meter-track" aria-hidden="true">
-                                    <span class="feed-meter-fill" style="width: {{ (int) round($meter['count'] / $heroMeterMax * 100) }}%"></span>
-                                </span>
-                            </div>
-                        @endforeach
-                    </div>
-
-                    {{-- The corpus by type: the same counts the composer offers,
-                         so the reader sees what this surface is made of. --}}
-                    <p class="mt-4 border-t border-ink-800 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">
-                        {{ __('Corpus by type') }}
-                    </p>
-                    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                        @foreach ($heroTypes as $heroType)
-                            <div class="flex items-baseline justify-between gap-2">
-                                <dt class="truncate text-[11px] text-ink-400">{{ $heroType['label'] }}</dt>
-                                <dd class="tabular-nums text-[11px] font-semibold text-ink-200">{{ $heroType['count'] }}</dd>
-                            </div>
-                        @endforeach
-                    </dl>
-
-                    <p class="mt-4 border-t border-ink-800 pt-2.5 text-[11px] leading-relaxed text-ink-500">
-                        {{ __('Every count is read from the corpus as you load it. Nothing on this page is a mock.') }}
-                    </p>
-                </aside>
-            </div>
-
-            {{-- Section tabs — only destinations that exist --}}
-            <nav class="feed-hero-tabs mt-8 flex items-end gap-6 overflow-x-auto" aria-label="{{ __('Feed sections') }}">
-                <a href="{{ route('feed.index') }}" wire:navigate class="feed-tab" aria-current="page">{{ __('Posts') }}</a>
-                <a href="{{ route('communities.index') }}" wire:navigate class="feed-tab">{{ __('Communities') }}</a>
-                <a href="{{ route('about') }}" wire:navigate class="feed-tab">{{ __('About') }}</a>
-                <a href="{{ route('marketplace.index') }}" wire:navigate class="feed-tab">{{ __('Projects') }}</a>
-                <a href="{{ route('blog.index') }}" wire:navigate class="feed-tab">{{ __('Writing') }}</a>
-                <div class="relative" x-data="{ open: false }" x-on:keydown.escape.window="open = false">
-                    <button
-                        type="button"
-                        class="feed-tab"
-                        x-on:click="open = ! open"
-                        x-bind:aria-expanded="open ? 'true' : 'false'"
-                        aria-haspopup="menu"
-                    >
-                        {{ __('More') }}
-                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <div x-show="open" x-cloak x-on:click.outside="open = false" class="feed-menu" role="menu">
-                        <a href="{{ route('ai-hub.index') }}" wire:navigate role="menuitem" class="feed-menu-item">{{ __('AI Knowledge Hub') }}</a>
-                        <a href="{{ route('dev-lab.index') }}" wire:navigate role="menuitem" class="feed-menu-item">{{ __('Developer Lab') }}</a>
-                        <a href="{{ route('ideas.index') }}" wire:navigate role="menuitem" class="feed-menu-item">{{ __('Idea Bank') }}</a>
-                        <a href="{{ route('topics.index') }}" wire:navigate role="menuitem" class="feed-menu-item">{{ __('Browse by subject') }}</a>
-                        @auth
-                            <a href="{{ route('dashboard.index') }}" wire:navigate role="menuitem" class="feed-menu-item">{{ __('Dashboard') }}</a>
-                        @endauth
-                    </div>
-                </div>
+    <x-slot:header>
+        <div class="dn-header">
+            <h1 class="sr-only">{{ __('The Log') }}</h1>
+            <nav class="dn-tabs" aria-label="{{ __('Logs') }}">
+                @foreach (['following' => __('Following'), 'latest' => __('Latest'), 'trending' => __('Trending')] as $key => $label)
+                    <a
+                        href="{{ route('feed.index', ['log' => $key]) }}"
+                        wire:navigate
+                        class="dn-tab {{ $log === $key ? 'is-active' : '' }}"
+                        @if ($log === $key) aria-current="page" @endif
+                        data-test="log-tab-{{ $key }}"
+                    >{{ $label }}</a>
+                @endforeach
             </nav>
-        </div>
 
-        {{-- The ticker: what is moving right now. One continuous strip — the
-             module's signature motion — carrying the live tag list and the
-             destinations a community member actually uses. The second copy
-             makes the loop seamless; it is inert, so it never takes focus or
-             reaches the accessibility tree. --}}
-        <div class="feed-ticker mt-6" aria-label="{{ __('What is moving right now') }}">
-            <div class="feed-ticker-run">
-                <ul class="feed-ticker-items">
-                    @foreach ($heroTicker as $trend)
-                        <li>
-                            <a href="{{ route('feed.index', ['tag' => $trend['tag']]) }}" wire:navigate class="feed-ticker-item">
-                                <span class="text-feed-azure">#</span>{{ $trend['tag'] }}
-                                <span class="feed-count">{{ $trend['count'] }}</span>
-                            </a>
-                        </li>
+            {{--
+                The categories. Two axes, both read from the corpus: what the
+                commit *is* (a question, a showcase, a poll) and what part of the
+                stack it belongs to. They compose with the tag and text filters,
+                which is why every chip goes through `filterUrl()` — a chip that
+                built its own link would silently drop the other three.
+            --}}
+            <div class="dn-categories" data-test="log-filters">
+                <div class="dn-filter-row" role="group" aria-label="{{ __('Commit type') }}">
+                    <a
+                        href="{{ $this->filterUrl(['type' => 'all']) }}"
+                        wire:navigate
+                        class="dn-chip {{ $type === 'all' ? 'is-on' : '' }}"
+                        @if ($type === 'all') aria-current="page" @endif
+                        data-test="filter-type-all"
+                    >{{ __('all') }}</a>
+
+                    @foreach ($this->typeOptions as $key => $count)
+                        <a
+                            href="{{ $this->filterUrl(['type' => $key]) }}"
+                            wire:navigate
+                            class="dn-chip {{ $type === $key ? 'is-on' : '' }}"
+                            @if ($type === $key) aria-current="page" @endif
+                            data-test="filter-type-{{ $key }}"
+                        >{{ $key }}<span class="dn-chip-count">{{ $count }}</span></a>
                     @endforeach
-                    <li><a href="{{ route('communities.index') }}" wire:navigate class="feed-ticker-item">{{ __('Communities') }}</a></li>
-                    <li><a href="{{ route('ai-hub.index') }}" wire:navigate class="feed-ticker-item">{{ __('AI Knowledge Hub') }}</a></li>
-                    <li><a href="{{ route('dev-lab.index') }}" wire:navigate class="feed-ticker-item">{{ __('Developer Lab') }}</a></li>
-                    <li><a href="{{ route('marketplace.index') }}" wire:navigate class="feed-ticker-item">{{ __('Marketplace') }}</a></li>
-                    <li><a href="{{ route('ideas.index') }}" wire:navigate class="feed-ticker-item">{{ __('Idea Bank') }}</a></li>
-                </ul>
-                <ul class="feed-ticker-items" inert aria-hidden="true">
-                    @foreach ($heroTicker as $trend)
-                        <li>
-                            <a href="{{ route('feed.index', ['tag' => $trend['tag']]) }}" wire:navigate class="feed-ticker-item" tabindex="-1">
-                                <span class="text-feed-azure">#</span>{{ $trend['tag'] }}
-                                <span class="feed-count">{{ $trend['count'] }}</span>
-                            </a>
-                        </li>
+                </div>
+
+                <div class="dn-filter-row" role="group" aria-label="{{ __('Topic') }}">
+                    @foreach ($this->topicOptions as $key => $count)
+                        <a
+                            href="{{ $this->filterUrl(['topic' => $topic === $key ? 'all' : $key]) }}"
+                            wire:navigate
+                            class="dn-chip is-quiet {{ $topic === $key ? 'is-on' : '' }}"
+                            @if ($topic === $key) aria-current="page" @endif
+                            data-test="filter-topic-{{ $key }}"
+                        >{{ $key }}<span class="dn-chip-count">{{ $count }}</span></a>
                     @endforeach
-                    <li><a href="{{ route('communities.index') }}" wire:navigate class="feed-ticker-item" tabindex="-1">{{ __('Communities') }}</a></li>
-                    <li><a href="{{ route('ai-hub.index') }}" wire:navigate class="feed-ticker-item" tabindex="-1">{{ __('AI Knowledge Hub') }}</a></li>
-                    <li><a href="{{ route('dev-lab.index') }}" wire:navigate class="feed-ticker-item" tabindex="-1">{{ __('Developer Lab') }}</a></li>
-                    <li><a href="{{ route('marketplace.index') }}" wire:navigate class="feed-ticker-item" tabindex="-1">{{ __('Marketplace') }}</a></li>
-                    <li><a href="{{ route('ideas.index') }}" wire:navigate class="feed-ticker-item" tabindex="-1">{{ __('Idea Bank') }}</a></li>
-                </ul>
-            </div>
-        </div>
-    </section>
 
-    {{-- ================================================================== --}}
-    {{-- Body — a three-column desktop grid: navigation, stream and the     --}}
-    {{-- inspector. Below xl it folds to two columns, below lg to one, so   --}}
-    {{-- breakpoint leaves a dead gutter.                                   --}}
-    {{--                                                                        --}}
-    {{-- On the single-column breakpoints the stream leads (order-1) and the --}}
-    {{-- rails follow it: a phone opens on the feed, not on navigation.      --}}
-    {{-- ================================================================== --}}
-    <div class="mx-auto w-full max-w-[1920px] px-4 pb-14 pt-5 sm:px-6 xl:px-8">
-        <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6 xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
-            <div class="order-2 lg:col-span-2 lg:order-none xl:col-span-1">
-                <x-feed.nav-rail
-                    :sort="$sort"
-                    :category="$category"
-                    :type="$type"
-                    :topics="$this->topics"
-                    :type-counts="$this->typeCounts"
-                    :communities="$this->communities"
-                    :community-count="$this->communityCount"
-                />
-            </div>
-
-            <div class="order-1 min-w-0 lg:order-none">
-                {{-- Sticky command bar. The live pill rides above the tabs so an
-                     arriving post is announced without moving the stream. --}}
-                <div class="feed-command-bar">
-                    @if ($pendingNew > 0)
-                        <button
-                            type="button"
-                            wire:click="showNewPosts"
-                            class="feed-live-pill mb-3"
-                            data-test="feed-live-pill"
-                            aria-live="polite"
+                    @if ($tag !== null)
+                        <a
+                            href="{{ $this->filterUrl(['tag' => null]) }}"
+                            wire:navigate
+                            class="dn-chip is-on is-tag"
+                            title="{{ __('Clear the tag filter') }}"
+                            data-test="filter-tag-clear"
                         >
-                            <span class="feed-live-dot size-1.5 rounded-full bg-feed-mint" aria-hidden="true"></span>
-                            {{ $pendingNew }} {{ $pendingNew === 1 ? __('new post') : __('new posts') }}
-                            <span class="font-normal text-feed-ink-2">— {{ __('show') }}</span>
-                        </button>
+                            #{{ $tag }}
+                            <x-feed.icon name="close" :size="11" />
+                        </a>
                     @endif
 
-                    <x-feed.filters
-                        :sort="$sort"
-                        :type="$type"
-                        :category="$category"
-                        :tag="$tag"
-                        :topics="$this->topics"
-                        :tags="$this->trendingTags"
-                    />
+                    @if (trim($q) !== '')
+                        <a
+                            href="{{ $this->filterUrl(['q' => null]) }}"
+                            wire:navigate
+                            class="dn-chip is-on is-tag"
+                            title="{{ __('Clear the search filter') }}"
+                            data-test="filter-q-clear"
+                        >
+                            “{{ $q }}”
+                            <x-feed.icon name="close" :size="11" />
+                        </a>
+                    @endif
                 </div>
+            </div>
+        </div>
+    </x-slot:header>
 
-                <x-feed.composer :initials="$coverInitials" />
+    @if ($pendingNew > 0)
+        <div class="dn-pill-wrap">
+            {{-- The pill scrolls the reader to what it is announcing: the click
+                 and the jump are one gesture, so it never becomes a button that
+                 reloads the stream under the reader's scroll position. --}}
+            <button
+                type="button"
+                class="dn-pill"
+                wire:click="showNewCommits"
+                x-on:click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+                data-test="new-commits-pill"
+            >
+                <x-feed.icon name="up" :size="16" />
 
-                {{-- One write surface for the whole feed. Guests never render it:
-                     there is no composer for an account that cannot authorise
-                     `create`, and mounting it for them would cost a component
-                     they can only be refused by. --}}
-                @auth
-                    <livewire:pages::feed.composer-modal />
-                @endauth
+                <span class="dn-pill-faces" aria-hidden="true">
+                    @foreach ($this->pendingAuthors as $author)
+                        <span class="dn-avatar" style="--dn-lane: {{ $author['lane'] }}; width: 22px; height: 22px; font-size: 9px;">{{ $author['initials'] }}</span>
+                    @endforeach
+                </span>
 
-                <p class="feed-eyebrow mt-4 flex items-center justify-between" aria-live="polite">
-                    <span>{{ $this->filteredPosts->count() }} {{ __('matching posts') }} · {{ __('showing') }} {{ $this->visiblePosts->count() }}</span>
-                    @if ($pendingNew > 0)
-                        <span class="text-feed-mint">{{ $pendingNew }} {{ __('waiting') }}</span>
+                {{ trans_choice(':count new commit|:count new commits', $pendingNew, ['count' => $pendingNew]) }}
+            </button>
+        </div>
+    @endif
+
+    @if ($this->reader() !== null)
+        @include('feed.composer', [
+            'reader' => $this->reader(),
+            'lane' => \App\Support\LogIdentity::lane((string) $this->reader()->handle),
+            'initials' => \App\Support\LogIdentity::initials($this->reader()->name),
+            'max' => self::MAX_BODY,
+            'pollMaxOptions' => $this->pollMaxOptions,
+        ])
+    @endif
+
+    @php
+        $rows = $this->rows;
+    @endphp
+
+    @if ($rows === [])
+        <div class="dn-empty" data-test="log-empty">
+            @if ($log === 'following')
+                <p class="dn-empty-command">fatal: your log does not have any commits yet</p>
+                <p class="dn-empty-text">
+                    {{ __('Your log shows the topics of the communities you joined.') }}
+                    @if ($this->reader() === null)
+                        <a href="{{ route('login') }}" x-on:click="$flux.modal('login').show(); $event.preventDefault()">{{ __('Sign in') }}</a>
+                        {{ __('to join one.') }}
+                    @else
+                        {{ __('Join a community to fill it.') }}
                     @endif
+                    {{ __('Until then,') }}
+                    <a href="{{ route('feed.index', ['log' => 'trending']) }}" wire:navigate>{{ __('Trending') }}</a>
+                    {{ __('is where the conversation is.') }}
                 </p>
-
-                {{-- Cards — one per row, the reference's timeline width: author,
-                     body, artefact, tags, then the meta bar. The stream's own
-                     column is the honest measure, so no container query folds
-                     it into two. --}}
-                <div class="mt-4 space-y-4" aria-live="polite">
-                    @forelse ($this->visiblePosts as $post)
-                        <x-feed.card :post="$post" :fresh="in_array($post->id, $freshIds, true)" :index="$loop->iteration" />
-                    @empty
-                        <div class="feed-empty feed-card">
-                            <p class="font-mono text-[10px] uppercase tracking-wider text-feed-ink-3">{{ __('No matching posts') }}</p>
-                            <p class="mt-3 max-w-sm text-sm leading-relaxed text-feed-ink-2">
-                                {{ __('No posts match this topic, sort and search together. Loosen one filter and the feed comes back.') }}
-                            </p>
-                            <button type="button" wire:click="clearFilters" class="feed-ghost mt-6 border border-feed-line">
-                                {{ __('Reset filters') }}
-                            </button>
+            @elseif ($log === 'trending')
+                <p class="dn-empty-command">fatal: nothing is trending yet</p>
+                <p class="dn-empty-text">
+                    {{ __('Stars and replies decide what trends. Nobody has given either yet.') }}
+                    <a href="{{ route('feed.index', ['log' => 'latest']) }}" wire:navigate>{{ __('Latest') }}</a>
+                    {{ __('is chronological and always full.') }}
+                </p>
+            @else
+                <p class="dn-empty-command">fatal: no commits yet</p>
+                <p class="dn-empty-text">
+                    {{ __('Nobody has committed anything. Be the first. It is just plain text; you will be fine.') }}
+                </p>
+            @endif
+        </div>
+    @else
+        <div class="dn-feed" data-test="log-feed">
+            @foreach ($rows as $row)
+                {{-- Where the reader stopped last time. It is claimed once, above
+                     the first commit they had not seen, so the log reads as
+                     "these are new" rather than as a ruler. --}}
+                @if ($row['lastVisit'])
+                    <div
+                        class="dn-marker is-visit"
+                        role="separator"
+                        aria-label="{{ __('Commits above are new since your last visit') }}"
+                        data-test="last-visit"
+                    >
+                        <div class="dn-rail">
+                            <span class="dn-rail-line is-down is-dashed"></span>
                         </div>
-                    @endforelse
-                </div>
-
-                {{-- Load more --}}
-                @if ($this->hasMore)
-                    <div class="flex flex-col items-center gap-3 pt-6">
-                        <button type="button" wire:click="loadMore" class="feed-ghost border border-feed-line px-5! py-2.5! text-sm! text-feed-ink!">
-                            {{ __('Load more posts') }}
-                        </button>
-                        <p class="feed-eyebrow">
-                            {{ $this->filteredPosts->count() - $this->visiblePosts->count() }} {{ __('more in this view') }}
-                        </p>
+                        <div class="dn-marker-content">
+                            {{-- The git ref is a literal, so it is echoed rather
+                                 than written into the markup: Blade reads a bare
+                                 `@` as the start of a directive, and `@@` is
+                                 not an escape it performs. --}}
+                            <h3 class="dn-marker-label">{{ 'HEAD@{last visit}' }}</h3>
+                            <span class="dn-marker-rule"></span>
+                        </div>
                     </div>
                 @endif
-            </div>
 
-            <div class="order-3 min-w-0 lg:order-none">
-                <x-feed.inspector
-                    :posts="$this->posts"
-                    :trending-tags="$this->trendingTags"
-                    :bounties="$this->bounties"
-                    :contributors="$this->contributors"
-                    :communities="$this->communities"
-                    :featured-products="$this->featuredProducts"
-                    :reader="$this->reader"
-                    :reader-initials="$this->readerInitials"
-                    :tag="$tag"
-                    :refused-slug="$refusedSlug"
-                />
-            </div>
+                @if ($loop->first || $row['day'] !== $rows[$loop->index - 1]['day'])
+                    <div class="dn-marker">
+                        <div class="dn-rail">
+                            <span class="dn-rail-line is-down is-dashed"></span>
+                        </div>
+                        <div class="dn-marker-content">
+                            <h3 class="dn-marker-label">{{ $row['day'] }}</h3>
+                        </div>
+                    </div>
+                @endif
 
+                @include('feed.commit', [
+                    'commit' => $row,
+                    'isLast' => $loop->last && ! $this->hasMore,
+                    'maxReply' => self::MAX_REPLY,
+                ])
+
+                @if ($row['interlude'] && $this->whoToFollow !== [])
+                    @include('feed.interlude', ['authors' => $this->whoToFollow])
+                @endif
+            @endforeach
+
+            @if ($this->hasMore)
+                {{-- The sentinel is also the button: an observer opens the next
+                     page when the reader approaches it, and the button is what
+                     a keyboard, a screen reader or a browser without the script
+                     still gets. --}}
+                <div class="dn-more" x-data="feedMore()" data-test="load-older-sentinel">
+                    <div class="dn-rail">
+                        <span class="dn-rail-line is-down" style="background: {{ $rows[count($rows) - 1]['lane'] }}"></span>
+                    </div>
+
+                    <div class="dn-more-body">
+                        <div class="dn-skeletons" wire:loading.class="is-loading" wire:target="loadMore" aria-hidden="true">
+                            @for ($i = 0; $i < 2; $i++)
+                                <div class="dn-skeleton">
+                                    <span class="dn-skeleton-avatar"></span>
+                                    <span class="dn-skeleton-body">
+                                        <span class="dn-skeleton-line" style="width: 38%"></span>
+                                        <span class="dn-skeleton-line" style="width: 88%"></span>
+                                        <span class="dn-skeleton-line" style="width: 64%"></span>
+                                    </span>
+                                </div>
+                            @endfor
+                        </div>
+
+                        <button
+                            type="button"
+                            class="dn-btn dn-btn-outline dn-btn-sm"
+                            wire:click="loadMore"
+                            wire:loading.attr="disabled"
+                            data-test="load-older"
+                        >
+                            {{ __('Load older commits') }}
+                        </button>
+                    </div>
+                </div>
+            @else
+                <div class="dn-root">
+                    <div class="dn-rail">
+                        <span class="dn-rail-node" style="--dn-lane: {{ $rows[count($rows) - 1]['lane'] }}" aria-hidden="true">
+                            <span class="dn-node is-root"></span>
+                        </span>
+                    </div>
+                    <p class="dn-root-text" data-test="log-root">
+                        {{ __("That's the root commit. There's nothing before it.") }}
+                    </p>
+                </div>
+            @endif
         </div>
-    </div>
-</div>
+    @endif
+
+    @if ($toast !== null)
+        <div class="dn-toast" role="status" wire:key="toast-{{ md5($toast) }}">
+            <span>{{ $toast }}</span>
+
+            @if ($undoableId !== null)
+                <button
+                    type="button"
+                    class="dn-toast-undo"
+                    wire:click="undoDelete"
+                    data-test="undo-delete"
+                >{{ __('Undo') }}</button>
+            @endif
+
+            <button type="button" aria-label="{{ __('Dismiss') }}" x-on:click="$el.closest('.dn-toast').remove()">
+                <x-feed.icon name="check" :size="14" />
+            </button>
+        </div>
+    @endif
+</x-log.frame>

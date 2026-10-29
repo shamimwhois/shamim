@@ -48,3 +48,9 @@ yarn-error.log
 /ext/
 /.kilo/
 /.qoder/settings.local.json
+
+# Browser tooling cache (not committed)
+/.playwright-cli/
+
+# Local archives (not committed)
+/shamim.zip

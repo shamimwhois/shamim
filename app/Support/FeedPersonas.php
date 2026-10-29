@@ -32,17 +32,18 @@ final class FeedPersonas
      * `email` is the account key: the six personas the community directory
      * already seeded keep the addresses they were created with, so switching to
      * this registry renames those accounts without orphaning their memberships.
-     * `Shamim Hossain` is the seeded author account (`test@example.com`), which
-     * is why the corpus's own showcase post has a real login behind it.
+     * `Md Shamim Hossain` is the seeded author account
+     * (`shamimstack@gmail.com`), which is why the corpus's own showcase post has
+     * a real login behind it.
      *
      * @return array<string, FeedPersona>
      */
     public static function all(): array
     {
         return [
-            'shamim' => [
-                'handle' => 'shamim', 'name' => 'Shamim Hossain', 'email' => 'test@example.com',
-                'avatar' => 'SH', 'role' => 'Full Stack Developer · Laravel',
+            'shamimstack' => [
+                'handle' => 'shamimstack', 'name' => 'Md Shamim Hossain', 'email' => 'shamimstack@gmail.com',
+                'avatar' => 'MS', 'role' => 'Full Stack Developer · Laravel',
             ],
             'priya' => [
                 'handle' => 'priya', 'name' => 'Priya Menon', 'email' => 'priya@example.com',

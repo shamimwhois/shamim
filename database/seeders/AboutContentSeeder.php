@@ -6,6 +6,7 @@ use App\Enums\AboutItemType;
 use App\Enums\AboutSectionType;
 use App\Models\AboutItem;
 use App\Models\AboutSection;
+use App\Services\AboutContent;
 use Illuminate\Database\Seeder;
 
 /**
@@ -35,7 +36,7 @@ class AboutContentSeeder extends Seeder
         $sections = [
             ['key' => 'about-hero', 'type' => AboutSectionType::Hero, 'ordinal' => 1, 'label' => 'Intro', 'heading' => $author['role'], 'lead' => $author['tagline'], 'body' => $author['availability'], 'icon' => null],
             ['key' => 'about-reasons', 'type' => AboutSectionType::Reasons, 'ordinal' => 2, 'label' => 'Why me', 'heading' => 'Why hire me', 'lead' => null, 'body' => null, 'icon' => null],
-            ['key' => 'about-principles', 'type' => AboutSectionType::Principles, 'ordinal' => 4, 'label' => 'How I work', 'heading' => 'The things I keep coming back to', 'lead' => 'These are the six defaults learned the expensive way — when a decision is hard, they are what break the tie.', 'body' => null, 'icon' => null],
+            ['key' => 'about-principles', 'type' => AboutSectionType::Principles, 'ordinal' => 4, 'label' => 'How I work', 'heading' => 'Two systems, one engineer', 'lead' => 'Every ability below belongs to one of the two systems: the fast one that spots the shape, and the deliberate one that decides what the shape costs. Hover a hemisphere to preview it; click one to open its cards.', 'body' => null, 'icon' => null],
             ['key' => 'about-expertise', 'type' => AboutSectionType::Expertise, 'ordinal' => 5, 'label' => 'Capabilities', 'heading' => 'Capabilities', 'lead' => null, 'body' => null, 'icon' => null],
             ['key' => 'about-experience', 'type' => AboutSectionType::Experience, 'ordinal' => 6, 'label' => 'Experience', 'heading' => 'Experience', 'lead' => null, 'body' => null, 'icon' => null],
             ['key' => 'about-work', 'type' => AboutSectionType::Work, 'ordinal' => 7, 'label' => 'Work', 'heading' => 'Selected work', 'lead' => null, 'body' => null, 'icon' => null],
@@ -344,17 +345,20 @@ class AboutContentSeeder extends Seeder
     /**
      * The built-in "why hire me" prose.
      *
+     * Mirrors {@see AboutContent::defaultReasons()} exactly —
+     * seeding writes what a fresh install renders, so the two can never drift.
+     *
      * @return array<int, array{title: string, body: string}>
      */
     private function defaultReasons(): array
     {
         return [
-            ['title' => 'I close loops', 'body' => 'Most teams do not lack talent; they lack someone who finishes. Feature, tests, docs, deploy, monitor — the work is done when the pager stays quiet, not when the pull request merges.'],
-            ['title' => 'Hiring for year two, not the launch', 'body' => 'Almost everything that makes a system expensive later was a reasonable decision in month one. You get the migrations, dashboards and runbooks that still read well when the original author is on holiday.'],
-            ['title' => 'Backend depth where it fails at 3am', 'body' => 'Postgres query plans, Redis semantics, queue backpressure, cache invalidation — the parts of an application that break overnight are the parts I have spent eight-plus years specialising in.'],
-            ['title' => 'Breadth at the edges, on purpose', 'body' => 'TypeScript, Go, Kubernetes and Terraform where the job needs them — enough to own a problem from model to ingress without pretending to be a specialist in six stacks at once.'],
-            ['title' => 'Writes like an engineer', 'body' => 'Design docs, decision records and incident reviews the next engineer can follow without a walkthrough. The writing on this site is the same habit, not a performance of it.'],
-            ['title' => 'Honest by default', 'body' => 'If a feature should not exist, I say so before you pay for it. The most expensive consultant in the room is the one whose answer is always yes.'],
+            ['title' => 'Backend Engineering', 'body' => 'Clean, secure & maintainable code'],
+            ['title' => 'API Development', 'body' => 'Integrations & third-party services'],
+            ['title' => 'Scalable Architecture', 'body' => 'Modular & future-ready applications'],
+            ['title' => 'Automation & Tools', 'body' => 'Save time with efficient workflows'],
+            ['title' => 'Quality & Reliability', 'body' => 'Testing, validation & clean structure'],
+            ['title' => 'Client & Team Focus', 'body' => 'Clear communication and real solutions'],
         ];
     }
 }

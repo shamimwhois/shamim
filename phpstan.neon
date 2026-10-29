@@ -3,6 +3,20 @@ includes:
     - vendor/nesbot/carbon/extension.neon
 
 parameters:
+    ignoreErrors:
+        # The trait's only users are Livewire single-file components, which live
+        # in resources/views and are outside the analysed paths. The trait is
+        # real; PHPStan simply has no class in scope that consumes it.
+        -
+            identifier: trait.unused
+            path: app/Concerns/HasCommitActions.php
+        -
+            identifier: trait.unused
+            path: app/Concerns/ReportsCommits.php
+        -
+            identifier: trait.unused
+            path: app/Concerns/VotesInPolls.php
+
     paths:
         - app/
         - bootstrap/app.php

@@ -1,0 +1,6087 @@
+/* ==========================================================================
+   The Log — the /feed surface, ported from dev-null.sh
+   --------------------------------------------------------------------------
+   This stylesheet is the whole design system of the log, and it is scoped to
+   `.dn` (the shell root) on purpose:
+
+   * The site's own tokens (`--color-ink-*`, the Flux scale, the editorial
+     accent) describe a different product. Loading dev-null's palette globally
+     would repaint every other page, so every value below is namespaced
+     `--dn-*` and only exists inside the log.
+   * The palette, the type scale, the radii and the geometry are copied
+     verbatim from the reference design system (DESIGN.md), light and dark, so
+     the surface is a port rather than an interpretation.
+
+   Vocabulary, because it drives the markup: a post is a **commit**, a timeline
+   is a **log**, engagement is a **star**. A lane colour marks an author and
+   nothing else; blue means "you can act here" or "you are here".
+   ========================================================================== */
+
+/* --- Typeface ------------------------------------------------------------- */
+/* Geist carries both voices: the sans for people, the mono for anything a
+   machine would print (handles, hashes, times, counts, `fatal:` lines). */
+
+@font-face {
+    font-family: 'Geist';
+    src: url('../../public/fonts/geist/Geist-Variable.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Geist Mono';
+    src: url('../../public/fonts/geist/GeistMono-Variable.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* --- Tokens --------------------------------------------------------------- */
+
+.dn {
+    /* Surfaces and ink */
+    --dn-shell: #f6f7f8;
+    --dn-surface: #ffffff;
+    --dn-popover: #ffffff;
+    --dn-ink: #121417;
+    --dn-muted: #5b616b;
+    --dn-hairline: #e1e4e8;
+    --dn-rail: #d3d7dd;
+    --dn-wash: #eef0f2;
+
+    /* The one blue: action and location */
+    --dn-primary: #3b6fe0;
+    --dn-primary-hover: #2e5ccb;
+    --dn-primary-soft: #e8effc;
+    --dn-primary-ink: #ffffff;
+
+    /* Rm red: delete affordances and the empty counter */
+    --dn-destructive: #c92a2a;
+
+    /* Author lanes: identity, inside the graph only */
+    --dn-lane-0: #d9480f;
+    --dn-lane-1: #2f9e44;
+    --dn-lane-2: #9c36b5;
+    --dn-lane-3: #0c8599;
+    --dn-lane-4: #c2255c;
+    --dn-lane-5: #b7791f;
+
+    /* Geometry */
+    --dn-radius-sm: 4px;
+    --dn-radius-md: 6px;
+    --dn-radius-lg: 8px;
+    --dn-rail-column: 4rem;
+    --dn-feed-column: 620px;
+    --dn-nav-column: 256px;
+    --dn-aside-column: 320px;
+    --dn-shell-max: 1264px;
+
+    /* Type */
+    --dn-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    --dn-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --dn-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dn-ease-slide: cubic-bezier(0.33, 1, 0.68, 1);
+
+    box-sizing: border-box;
+    background-color: var(--dn-shell);
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    font-size: 15px;
+    line-height: 1.625;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+.dn *,
+.dn *::before,
+.dn *::after {
+    box-sizing: border-box;
+}
+
+.dark .dn {
+    --dn-shell: #111112;
+    --dn-surface: #18181a;
+    --dn-popover: #1f1f22;
+    --dn-ink: #ececec;
+    --dn-muted: #a1a1a6;
+    --dn-hairline: #2a2a2d;
+    --dn-rail: #36363a;
+    --dn-wash: #232326;
+    --dn-primary: #7aa2f7;
+    --dn-primary-hover: #94b5f9;
+    --dn-primary-soft: #18233a;
+    --dn-primary-ink: #111112;
+    --dn-destructive: #ff6b6b;
+    --dn-lane-0: #ff8a4c;
+    --dn-lane-1: #51cf66;
+    --dn-lane-2: #da77f2;
+    --dn-lane-3: #3bc9db;
+    --dn-lane-4: #f06595;
+    --dn-lane-5: #fcc419;
+}
+
+.dn ::selection {
+    background: var(--dn-primary-soft);
+    color: var(--dn-ink);
+}
+
+.dn :focus-visible {
+    outline: 2px solid var(--dn-primary);
+    outline-offset: 2px;
+}
+
+/* Element resets.
+   Both selectors are wrapped in `:where()` so they carry no specificity: a
+   reset must be the weakest rule in the file, or ` .dn button` (0,1,1) would
+   silently beat `.dn-btn` (0,1,0) and every button in the log would paint
+   transparent with an inherited colour. */
+
+.dn :where(a) {
+    color: inherit;
+    text-decoration: none;
+    text-underline-offset: 0.2em;
+}
+
+.dn :where(button) {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+}
+
+.dn :where(button:not(:disabled)) {
+    cursor: pointer;
+}
+
+.dn-mono {
+    font-family: var(--dn-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: normal;
+}
+
+/* --- Shell ---------------------------------------------------------------- */
+/* A centred 1264px shell: sticky nav, the 620px feed column, sticky aside.
+   Below md the nav becomes a bottom bar and the aside disappears. */
+
+.dn-shell {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    max-width: var(--dn-shell-max);
+    min-height: 100svh;
+    margin-inline: auto;
+}
+
+.dn-nav {
+    position: sticky;
+    top: 0;
+    display: none;
+    flex: none;
+    width: 80px;
+    height: 100svh;
+}
+
+.dn-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    background: var(--dn-surface);
+}
+
+.dn-aside {
+    display: none;
+    flex: none;
+    width: var(--dn-aside-column);
+}
+
+@media (min-width: 768px) {
+    .dn-nav {
+        display: block;
+    }
+
+    .dn-main {
+        max-width: var(--dn-feed-column);
+        border-inline: 1px solid var(--dn-hairline);
+        padding-bottom: 0;
+    }
+
+    .dn {
+        --dn-rail-column: 4.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .dn-nav {
+        width: var(--dn-nav-column);
+    }
+
+    /* The feed column widens as the nav collapses: the shell stays 1264px. */
+    .dn-main {
+        max-width: calc(876px - var(--dn-nav-column));
+    }
+}
+
+@media (min-width: 1280px) {
+    .dn-aside {
+        display: flex;
+    }
+}
+
+/* --- Wordmark ------------------------------------------------------------- */
+
+.dn-wordmark {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--dn-ink);
+}
+
+/* The second slash is drawn as an outline in the first lane, as the design
+   system asks of the wordmark. */
+.dn-wordmark-accent {
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--dn-lane-0);
+}
+
+/* --- Side navigation ------------------------------------------------------ */
+
+.dn-nav-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 24px 14px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.dn-brand {
+    display: grid;
+    grid-template-rows: 36px 20px;
+    row-gap: 4px;
+    flex: none;
+    margin-bottom: 32px;
+    padding-inline: 12px;
+    border-radius: var(--dn-radius-md);
+}
+
+.dn-brand-mark {
+    display: none;
+    grid-area: 1 / 1;
+    width: 28px;
+    height: 28px;
+    align-self: center;
+    fill: currentColor;
+}
+
+.dn-brand-text {
+    grid-area: 1 / 1;
+    width: max-content;
+}
+
+.dn-brand-tag {
+    grid-area: 2 / 1;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--dn-muted);
+}
+
+.dn-nav-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.dn-nav-list::-webkit-scrollbar {
+    display: none;
+}
+
+.dn-nav-item {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+    height: 44px;
+    padding: 12px 12px 12px 16px;
+    border-radius: var(--dn-radius-lg);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-nav-item:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-nav-item.is-active {
+    color: var(--dn-primary);
+}
+
+.dn-nav-item.is-active:hover {
+    background: transparent;
+    color: var(--dn-primary);
+}
+
+.dn-nav-active {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-primary-soft);
+}
+
+.dn-nav-item svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+}
+
+.dn-nav-primary {
+    justify-content: flex-start;
+    margin-top: 4px;
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+}
+
+.dn-nav-primary:hover {
+    background: var(--dn-primary-hover);
+    color: var(--dn-primary-ink);
+}
+
+.dn-nav-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    min-width: 16px;
+    padding-inline: 4px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+    font-family: var(--dn-mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+}
+
+.dn-nav-count {
+    margin-left: auto;
+    display: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--dn-primary);
+}
+
+/* Labels collapse to icons between md and lg, and when the nav is collapsed. */
+.dn-nav-label {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width 300ms var(--dn-ease-slide), opacity 300ms var(--dn-ease-slide);
+}
+
+.dn-shell[data-nav='expanded'] .dn-nav-label,
+.dn-shell[data-nav='expanded'] .dn-brand-text,
+.dn-shell[data-nav='expanded'] .dn-brand-tag,
+.dn-shell[data-nav='expanded'] .dn-nav-count,
+.dn-shell[data-nav='expanded'] .dn-user-meta,
+.dn-shell[data-nav='expanded'] .dn-nav-kbd {
+    max-width: 160px;
+    opacity: 1;
+}
+
+.dn-shell[data-nav='expanded'] .dn-brand-mark {
+    display: none;
+}
+
+.dn-shell[data-nav='collapsed'] .dn-brand-mark {
+    display: block;
+}
+
+.dn-shell[data-nav='collapsed'] .dn-brand-text,
+.dn-shell[data-nav='collapsed'] .dn-brand-tag {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.dn-nav-collapse {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    .dn-nav-collapse {
+        display: flex;
+    }
+}
+
+/* The user chip at the foot of the nav. */
+.dn-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+    margin-top: auto;
+    padding: 8px;
+    border-radius: var(--dn-radius-lg);
+    text-align: left;
+    transition: background-color 150ms ease;
+}
+
+.dn-user:hover {
+    background: var(--dn-wash);
+}
+
+.dn-user-meta {
+    min-width: 0;
+    max-width: 0;
+    flex: 1;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width 300ms var(--dn-ease-slide), opacity 300ms var(--dn-ease-slide);
+}
+
+.dn-user-name {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-user-handle {
+    display: block;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The chip's chevron: only once the label is there to sit beside, because a
+   collapsed rail shows the avatar alone and an arrow pointing at nothing reads
+   as a stray mark. It points *up* at rest, because this chip sits at the foot of
+   the rail and the menu it opens rises above it — the arrow promises the
+   direction, and flips to down while the menu is showing. */
+.dn-user-more {
+    display: none;
+    flex: none;
+    margin-left: auto;
+    color: var(--dn-muted);
+    transform: rotate(180deg);
+    transition: transform 180ms var(--dn-ease-slide);
+}
+
+.dn-shell[data-nav='expanded'] .dn-user-more {
+    display: block;
+}
+
+.dn-user[aria-expanded='true'] .dn-user-more {
+    transform: none;
+}
+
+/* --- The account menu ----------------------------------------------------- */
+/* `position: fixed`, unlike every other popover in the log, because this one
+   is rendered at the end of the shell rather than inside the nav: `.dn-nav` is
+   `display: none` below 1024px and a fixed child of a hidden subtree is never
+   painted. `userMenu()` in `log-shell.js` measures whichever trigger opened it
+   and writes `left` plus either `bottom` (rail chip, opens upward) or `top`
+   (phone header, opens downward). The width is mirrored there so the clamp to
+   the viewport edge knows the real number. */
+
+/* The panel's wrapper is a flex child of the shell and the panel inside it is
+   fixed, so the wrapper has to contribute nothing to the row: without this it
+   is a zero-content flex item that can still nudge the centring. */
+.dn-user-menu-scope {
+    flex: none;
+    width: 0;
+}
+
+.dn-user-menu {
+    position: fixed;
+    z-index: 50;
+    width: 252px;
+    max-height: calc(100svh - 24px);
+    padding: 6px;
+    overflow-y: auto;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-surface);
+    box-shadow: 0 18px 44px rgb(0 0 0 / 0.22);
+}
+
+.dn-user-menu-id {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 7px 8px;
+    border-radius: var(--dn-radius-md);
+}
+
+.dn-user-menu-id:hover {
+    background: var(--dn-wash);
+}
+
+.dn-user-menu-id-meta {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-user-menu-id-name {
+    display: block;
+    overflow: hidden;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-user-menu-id-handle {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The handle and the role share a line so a long name is not squeezed by the
+   badge above it. */
+.dn-user-menu-id-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 1px;
+}
+
+.dn-user-menu-role {
+    flex: none;
+    padding: 2px 6px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: 9999px;
+    font-family: var(--dn-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-user-menu-form {
+    margin: 0;
+}
+
+/* Marks a row that leaves the app, pushed to the far edge so the arrow is not
+   mistaken for part of the label. */
+.dn-pop-trail {
+    margin-left: auto;
+    color: var(--dn-muted);
+}
+
+.dn-nav-kbd {
+    margin-left: auto;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+}
+
+/* --- Mobile header and bottom bar ---------------------------------------- */
+
+.dn-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding-inline: 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-mobile-header .dn-wordmark {
+    font-size: 18px;
+}
+
+.dn-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* The header avatar is the phone's account trigger — the rail is off-screen
+   there, so this is the only way into the menu. */
+.dn-mobile-avatar {
+    display: grid;
+    place-items: center;
+    border-radius: 9999px;
+}
+
+.dn-mobile-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--dn-hairline);
+    background: var(--dn-surface);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dn-mobile-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding-block: 8px 6px;
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-mobile-item svg {
+    position: relative;
+    z-index: 1;
+    width: 22px;
+    height: 22px;
+    padding: 3px 8px;
+    border-radius: var(--dn-radius-lg);
+    transition: background-color 200ms ease, color 200ms ease;
+}
+
+.dn-mobile-item.is-active {
+    color: var(--dn-primary);
+}
+
+.dn-mobile-item.is-active svg {
+    background: var(--dn-primary-soft);
+}
+
+@media (min-width: 768px) {
+    .dn-mobile-header,
+    .dn-mobile-bar {
+        display: none;
+    }
+}
+
+/* The fixed bottom bar owns 56px plus the safe area, so the stream has to end
+   above it. */
+@media (max-width: 767px) {
+    .dn-main {
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    }
+}
+
+/* --- Page tabs ------------------------------------------------------------ */
+/* Full-width split under a sticky header, with a 3px underline hugging the
+   active label. */
+
+.dn-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--dn-surface);
+}
+
+.dn-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-tab {
+    position: relative;
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    padding-block: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-tab:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-tab.is-active {
+    color: var(--dn-ink);
+}
+
+.dn-tab.is-active::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--dn-primary);
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.dn-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    padding-inline: 16px;
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.dn-btn:hover {
+    background: var(--dn-primary-hover);
+}
+
+.dn-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dn-btn-outline {
+    background: var(--dn-shell);
+    color: var(--dn-ink);
+    box-shadow: inset 0 0 0 1px var(--dn-rail);
+}
+
+.dn-btn-outline:hover {
+    background: var(--dn-wash);
+}
+
+.dn-btn-ghost {
+    background: transparent;
+    color: var(--dn-ink);
+}
+
+.dn-btn-ghost:hover {
+    background: var(--dn-wash);
+}
+
+.dn-btn-destructive {
+    height: 32px;
+    padding-inline: 12px;
+    background: var(--dn-destructive);
+    color: #fff;
+}
+
+.dn-btn-sm {
+    height: 32px;
+    padding-inline: 12px;
+    font-size: 13px;
+}
+
+.dn-btn-block {
+    width: 100%;
+}
+
+.dn-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding-inline: 4px;
+    border: 1px solid var(--dn-hairline);
+    border-bottom-width: 2px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+/* --- Composer ------------------------------------------------------------- */
+/* Borderless: the graph carries its state. The staged node is hollow until the
+   body has a character, then fills with the author's lane; the tail below it
+   is a dashed rail-gray line. */
+
+.dn-composer {
+    display: flex;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+/* The panel a commit is written into. The rail stays part of the graph; what
+   the reader types into is a bounded surface — text borderless inside it, but
+   never the surface itself, because a composer that floats is a composer the
+   reader is never sure they can click into. */
+
+/* --- The staged images -------------------------------------------------- */
+
+.dn-composer-media {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 0 0;
+    margin: 0;
+    list-style: none;
+}
+
+.dn-composer-media-item {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    overflow: hidden;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+}
+
+.dn-composer-media-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dn-composer-media-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.62);
+    color: #fff;
+    cursor: pointer;
+}
+
+.dn-composer-media-remove:hover {
+    background: var(--dn-destructive);
+}
+
+/* --- The schedule row --------------------------------------------------- */
+
+.dn-composer-schedule {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 8px;
+    margin-top: 6px;
+    border-top: 1px dashed var(--dn-hairline);
+}
+
+.dn-composer-schedule-label {
+    flex: none;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-composer-schedule-input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+    font-family: var(--dn-mono);
+    font-size: 12px;
+}
+
+.dn-composer-schedule-input:focus-visible {
+    border-color: var(--dn-primary);
+    outline: 0;
+}
+
+/* --- The poll editor ---------------------------------------------------- */
+
+/* Same inset treatment as the schedule row: dashed top divider, wash-filled
+   inputs with a hairline border, accent on focus. One border language across
+   every panel the composer can open, so the tools read as one instrument. */
+.dn-composer-poll {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+    margin-top: 6px;
+    border-top: 1px dashed var(--dn-hairline);
+}
+
+.dn-composer-poll__label {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-composer-poll__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dn-composer-poll__input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 9px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+    font-family: var(--dn-mono);
+    font-size: 12.5px;
+}
+
+.dn-composer-poll__input:focus-visible {
+    border-color: var(--dn-primary);
+    outline: 0;
+}
+
+.dn-composer-poll__add {
+    align-self: flex-start;
+    padding: 3px 8px;
+    border: 1px dashed var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: transparent;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    cursor: pointer;
+    transition: color 160ms var(--dn-ease-out), border-color 160ms var(--dn-ease-out);
+}
+
+.dn-composer-poll__add:hover {
+    border-color: var(--dn-primary);
+    color: var(--dn-primary);
+}
+
+.dn-composer-error {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: var(--dn-destructive);
+}
+
+.dn-composer-body {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px 12px 0;
+}
+
+.dn-composer-inner {
+    flex: 1;
+    min-width: 0;
+    margin: 10px 0 12px;
+    padding: 4px 12px 8px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-surface);
+    transition: border-color 160ms var(--dn-ease-out);
+}
+
+.dn-composer-inner:focus-within {
+    border-color: var(--dn-primary);
+}.dn-composer-input {
+    display: block;
+    width: 100%;
+    max-height: 60vh;
+    min-height: 40px;
+    field-sizing: content;
+    padding-block: 6px;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 17px;
+    line-height: 1.375;
+}
+
+.dn-composer-input::placeholder {
+    color: var(--dn-muted);
+}
+
+.dn-composer-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px 16px;
+    margin-top: 8px;
+}
+
+.dn-composer-tools {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.dn-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-icon-btn:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-icon-btn.is-on {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+.dn-icon-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.dn-counter {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-counter.is-empty {
+    color: var(--dn-destructive);
+}
+
+.dn-stash {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-stash button {
+    color: var(--dn-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* The preview of a draft, rendered where the posted commit would sit. */
+.dn-composer-preview {
+    padding-block: 6px;
+    font-size: 15px;
+    line-height: 1.625;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.dn-composer-preview-url {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px dashed var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* --- Graph rail ----------------------------------------------------------- */
+/* A 2px line centred in a 64px (72px from sm) column, with one node per commit.
+   The segment above a node takes the previous author's lane; the segment below
+   takes this author's. */
+
+.dn-rail {
+    position: relative;
+    flex: none;
+    width: var(--dn-rail-column);
+    min-height: 64px;
+}
+
+.dn-rail-line {
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    translate: -50% 0;
+}
+
+.dn-rail-line.is-up {
+    top: 0;
+    height: calc(2rem + 1px);
+}
+
+.dn-rail-line.is-down {
+    top: calc(2rem - 1px);
+    bottom: 0;
+}
+
+.dn-rail-line.is-dashed {
+    background-image: repeating-linear-gradient(
+        to bottom,
+        var(--dn-rail) 0 4px,
+        transparent 4px 8px
+    );
+}
+
+.dn-rail-node {
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    display: flex;
+    translate: -50% -50%;
+    border-radius: 9999px;
+    background: var(--dn-surface);
+}
+
+.dn-rail-node.is-end {
+    top: auto;
+    bottom: 20px;
+    translate: -50% 50%;
+}
+
+/* 14px ring: a 3px punched gap in the surface colour, then a 2px lane ring. */
+.dn-node {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border: 3px solid var(--dn-surface);
+    border-radius: 9999px;
+    background: var(--dn-lane);
+    box-shadow: 0 0 0 2px var(--dn-lane);
+    transition: background-color 200ms ease, scale 200ms ease, opacity 200ms ease;
+}
+
+.dn-node.is-hollow {
+    background: var(--dn-surface);
+}
+
+.dn-node.is-root {
+    background: var(--dn-surface);
+    box-shadow: 0 0 0 2px var(--dn-rail);
+}
+
+.dn-rail-avatar {
+    display: flex;
+    border: 2px solid var(--dn-lane);
+    border-radius: 9999px;
+    padding: 2px;
+    background: var(--dn-surface);
+    transition: opacity 200ms ease;
+}
+
+.dn-avatar {
+    display: grid;
+    place-items: center;
+    border-radius: 9999px;
+    background: var(--dn-lane);
+    color: #fff;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    user-select: none;
+}
+
+.dn-rail-avatar .dn-avatar {
+    width: 36px;
+    height: 36px;
+}
+
+/* The composer's staged node is hollow — its ring dashed — until the body has a
+   character, then it takes the author's lane. */
+.dn-rail-avatar.is-empty {
+    border-style: dashed;
+    border-color: var(--dn-rail);
+}
+
+/* Lane dimming: hovering an author keeps their lane at full strength and fades
+   every other node and segment. */
+.dn-commit-row.is-dimmed .dn-node,
+.dn-commit-row.is-dimmed .dn-rail-line,
+.dn-commit-row.is-dimmed .dn-rail-avatar {
+    opacity: 0.3;
+}
+
+/* --- Commit row ----------------------------------------------------------- */
+
+.dn-commit {
+    display: grid;
+    grid-template-columns: var(--dn-rail-column) minmax(0, 1fr);
+    outline: none;
+    transition: background-color 150ms ease;
+}
+
+.dn-commit:hover {
+    background: color-mix(in srgb, var(--dn-wash) 50%, transparent);
+}
+
+.dn-commit.is-focused {
+    background: var(--dn-primary-soft);
+}
+
+.dn-commit.is-highlighted {
+    background: color-mix(in srgb, var(--dn-primary-soft) 60%, transparent);
+}
+
+.dn-commit.is-deleting {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 300ms ease 400ms, opacity 300ms ease 400ms;
+}
+
+.dn-commit-content {
+    min-width: 0;
+    padding: 12px 16px 12px 0;
+}
+
+.dn-commit-head {
+    display: flex;
+    /* Wraps rather than clipping: a row now carries a type, a pin, an answer
+       badge and a hash, and on a phone that is more than one line. Wrapping
+       keeps the handle readable instead of letting `flex-shrink` reduce it to
+       a bare `@`. */
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 15px;
+    min-width: 0;
+}
+
+.dn-name {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- The identity cluster and its hover card ---------------------------- */
+
+/* The wrapper is one flex child where the name and handle used to be two, so
+   the head's wrapping and the ellipsis rules below it keep working. It is the
+   positioning context for the card: an ancestor of the row clips nothing, but
+   the card still has to beat the row beneath it, which is why the z-index is
+   explicit rather than inherited. */
+.dn-id {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.dn-id .dn-name {
+    text-decoration-line: none;
+    transition: color 160ms var(--dn-ease-out);
+}
+
+.dn-id:hover .dn-name,
+.dn-id:focus-within .dn-name {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
+}
+
+.dn-hovercard {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 30;
+    width: 264px;
+    padding: 12px 14px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-popover);
+    box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.45);
+    cursor: default;
+}
+
+/* Enter: the card arrives from 4px below at full speed and settles. Leaving
+   hides at once — a card that lingers after the pointer has gone reads as a
+   bug, not as grace. */
+.dn-hovercard-in.is-entering {
+    opacity: 0;
+    translate: 0 4px;
+}
+
+.dn-hovercard-in.is-entered {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+        opacity 160ms var(--dn-ease-out),
+        translate 160ms var(--dn-ease-out);
+}
+
+.dn-hovercard__id {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dn-hovercard__id .dn-avatar {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+}
+
+.dn-hovercard__who {
+    min-width: 0;
+}
+
+.dn-hovercard__name {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-hovercard__meta {
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-hovercard__stats {
+    display: flex;
+    gap: 14px;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-hovercard__stat dd {
+    margin: 0;
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.dn-hovercard__stat dt {
+    font-size: 10.5px;
+    color: var(--dn-muted);
+}
+
+.dn-hovercard__go {
+    margin-top: 10px;
+}
+
+.dn-hovercard__go a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-primary);
+    text-decoration-line: none;
+}
+
+.dn-hovercard__go a:hover {
+    text-decoration-line: underline;
+    text-underline-offset: 3px;
+}
+
+.dn-name:hover {
+    text-decoration: underline;
+}
+
+.dn-handle {
+    flex-shrink: 4;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-dot {
+    color: var(--dn-muted);
+}
+
+.dn-time {
+    flex: none;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-time:hover {
+    text-decoration: underline;
+}
+
+.dn-hash {
+    margin-left: auto;
+    display: none;
+    flex: none;
+    align-self: center;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-hash:hover {
+    color: var(--dn-ink);
+}
+
+@media (min-width: 640px) {
+    .dn-hash {
+        display: inline;
+    }
+}
+
+.dn-commit.is-deletable:hover .dn-hash {
+    opacity: 0;
+}
+
+/* A commit's own delete affordance, revealed on hover or focus. */
+.dn-delete {
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    translate: 0 -50%;
+    padding: 6px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    opacity: 0;
+    transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.dn-delete:hover {
+    background: color-mix(in srgb, var(--dn-destructive) 10%, transparent);
+    color: var(--dn-destructive);
+}
+
+.dn-commit:hover .dn-delete,
+.dn-commit:focus-within .dn-delete,
+.dn-delete:focus-visible {
+    opacity: 1;
+}
+
+.dn-hash-wrap {
+    position: relative;
+    margin-left: auto;
+    display: flex;
+    flex: none;
+    align-self: center;
+}
+
+/* --- Commit body ---------------------------------------------------------- */
+
+/* The subject: git's first line, kept bold so the headline still reads first. */
+.dn-commit-subject {
+    margin-top: 2px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.dn-body {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 1.625;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.dn-body a {
+    color: var(--dn-primary);
+}
+
+.dn-body a:hover {
+    text-decoration: underline;
+}
+
+.dn-body .dn-mention {
+    color: var(--dn-primary);
+}
+
+.dn-body code {
+    padding: 1px 4px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 13px;
+}
+
+/* A fenced block: the machine's voice, on the wash, never a card. */
+.dn-code {
+    margin: 8px 0 2px;
+    padding: 12px 14px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-wash);
+    overflow-x: auto;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.dn-code-filename {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border: 1px solid var(--dn-hairline);
+    border-bottom: 0;
+    border-radius: var(--dn-radius-lg) var(--dn-radius-lg) 0 0;
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-code-filename + .dn-code {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* --- Action row ----------------------------------------------------------- */
+
+.dn-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    margin-top: 4px;
+    margin-left: -8px;
+    font-size: 13px;
+}
+
+.dn-actions-left {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+}
+
+.dn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-action:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-action svg {
+    width: 16px;
+    height: 16px;
+}
+
+.dn-action.is-on {
+    color: var(--dn-primary);
+}
+
+.dn-action.is-on svg {
+    fill: currentColor;
+}
+
+.dn-action-count {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+}
+
+.dn-replies-link {
+    color: var(--dn-primary);
+}
+
+.dn-replies-link:hover {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+/* --- Replies -------------------------------------------------------------- */
+
+.dn-thread {
+    margin-top: 4px;
+    border-left: 1px solid var(--dn-rail);
+    padding-left: 12px;
+}
+
+.dn-reply {
+    display: flex;
+    gap: 8px;
+    padding-block: 8px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-reply:first-child {
+    border-top: 0;
+}
+
+.dn-reply-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-reply-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.dn-reply-text {
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.dn-reply-composer {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+}
+
+.dn-reply-composer textarea {
+    display: block;
+    width: 100%;
+    field-sizing: content;
+    min-height: 32px;
+    padding: 4px 0;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.dn-reply-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+/* --- Day marker, last visit, root ---------------------------------------- */
+/* These rows keep the rail running with no node: dividers never cross it. */
+
+.dn-marker {
+    display: flex;
+}
+
+.dn-marker-content {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 8px 0;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-marker-label {
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-marker-rule {
+    flex: 1;
+    border-top: 1px dashed var(--dn-hairline);
+}
+
+.dn-root {
+    display: flex;
+}
+
+.dn-root-text {
+    padding: 21px 16px 40px 0;
+    font-size: 14px;
+    color: var(--dn-muted);
+}
+
+/* --- Inline delete confirmation ------------------------------------------ */
+/* A soft red strip, not a dialog: the row is the context, so the question sits
+   where the answer belongs. */
+
+.dn-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 48px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: var(--dn-radius-md);
+    background: color-mix(in srgb, var(--dn-destructive) 8%, transparent);
+    font-size: 14px;
+}
+
+/* --- Empty states --------------------------------------------------------- */
+
+.dn-empty {
+    padding: 32px 16px 48px;
+    text-align: center;
+}
+
+.dn-empty-command {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-empty-text {
+    max-width: 24rem;
+    margin: 12px auto 0;
+    font-size: 15px;
+    text-wrap: pretty;
+}
+
+.dn-empty-text a {
+    color: var(--dn-primary);
+    font-weight: 500;
+    text-decoration: underline;
+}
+
+/* --- Skeleton ------------------------------------------------------------- */
+/* Loading rows keep the rail running. */
+
+.dn-skeleton {
+    display: flex;
+}
+
+.dn-skeleton-body {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px 12px 0;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-skeleton-bar {
+    display: block;
+    height: 12px;
+    margin-block: 5px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+}
+
+.dn-skeleton-node {
+    display: block;
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--dn-surface);
+    border-radius: 9999px;
+    background: var(--dn-wash);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .dn-skeleton-body,
+    .dn-skeleton-node {
+        animation: dn-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+}
+
+@keyframes dn-pulse {
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* --- New commits pill ----------------------------------------------------- */
+
+.dn-pill-wrap {
+    position: sticky;
+    /* Just under the 53px sticky header, so the pill never covers the tabs. */
+    top: 53px;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    height: 0;
+    pointer-events: none;
+}
+
+.dn-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    max-width: calc(100vw - 2rem);
+    margin-top: 12px;
+    padding: 6px 16px;
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 14px -4px rgb(0 0 0 / 0.35);
+    pointer-events: auto;
+    transition: background-color 150ms ease;
+}
+
+.dn-pill:hover {
+    background: var(--dn-primary-hover);
+}
+
+.dn-pill svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+/* --- Aside --------------------------------------------------------------- */
+
+.dn-aside-inner {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    width: var(--dn-aside-column);
+    height: 100svh;
+    padding: 24px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.dn-aside-inner::-webkit-scrollbar {
+    display: none;
+}
+
+.dn-search-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    margin-bottom: -8px;
+    padding: 10px 16px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-surface);
+    color: var(--dn-muted);
+    font-size: 15px;
+    text-align: left;
+    transition: border-color 150ms ease, color 150ms ease;
+}
+
+.dn-search-button:hover {
+    border-color: var(--dn-rail);
+    color: var(--dn-ink);
+}
+
+.dn-search-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.dn-search-button .dn-kbd {
+    margin-left: auto;
+}
+
+.dn-aside-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dn-aside-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+
+.dn-card {
+    padding: 16px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-surface);
+}
+
+.dn-card p {
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-you {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dn-you .dn-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 15px;
+}
+
+.dn-you-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-you-handle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    color: var(--dn-muted);
+}
+
+.dn-lane-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--dn-lane);
+}
+
+.dn-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.dn-stat {
+    display: flex;
+    flex-direction: column-reverse;
+    min-width: 0;
+}
+
+.dn-stat dt {
+    color: var(--dn-muted);
+}
+
+.dn-stat dd {
+    margin: 0;
+    font-family: var(--dn-mono);
+    font-weight: 500;
+}
+
+/* Who to follow: rows, not cards. */
+.dn-who {
+    display: flex;
+    flex-direction: column;
+}
+
+.dn-who-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-block: 8px;
+}
+
+.dn-who-row .dn-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+}
+
+.dn-who-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-who-name {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-who-meta {
+    display: block;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-aside-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: -16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--dn-hairline);
+    font-size: 14px;
+    color: var(--dn-muted);
+}
+
+.dn-aside-foot a:hover {
+    color: var(--dn-ink);
+}
+
+.dn-shortcuts-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    align-self: flex-start;
+    font-size: 14px;
+    color: var(--dn-muted);
+}
+
+.dn-shortcuts-link:hover {
+    color: var(--dn-ink);
+}
+
+/* --- Dialogs ------------------------------------------------------------- */
+/* One overlay treatment for search and the shortcut sheet: the popover
+   surface, a hairline, and the component library's near-invisible shadow. */
+
+.dn-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 12vh 16px 16px;
+    background: rgb(0 0 0 / 0.4);
+}
+
+.dn-dialog {
+    width: 100%;
+    max-width: 576px;
+    overflow: hidden;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-popover);
+    box-shadow: 0 24px 48px -12px rgb(0 0 0 / 0.35);
+}
+
+.dn-dialog-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-dialog-input input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 17px;
+}
+
+.dn-dialog-input input::placeholder {
+    color: var(--dn-muted);
+}
+
+.dn-dialog-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.dn-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--dn-radius-md);
+    text-align: left;
+}
+
+.dn-result .dn-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+}
+
+.dn-result.is-active,
+.dn-result:hover {
+    background: var(--dn-wash);
+}
+
+.dn-result-name {
+    font-weight: 600;
+}
+
+.dn-result-handle {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-result-bio {
+    overflow: hidden;
+    font-size: 13px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-dialog-empty {
+    padding: 24px 16px;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-dialog-foot {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--dn-hairline);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-dialog-foot .dn-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dn-sheet-section + .dn-sheet-section {
+    margin-top: 20px;
+}
+
+.dn-sheet-title {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-sheet-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 6px;
+    font-size: 14px;
+}
+
+.dn-sheet-keys {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* --- Toast ---------------------------------------------------------------- */
+/* After committing, a mono toast prints `[log <hash>] <body>`, the way
+   `git commit` reports. */
+
+.dn-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 2rem);
+    padding: 10px 16px;
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-ink);
+    color: var(--dn-shell);
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    translate: -50% 0;
+    box-shadow: 0 12px 24px -8px rgb(0 0 0 / 0.4);
+}
+
+@media (min-width: 768px) {
+    .dn-toast {
+        bottom: 32px;
+    }
+}
+
+.dn-toast-undo {
+    padding: 2px 8px;
+    border: 1px solid color-mix(in oklab, var(--dn-shell) 32%, transparent);
+    border-radius: var(--dn-radius-sm);
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-shell);
+}
+
+.dn-toast-undo:hover {
+    background: color-mix(in oklab, var(--dn-shell) 14%, transparent);
+}
+
+/* --- Categories ----------------------------------------------------------- */
+/* Two chip rows under the tabs: what a commit is, and what it is about. They
+   scroll sideways on a phone rather than wrapping, so the stream never starts
+   below three lines of filters. Deliberately NOT `.dn-filters` — that class is
+   the list pages' horizontal tab rail, and this rule's column direction used
+   to leak into it, stacking every category pill full-width. */
+
+.dn-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 16px 10px;
+}
+
+.dn-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.dn-filter-row::-webkit-scrollbar {
+    display: none;
+}
+
+.dn-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: 9999px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    white-space: nowrap;
+    transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.dn-chip:hover {
+    border-color: var(--dn-primary);
+    color: var(--dn-ink);
+}
+
+.dn-chip.is-on {
+    border-color: var(--dn-primary);
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+.dn-chip.is-quiet {
+    border-color: transparent;
+}
+
+.dn-chip-count {
+    font-size: 10px;
+    color: var(--dn-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.dn-chip.is-on .dn-chip-count {
+    color: inherit;
+    opacity: 0.7;
+}
+
+.dn-chip.is-tag {
+    gap: 6px;
+}
+
+/* --- The commit's own record ---------------------------------------------- */
+
+.dn-type {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+    color: var(--dn-muted);
+    letter-spacing: 0.02em;
+}
+
+.dn-type:hover {
+    border-color: var(--dn-primary);
+    color: var(--dn-primary);
+}
+
+.dn-badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: var(--dn-radius-sm);
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+}
+
+.dn-badge.is-pin {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+.dn-badge.is-answer {
+    background: color-mix(in oklab, var(--dn-success, #2f9e63) 16%, transparent);
+    color: var(--dn-success, #2f9e63);
+}
+
+/* Featured is the loudest badge on a row, so it takes the accent wash rather
+   than a colour of its own: the accent is already the site's "look here". */
+.dn-badge.is-featured {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+/* --- The images a commit carries ---------------------------------------- */
+
+.dn-media {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.dn-media-item {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-wash);
+    transition: border-color 160ms var(--dn-ease-out);
+}
+
+.dn-media-item:hover,
+.dn-media-item:focus-visible {
+    border-color: var(--dn-primary);
+}
+
+.dn-media-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 220px;
+    object-fit: cover;
+}
+
+/* --- The accepted answer ------------------------------------------------ */
+
+/* A solved question carries its answer in the row, not behind a click: the
+   answer is the reason the question is worth reading. */
+.dn-answer {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-left: 2px solid var(--dn-success, #2f9e63);
+    border-radius: 0 var(--dn-radius-sm) var(--dn-radius-sm) 0;
+    background: var(--dn-wash);
+}
+
+.dn-answer-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+}
+
+.dn-answer-head .dn-badge {
+    margin-left: auto;
+}
+
+.dn-answer-body {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--dn-ink);
+}
+
+.dn-answer-body code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--dn-surface);
+    font-family: var(--dn-mono);
+    font-size: 12.5px;
+}
+
+/* --- The activity line -------------------------------------------------- */
+
+/* "This is still moving": a quiet link to the discussion surface, where the
+   thread and the diff live. */
+.dn-activity {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 10px;
+    padding: 3px 8px 3px 6px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    text-decoration: none;
+    transition: color 160ms var(--dn-ease-out), border-color 160ms var(--dn-ease-out);
+}
+
+.dn-activity:hover,
+.dn-activity:focus-visible {
+    border-color: var(--dn-primary);
+    color: var(--dn-ink);
+}
+
+.dn-activity-label {
+    color: var(--dn-primary);
+    font-weight: 600;
+}
+
+.dn-activity-detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-activity-go {
+    flex: none;
+    opacity: 0.7;
+}
+
+/* --- Reporting ---------------------------------------------------------- */
+
+/* The wrapper is the positioning context for the reason list: without it the
+   popover would escape the row and hang off the page. */
+.dn-report {
+    position: relative;
+    display: flex;
+}
+
+.dn-report-pop {
+    right: 0;
+    bottom: calc(100% + 6px);
+    min-width: 220px;
+}
+
+.dn-pop-head {
+    padding: 6px 8px 4px;
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--dn-muted);
+}
+
+.dn-pop-item:hover {
+    background: var(--dn-wash);
+}
+
+/* A commit already reported reads as done, not as a button that failed. */
+.dn-action.is-reported {
+    color: var(--dn-muted);
+    opacity: 0.65;
+    cursor: default;
+}
+
+.dn-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.dn-tag {
+    padding: 1px 7px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    transition: color 140ms ease, background-color 140ms ease;
+}
+
+.dn-tag:hover {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+/* The fold. A `max-height` rather than a truncated string: slicing rendered
+   HTML breaks tags, and a commit that ends mid-code-block is worse than a
+   commit the reader has to expand. */
+.dn-body.is-folded {
+    position: relative;
+    max-height: 11.5rem;
+    overflow: hidden;
+}
+
+.dn-body.is-folded:not(.is-open)::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 3rem;
+    background: linear-gradient(to bottom, transparent, var(--dn-surface));
+    pointer-events: none;
+}
+
+.dn-body.is-open {
+    max-height: none;
+}
+
+.dn-fold {
+    margin-top: 4px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-primary);
+}
+
+.dn-fold:hover {
+    text-decoration: underline;
+}
+
+/* A commit's code, printed the way the terminal would. */
+.dn-code {
+    margin-top: 10px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-wash);
+    overflow: hidden;
+}
+
+.dn-code-file {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--dn-hairline);
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-code-body {
+    margin: 0;
+    padding: 10px;
+    overflow-x: auto;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--dn-ink);
+}
+
+/* A poll's bars, sized from the share the presenter already worked out. */
+.dn-poll {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dn-poll-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 9px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    overflow: hidden;
+}
+
+.dn-poll-bar {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    background: var(--dn-primary-soft);
+}
+
+.dn-poll-label {
+    position: relative;
+    flex: 1;
+    font-size: 13px;
+}
+
+.dn-poll-share {
+    position: relative;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.dn-poll-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+}
+
+/* The radio is the reader's handle on the poll, so it sits inside the row
+   rather than beside it — the row is the click target. */
+.dn-poll-radio {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: var(--dn-primary);
+    cursor: pointer;
+}
+
+.dn-poll-radio:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.dn-poll-row:has(.dn-poll-radio:not(:disabled)) {
+    cursor: pointer;
+}
+
+.dn-poll-row:has(.dn-poll-radio:focus-visible) {
+    border-color: var(--dn-primary);
+}
+
+.dn-poll-row.is-mine {
+    border-color: var(--dn-primary);
+}
+
+/* The reader's own choice gets the accent wash, so the eye finds it in a
+   column of four rows without hunting for the radio. */
+.dn-poll-row.is-mine .dn-poll-bar {
+    background: color-mix(in oklab, var(--dn-primary) 22%, transparent);
+}
+
+.dn-poll-mine {
+    margin-left: auto;
+    color: var(--dn-primary);
+    font-weight: 600;
+}
+
+.dn-poll-vote {
+    margin-left: auto;
+}
+
+/* Reaction tallies on a commit. Deliberately NOT `.dn-reaction` — that name
+   belongs to the messenger's reaction chips further down this file, and a
+   shared name would make a commit inherit a pill it never asked for. */
+.dn-tallies {
+    display: inline-flex;
+    gap: 8px;
+    margin-left: 4px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+}
+
+.dn-tally {
+    white-space: nowrap;
+}
+
+.dn-readtime {
+    margin-left: 4px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+}
+
+/* --- The pill's faces ----------------------------------------------------- */
+
+.dn-pill-faces {
+    display: flex;
+    margin-right: 2px;
+}
+
+.dn-pill-faces .dn-avatar {
+    margin-left: -6px;
+    box-shadow: 0 0 0 2px var(--dn-primary);
+}
+
+.dn-pill-faces .dn-avatar:first-child {
+    margin-left: 0;
+}
+
+/* --- The last-visit line -------------------------------------------------- */
+
+.dn-marker.is-visit .dn-marker-label {
+    color: var(--dn-primary);
+}
+
+/* --- The interlude -------------------------------------------------------- */
+
+.dn-interlude {
+    display: flex;
+}
+
+.dn-interlude-body {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px 14px 0;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-interlude-label {
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+}
+
+.dn-interlude-body .dn-who {
+    margin-top: 8px;
+}
+
+.dn-interlude-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-primary);
+}
+
+.dn-interlude-link:hover {
+    text-decoration: underline;
+}
+
+/* --- Loading the next page ------------------------------------------------ */
+
+.dn-more {
+    display: flex;
+}
+
+.dn-more-body {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px 40px 0;
+}
+
+.dn-skeletons {
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.dn-skeletons.is-loading {
+    display: flex;
+}
+
+.dn-skeleton {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.dn-skeleton-avatar {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    background: var(--dn-wash);
+}
+
+.dn-skeleton-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 4px;
+}
+
+.dn-skeleton-line {
+    display: block;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--dn-wash);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .dn-skeleton-avatar,
+    .dn-skeleton-line {
+        animation: dn-pulse 1400ms ease-in-out infinite;
+    }
+
+    @keyframes dn-pulse {
+        50% {
+            opacity: 0.45;
+        }
+    }
+}
+
+/* --- Motion --------------------------------------------------------------- */
+/* A commit made in the last 15 seconds pops onto the rail. */
+
+@media (prefers-reduced-motion: no-preference) {
+    .dn-commit.is-fresh .dn-node {
+        animation: dn-node-in 700ms var(--dn-ease-out) both;
+    }
+}
+
+@keyframes dn-node-in {
+    0% {
+        scale: 0;
+        box-shadow: 0 0 0 0 var(--dn-lane);
+    }
+
+    45% {
+        scale: 1.25;
+        box-shadow: 0 0 0 6px transparent;
+    }
+
+    100% {
+        scale: 1;
+    }
+}
+
+/* A commit's row fades in when it arrives from the live poll. */
+@media (prefers-reduced-motion: no-preference) {
+    .dn-commit.is-fresh .dn-commit-content {
+        animation: dn-commit-in 300ms linear both;
+    }
+}
+
+@keyframes dn-commit-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* The poll's bars grow to their share, so the shape of the result arrives as a
+   movement rather than as four numbers. `scaleX` from the left edge, because
+   the bar is anchored there and the share is what the width already says. */
+@media (prefers-reduced-motion: no-preference) {
+    .dn-poll-bar {
+        transform-origin: left center;
+        animation: dn-poll-bar-in 600ms var(--dn-ease-out) both;
+    }
+}
+
+@keyframes dn-poll-bar-in {
+    from {
+        scale: 0 1;
+    }
+}
+
+/* The pieces the row grew this pass answer a reveal the way a fresh commit
+   does: one short fade, once, then stillness. */
+@media (prefers-reduced-motion: no-preference) {
+    .dn-answer,
+    .dn-activity {
+        animation: dn-piece-in 320ms var(--dn-ease-out) both;
+    }
+}
+
+@keyframes dn-piece-in {
+    from {
+        opacity: 0;
+        translate: 0 4px;
+    }
+}
+
+/* The report's reason list snaps out of the button rather than out of nowhere. */
+@media (prefers-reduced-motion: no-preference) {
+    .dn-report-pop {
+        animation: dn-pop-in 140ms var(--dn-ease-out) both;
+    }
+}
+
+@keyframes dn-pop-in {
+    from {
+        opacity: 0;
+        translate: 0 4px;
+    }
+}
+
+/* A revealed page only moves to say where you went. */
+@media (prefers-reduced-motion: reduce) {
+    .dn *,
+    .dn *::before,
+    .dn *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+/* --- Utilities ------------------------------------------------------------ */
+/* Alpine's cloak: an element that starts hidden must not paint before Alpine
+   takes over, or the dialogs flash on first load. */
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* The log's shell owns the page's scroll, not the body: the sticky columns are
+   positioned against the viewport, and a page-level gutter would offset them. */
+
+.dn-feed {
+    display: block;
+}
+
+/* The aside's foot: the small print, then the two appearance and help controls
+   on one row. The theme toggle keeps its own component; it only needs the log's
+   spacing. */
+.dn-aside-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: -16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-aside-tools .dn-shortcuts-link {
+    margin-top: 0;
+}
+
+/* --- Page header ---------------------------------------------------------- */
+/* The sticky bar every non-tabbed surface opens with: a title, and the mono
+   meta that says what the page is counting. */
+
+.dn-page-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-page-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.dn-page-meta {
+    margin-left: auto;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* --- Profile header ------------------------------------------------------- */
+
+.dn-profile {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-profile-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+/* 80px disc, ringed in the owner's lane, offset from the surface. */
+.dn-profile-avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 80px;
+    height: 80px;
+    border-radius: 9999px;
+    background: var(--dn-lane);
+    color: #fff;
+    font-family: var(--dn-mono);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    box-shadow:
+        0 0 0 2px var(--dn-surface),
+        0 0 0 4px var(--dn-lane);
+    margin: 4px;
+}
+
+.dn-profile-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-profile-name {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+}
+
+.dn-profile-handle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    color: var(--dn-muted);
+}
+
+.dn-profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-profile-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.dn-profile-stats div {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.dn-profile-stats dd {
+    margin: 0;
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dn-profile-stats dt {
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* --- Activity strip ------------------------------------------------------- */
+/* Thirty UTC days in the owner's lane. Level 0 is the wash; 1–4 mix the lane
+   into the surface at 32/56/80/100%. */
+
+.dn-activity {
+    margin-top: 20px;
+}
+
+.dn-activity-total {
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-activity-total strong {
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    color: var(--dn-ink);
+}
+
+.dn-activity-strip {
+    display: grid;
+    grid-template-columns: repeat(30, minmax(0, 1fr));
+    gap: 3px;
+    height: 40px;
+    margin-top: 8px;
+}
+
+.dn-cell {
+    border-radius: 2px;
+    background: var(--dn-wash);
+}
+
+.dn-cell[data-level='1'] {
+    background: color-mix(in srgb, var(--dn-lane) 32%, var(--dn-surface));
+}
+
+.dn-cell[data-level='2'] {
+    background: color-mix(in srgb, var(--dn-lane) 56%, var(--dn-surface));
+}
+
+.dn-cell[data-level='3'] {
+    background: color-mix(in srgb, var(--dn-lane) 80%, var(--dn-surface));
+}
+
+.dn-cell[data-level='4'] {
+    background: var(--dn-lane);
+}
+
+.dn-activity-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+/* --- Filters -------------------------------------------------------------- */
+/* The inbox's second row of tabs: shorter than a page tab, because they filter
+   a list rather than change the page. The active one keeps the blue underline
+   so the two rows read as the same control. The layout is specified in full —
+   direction included — so a later or earlier `.dn-filters` rule can never
+   bend this rail into a column again. */
+
+.dn-filters {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.dn-filter {
+    position: relative;
+    flex: none;
+    padding: 8px 10px 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dn-muted);
+    white-space: nowrap;
+}
+
+.dn-filter:hover {
+    color: var(--dn-ink);
+}
+
+.dn-filter.is-active {
+    color: var(--dn-ink);
+}
+
+.dn-filter.is-active::after {
+    content: '';
+    position: absolute;
+    inset-inline: 6px;
+    bottom: 0;
+    height: 3px;
+    background: var(--dn-primary);
+}
+
+/* --- Notifications -------------------------------------------------------- */
+/* A row on the rail: a 36px hollow node holding the type's icon, then the
+   actor, the sentence, and the commit it is about. */
+
+.dn-note {
+    display: grid;
+    grid-template-columns: var(--dn-rail-column) minmax(0, 1fr);
+}
+
+.dn-note:hover {
+    background: color-mix(in srgb, var(--dn-wash) 50%, transparent);
+}
+
+.dn-note-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--dn-rail);
+    border-radius: 9999px;
+    background: var(--dn-surface);
+    color: var(--dn-muted);
+}
+
+/* A row that was unread on this visit keeps a Commit Blue ring. */
+.dn-note.is-new .dn-note-icon {
+    border-color: var(--dn-primary);
+    color: var(--dn-primary);
+}
+
+.dn-note-content {
+    min-width: 0;
+    padding: 12px 16px 12px 0;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-note-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dn-avatars {
+    display: flex;
+}
+
+.dn-note-sentence {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.dn-note-sentence strong {
+    font-weight: 600;
+}
+
+.dn-note-sentence .dn-handle {
+    margin-left: 4px;
+}
+
+.dn-note-words {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+/* Your own commit, quoted underneath: a hairline block, never a card. */
+.dn-note-quote {
+    display: block;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    font-size: 14px;
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.dn-note-quote:hover {
+    background: var(--dn-wash);
+    border-color: var(--dn-rail);
+}
+
+.dn-note-quote-title {
+    display: block;
+    margin-bottom: 2px;
+    font-weight: 600;
+    color: var(--dn-ink);
+}
+
+.dn-note-quote-body {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+/* --- Remotes -------------------------------------------------------------- */
+/* The messenger. It is the one surface that owns the viewport rather than
+   scrolling with it — a composer has to sit at the bottom of the screen, not of
+   the page — so the shell hands it the height and it divides that into an inbox
+   column and a thread. On a phone the two columns are pages: the list until you
+   check a conversation out, then the thread, with a back control that returns. */
+
+.dn-remotes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    /* One row, stretched: without an explicit track the columns keep their
+       content height and the panes end mid-screen with dead space under them. */
+    grid-template-rows: minmax(0, 1fr);
+    height: calc(100svh - 8rem);
+    min-height: 420px;
+}
+
+@media (min-width: 640px) {
+    .dn-remotes {
+        grid-template-columns: 260px minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    /* Above the phone chrome the messenger is the page, so let it fill what is
+       left of the column rather than guess a constant: `100svh - 8rem` left a
+       band of nothing under the composer, and the number had to be re-tuned
+       whenever the mobile header changed. */
+    .dn-main:has(> .dn-remotes) {
+        height: 100svh;
+        overflow: hidden;
+    }
+
+    .dn-remotes {
+        flex: 1;
+        height: auto;
+        min-height: 0;
+    }
+}
+
+@media (min-width: 1024px) {
+    .dn-remotes {
+        grid-template-columns: 320px minmax(0, 1fr);
+    }
+
+    /* The messenger is the one surface that needs the room the aside would take,
+       and it already has a right-hand column: the thread. Two rails of reference
+       beside a conversation would be a page reading its own footnotes. */
+    .dn-shell:has(.dn-remotes) .dn-aside {
+        display: none;
+    }
+
+    .dn-main:has(> .dn-remotes) {
+        max-width: calc(var(--dn-shell-max) - var(--dn-nav-column));
+    }
+}
+
+@media (max-width: 639px) {
+    .dn-remotes:not(.is-open) .dn-remote-thread {
+        display: none;
+    }
+
+    .dn-remotes.is-open .dn-remote-pane {
+        display: none;
+    }
+}
+
+/* The inbox column -------------------------------------------------------- */
+
+.dn-remote-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* The column divider is a column divider: on a phone the inbox is the page, and
+   a hairline down the right edge would read as a scrollbar track. */
+@media (min-width: 640px) {
+    .dn-remote-pane {
+        border-right: 1px solid var(--dn-hairline);
+    }
+}
+
+.dn-pane-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 10px 6px 14px;
+}
+
+.dn-pane-title {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.dn-pane-tools {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+}
+
+.dn-pane-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-pane-btn:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-pane-btn.is-on {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+/* The field lives inside the inbox column, so it carries the compact type step
+   rather than the 15px the module tools row uses. */
+.dn-remote-search {
+    flex: none;
+    padding: 4px 10px 8px;
+}
+
+.dn-remote-search .dn-search-field {
+    padding: 4px 8px;
+}
+
+.dn-remote-search .dn-search-field input {
+    font-size: 13px;
+}
+
+.dn-remote-tabs {
+    display: flex;
+    flex: none;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-remote-tab {
+    position: relative;
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-remote-tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 9px 4px;
+}
+
+.dn-remote-tab:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-remote-tab.is-active {
+    color: var(--dn-ink);
+}
+
+/* The tab's rule is drawn over the column's own hairline, not under it: two
+   1px lines a pixel apart read as a seam at this size. */
+.dn-remote-tab.is-active::after {
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--dn-primary);
+    content: '';
+}
+
+.dn-remote-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding-inline: 4px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    line-height: 1;
+}
+
+.dn-remote-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dn-remote-rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.dn-remote-row {
+    position: relative;
+}
+
+/* The active row's mark is in the flow of the row, not the column: it belongs
+   to the conversation, and it has to sit clear of the avatar. */
+.dn-row-bar {
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    left: 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--dn-primary);
+}
+
+.dn-remote-open {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px 9px 14px;
+    text-align: left;
+    transition: background-color 150ms ease;
+}
+
+.dn-remote-row:hover .dn-remote-open {
+    background: var(--dn-wash);
+}
+
+.dn-remote-row.is-active .dn-remote-open {
+    background: var(--dn-primary-soft);
+}
+
+.dn-remote-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 12px;
+    box-shadow: 0 0 0 2px var(--dn-surface), 0 0 0 3px var(--dn-lane, var(--dn-rail));
+}
+
+.dn-remote-body {
+    min-width: 0;
+}
+
+.dn-remote-top {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    min-width: 0;
+}
+
+.dn-remote-name {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-remote-handle {
+    flex: none;
+    overflow: hidden;
+    max-width: 50%;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-remote-preview {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 1px;
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* A conversation with something waiting reads at full strength: the whole row
+   is a preview, and a dimmed one is a row you scroll past. */
+.dn-remote-preview.is-ahead {
+    color: var(--dn-ink);
+}
+
+.dn-remote-preview-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-remote-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    min-width: 34px;
+    transition: opacity 150ms ease;
+}
+
+.dn-remote-time {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+    white-space: nowrap;
+}
+
+.dn-remote-ahead {
+    padding-inline: 6px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+    white-space: nowrap;
+}
+
+.dn-remote-pin,
+.dn-remote-muted {
+    display: grid;
+    place-items: center;
+    color: var(--dn-muted);
+}
+
+/* The row's menu is quiet until the row is hovered — and the timestamp gives up
+   its space to it, because a 260px row cannot hold both. Touch has no hover, so
+   the button is simply always there. */
+.dn-remote-more {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    translate: 0 -50%;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    opacity: 0;
+    transition: opacity 150ms ease, background-color 150ms ease;
+}
+
+.dn-remote-more:hover {
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+}
+
+.dn-remote-row:hover .dn-remote-more,
+.dn-remote-more:focus-visible,
+.dn-remote-row:has(.dn-pop) .dn-remote-more {
+    opacity: 1;
+}
+
+.dn-remote-row:hover .dn-remote-meta,
+.dn-remote-row:has(.dn-pop) .dn-remote-meta {
+    opacity: 0;
+}
+
+@media (hover: none) {
+    .dn-remote-more {
+        opacity: 1;
+    }
+
+    .dn-remote-row .dn-remote-meta {
+        padding-right: 22px;
+    }
+
+    .dn-remote-row:hover .dn-remote-meta {
+        opacity: 1;
+    }
+}
+
+.dn-remote-none {
+    padding: 28px 14px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.dn-remote-candidates {
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-remote-candidates-title {
+    padding: 10px 14px 2px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-candidate {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 14px;
+    text-align: left;
+    transition: background-color 150ms ease;
+}
+
+.dn-candidate:hover {
+    background: var(--dn-wash);
+}
+
+.dn-candidate-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+}
+
+.dn-candidate-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-candidate-name {
+    display: block;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-candidate-handle {
+    display: block;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-candidate-go {
+    flex: none;
+    color: var(--dn-muted);
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.dn-candidate:hover .dn-candidate-go {
+    opacity: 1;
+}
+
+/* A block is reversible or it is a trap: the conversation leaves every list, so
+   the only place its row could come back from is the foot of the list. */
+.dn-remote-blocked {
+    padding: 10px 14px 18px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-remote-blocked-label {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-remote-blocked-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.dn-remote-blocked-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The thread --------------------------------------------------------------- */
+
+.dn-remote-thread {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.dn-thread-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 58px;
+    padding-inline: 10px 10px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-thread-back {
+    display: none;
+    flex: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+}
+
+.dn-thread-back:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+@media (max-width: 639px) {
+    .dn-thread-back {
+        display: grid;
+    }
+}
+
+.dn-thread-who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    border-radius: var(--dn-radius-md);
+}
+
+.dn-thread-avatar {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+}
+
+.dn-thread-who-body {
+    min-width: 0;
+}
+
+.dn-thread-title {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-thread-handle {
+    display: block;
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The thread's own actions sit at the far end of the header, past the title. */
+.dn-thread-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: auto;
+}
+
+.dn-thread-action {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--dn-radius-md);
+    color: var(--dn-muted);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-thread-action:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-thread-action.is-on {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+/* Pins sit over the thread rather than in it: they are what the conversation is
+   about, so they are readable from anywhere in it, and collapsed they cost one
+   line instead of a second scroll container. */
+.dn-pins {
+    flex: none;
+    border-bottom: 1px solid var(--dn-hairline);
+    background: var(--dn-wash);
+}
+
+.dn-pins-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 12px;
+    color: var(--dn-muted);
+    text-align: left;
+}
+
+.dn-pins-bar:hover {
+    color: var(--dn-ink);
+}
+
+.dn-pins-count {
+    flex: none;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+}
+
+.dn-pins-peek {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--dn-ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-pins-caret {
+    flex: none;
+    transition: rotate 150ms ease;
+}
+
+.dn-pins.is-open .dn-pins-caret {
+    rotate: 180deg;
+}
+
+.dn-pins-list {
+    max-height: 34vh;
+    overflow-y: auto;
+    padding: 0 12px 8px;
+}
+
+.dn-pins-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12.5px;
+}
+
+.dn-pins-author {
+    flex: none;
+    font-weight: 600;
+}
+
+.dn-pins-body {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-pins-action {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--dn-radius-sm);
+    color: var(--dn-muted);
+}
+
+.dn-pins-action:hover {
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+}
+
+.dn-thread-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px 14px 8px;
+}
+
+/* A short thread sits on the composer, the way a conversation does, rather than
+   floating at the top of an empty page. `margin-top: auto` instead of
+   `justify-content: flex-end` because the latter clips the first message once
+   the column overflows in some browsers. */
+.dn-thread-body > :first-child {
+    margin-top: auto;
+}
+
+.dn-thread-empty {
+    padding: 40px 0;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    text-align: center;
+}
+
+.dn-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 8px 0 12px;
+}
+
+.dn-day span {
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+/* A push. Your own sit on the right, the way a conversation reads. */
+.dn-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.dn-msg + .dn-msg {
+    margin-top: 8px;
+}
+
+.dn-msg.is-mine {
+    align-items: flex-end;
+}
+
+.dn-msg-author {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-inline: 4px;
+    font-size: 11.5px;
+    color: var(--dn-muted);
+}
+
+.dn-msg-author-avatar {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+}
+
+.dn-msg-author-name {
+    font-weight: 600;
+    color: var(--dn-ink);
+}
+
+.dn-msg-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    max-width: 88%;
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .dn-msg-col {
+        max-width: 78%;
+    }
+}
+
+.dn-msg.is-mine .dn-msg-col {
+    align-items: flex-end;
+}
+
+/* The bubble and its tool row share a box so the tools can centre on the
+   bubble rather than on the column — a message with a quote and two reactions
+   is a taller column than the line the buttons belong to. */
+.dn-bubble-wrap {
+    position: relative;
+    display: flex;
+    max-width: 100%;
+}
+
+.dn-bubble {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    padding: 7px 11px;
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-bubble.is-mine {
+    background: var(--dn-primary);
+    color: var(--dn-primary-ink);
+}
+
+/* A pinned push keeps a mark in the bubble so the banner and the thread agree
+   about which line is the pinned one. */
+.dn-bubble.is-pinned {
+    box-shadow: inset 0 0 0 1.5px var(--dn-primary);
+}
+
+.dn-bubble.is-mine.is-pinned {
+    box-shadow: inset 0 0 0 1.5px var(--dn-primary-ink);
+}
+
+.dn-bubble-text {
+    font-size: 14px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+/* The tool row is quiet until the push is hovered or something in it has focus,
+   so a thread of twelve messages is not a grid of buttons. It sits beside the
+   bubble, clear of the text: a menu that covers a word is a menu you have to
+   stop reading to use. */
+.dn-bubble-tools {
+    position: absolute;
+    top: 50%;
+    display: flex;
+    gap: 1px;
+    translate: 0 -50%;
+    color: var(--dn-muted);
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.dn-msg.is-mine .dn-bubble-tools {
+    right: calc(100% + 4px);
+}
+
+.dn-msg:not(.is-mine) .dn-bubble-tools {
+    left: calc(100% + 4px);
+}
+
+.dn-msg:hover .dn-bubble-tools,
+.dn-bubble-tools:focus-within {
+    opacity: 1;
+}
+
+/* Touch has no hover, so the row is always there — under the bubble rather than
+   beside it, where a narrow screen has no room to give. */
+@media (hover: none) {
+    .dn-bubble-wrap {
+        flex-direction: column;
+    }
+
+    .dn-msg.is-mine .dn-bubble-wrap {
+        align-items: flex-end;
+    }
+
+    .dn-bubble-tools {
+        position: static;
+        translate: none;
+        margin-top: 2px;
+        opacity: 0.6;
+    }
+}
+
+.dn-bubble-tool {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--dn-radius-sm);
+    font-size: 12px;
+    line-height: 1;
+    color: inherit;
+}
+
+.dn-bubble-tool:hover {
+    background: var(--dn-wash);
+    color: var(--dn-ink);
+}
+
+.dn-bubble-tool.is-on {
+    color: var(--dn-primary);
+}
+
+.dn-tray {
+    display: flex;
+    gap: 1px;
+    padding: 3px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: 9999px;
+    background: var(--dn-surface);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.dn-tray-emoji {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 9999px;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.dn-tray-emoji:hover {
+    background: var(--dn-wash);
+}
+
+/* The quote above a bubble is a pointer, not a copy: it is the original's own
+   text, so a quoted line cannot drift from what was said. */
+.dn-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-width: 100%;
+    padding: 4px 8px;
+    border-left: 2px solid var(--dn-rail);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    text-align: left;
+}
+
+.dn-quote:hover {
+    border-left-color: var(--dn-primary);
+}
+
+.dn-msg.is-mine .dn-quote {
+    align-items: flex-end;
+    border-right: 2px solid var(--dn-rail);
+    border-left: 0;
+    text-align: right;
+}
+
+.dn-msg.is-mine .dn-quote:hover {
+    border-right-color: var(--dn-primary);
+}
+
+.dn-quote-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dn-muted);
+}
+
+.dn-quote-body {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 12px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dn-msg.is-mine .dn-reactions {
+    justify-content: flex-end;
+}
+
+.dn-reaction {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: 9999px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--dn-muted);
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.dn-reaction:hover {
+    border-color: var(--dn-rail);
+}
+
+.dn-reaction.is-mine {
+    border-color: var(--dn-primary);
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+.dn-reaction-count {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+}
+
+/* The receipt: staged, pushed, pulled. Mono and small, because it is a status
+   line on a message, not a notification. */
+.dn-seen {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-inline: 2px;
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+    color: var(--dn-muted);
+}
+
+.dn-seen time {
+    opacity: 0.75;
+}
+
+.dn-status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    color: var(--dn-muted);
+}
+
+.dn-status-pulled {
+    color: var(--dn-primary);
+}
+
+.dn-remote-composer {
+    flex: none;
+    padding: 8px 12px 12px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-composer-quote {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 4px 6px 4px 8px;
+    border-left: 2px solid var(--dn-primary);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+    font-size: 12px;
+}
+
+.dn-composer-quote-name {
+    flex: none;
+    font-weight: 600;
+}
+
+.dn-composer-quote-body {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-composer-quote-x {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--dn-radius-sm);
+    color: var(--dn-muted);
+}
+
+.dn-composer-quote-x:hover {
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+}
+
+.dn-remote-composer textarea {
+    display: block;
+    width: 100%;
+    field-sizing: content;
+    min-height: 38px;
+    max-height: 40vh;
+    padding: 8px 10px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    outline: 0;
+    resize: none;
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.dn-remote-composer textarea:focus {
+    border-color: var(--dn-rail);
+}
+
+.dn-remote-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.dn-form-error {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--dn-destructive);
+}
+
+/* Nothing checked out: the pane is a place to start, not an error. */
+.dn-thread-blank {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    text-align: center;
+}
+
+@media (min-width: 640px) {
+    .dn-thread-blank {
+        display: flex;
+    }
+}
+
+.dn-thread-blank-line {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* The conversation's action menu, shared by its row and its header ---------- */
+
+.dn-pop {
+    position: absolute;
+    z-index: 40;
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-surface);
+    box-shadow: 0 14px 36px rgb(0 0 0 / 0.18);
+}
+
+.dn-pop-row {
+    top: 40px;
+    right: 6px;
+}
+
+.dn-pop-thread {
+    top: 38px;
+    right: 0;
+}
+
+.dn-pop-settings {
+    top: 36px;
+    right: 0;
+    width: 284px;
+    padding: 6px;
+}
+
+.dn-pop-label {
+    padding: 6px 8px 4px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-pop-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: var(--dn-radius-md);
+    font-size: 13px;
+    color: var(--dn-ink);
+    text-align: left;
+}
+
+.dn-pop-item:hover {
+    background: var(--dn-wash);
+}
+
+.dn-pop-item.is-danger {
+    color: var(--dn-destructive);
+}
+
+.dn-pop-item.is-danger:hover {
+    background: color-mix(in oklab, var(--dn-destructive) 12%, transparent);
+}
+
+.dn-pop-back {
+    color: var(--dn-muted);
+}
+
+.dn-pop-rule {
+    margin: 4px 2px;
+    border: 0;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-pop-confirm {
+    margin-top: 4px;
+    padding: 8px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-pop-confirm-text {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--dn-muted);
+}
+
+.dn-pop-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.dn-pop-check {
+    display: flex;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--dn-radius-md);
+}
+
+.dn-pop-check:hover {
+    background: var(--dn-wash);
+}
+
+.dn-pop-check input {
+    flex: none;
+    margin-top: 2px;
+    accent-color: var(--dn-primary);
+}
+
+.dn-pop-check-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.dn-pop-check-note {
+    display: block;
+    margin-top: 2px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--dn-muted);
+}
+
+/* --- Settings ------------------------------------------------------------- */
+/* Forms, not feeds: a key column of mono labels, then the value. The section
+   heading is the design's "section" step — 1.125rem, tight tracking. */
+
+.dn-settings {
+    padding: 8px 16px 48px;
+}
+
+.dn-settings-section + .dn-settings-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-settings-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+
+.dn-settings-note {
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-fields {
+    margin-top: 16px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    overflow: hidden;
+}
+
+.dn-field {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+}
+
+.dn-field + .dn-field {
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-field-key {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* The handle verdict, under the handle field: the reader learns whether the
+   address is free while typing, not when the form refuses to save. Column 2
+   because the field is a two-column grid and the verdict belongs under the
+   value, not under the key. */
+.dn-handle-status {
+    grid-column: 2;
+    margin: 0;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+}
+
+.dn-handle-status.is-free {
+    color: var(--dn-success, #2f9e63);
+}
+
+.dn-handle-status.is-taken,
+.dn-handle-status.is-invalid {
+    color: var(--dn-destructive);
+}
+
+/* The signature the log will print, rendered live above the form: the same
+   avatar, name, handle and role a commit's byline carries, so the reader is
+   editing the words the preview is built from. */
+.dn-byline-preview {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-wash);
+}
+
+.dn-byline-preview__label {
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+    color: var(--dn-muted);
+}
+
+.dn-byline-preview__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.dn-byline-preview__who {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-byline-preview__name {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-byline-preview__meta {
+    overflow: hidden;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-byline-preview__go {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-primary);
+    text-decoration-line: none;
+}
+
+.dn-byline-preview__go:hover {
+    text-decoration-line: underline;
+    text-underline-offset: 3px;
+}
+
+.dn-field-value {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+/* A missing value prints as a mono `null`, the way the design asks. */
+.dn-null {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 15px;
+    line-height: 1.4;
+    outline: 0;
+}
+
+.dn-input:focus {
+    border-color: var(--dn-rail);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--dn-primary) 25%, transparent);
+}
+
+.dn-form-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.dn-form-status {
+    margin-right: auto;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+/* Segmented control: the theme switch. */
+.dn-segmented {
+    display: inline-flex;
+    gap: 2px;
+    margin-top: 12px;
+    padding: 2px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-wash);
+}
+
+.dn-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--dn-radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dn-muted);
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-segment:hover {
+    color: var(--dn-ink);
+}
+
+.dn-segment:has(input:checked) {
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.dn-segment:has(input:focus-visible) {
+    outline: 2px solid var(--dn-primary);
+    outline-offset: 2px;
+}
+
+/* The rows a settings list is made of: keys, sessions, blocked accounts. */
+.dn-list {
+    margin-top: 12px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    overflow: hidden;
+}
+
+.dn-list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.dn-list-row + .dn-list-row {
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-list-row .dn-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+}
+
+.dn-list-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-list-title {
+    display: block;
+    font-weight: 600;
+}
+
+.dn-list-meta {
+    display: block;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-list-empty {
+    padding: 16px 12px;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-link {
+    color: var(--dn-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* The six lane swatches on the appearance screen: a reference, not a control —
+   a lane is hashed from the handle, never chosen. */
+.dn-lanes {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.dn-lane-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background: var(--dn-lane);
+    box-shadow: 0 0 0 2px var(--dn-surface), 0 0 0 3px var(--dn-hairline);
+}
+
+/* A small status chip: a label that is not a button and not a count.
+   Deliberately NOT `.dn-chip` — that class is the feed's interactive filter
+   chip, and this rule's constant accent wash used to override it for every
+   filter on the page, leaving the active filter a 1px border difference. */
+.dn-status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    font-weight: 500;
+    vertical-align: 1px;
+}
+
+/* --- Marketplace ---------------------------------------------------------- */
+/* A catalogue drawn as a list of listings rather than a wall of cards: the log
+   already reads as rows, and a storefront that shares its grammar is the same
+   product. Price and rating sit in a fixed right column so a scan finds them. */
+
+.dn-market {
+    padding: 16px 16px 48px;
+}
+
+.dn-market-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.dn-search-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-surface);
+    color: var(--dn-muted);
+}
+
+.dn-search-field:focus-within {
+    border-color: var(--dn-rail);
+}
+
+.dn-search-field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 15px;
+}
+
+.dn-search-field input::placeholder {
+    color: var(--dn-muted);
+}
+
+.dn-market-sort {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dn-market-list {
+    margin-top: 16px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-product {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--dn-hairline);
+    transition: background-color 150ms ease;
+}
+
+.dn-product:hover {
+    background: color-mix(in srgb, var(--dn-wash) 50%, transparent);
+}
+
+.dn-product-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-product-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.dn-product-name {
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-product-version {
+    flex: none;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-product-tagline {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--dn-muted);
+    overflow-wrap: anywhere;
+}
+
+.dn-product-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-product-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex: none;
+    padding-top: 2px;
+}
+
+.dn-price {
+    font-family: var(--dn-mono);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dn-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-rating svg {
+    fill: currentColor;
+    color: var(--dn-lane-5);
+}
+
+.dn-filter-count {
+    margin-left: 4px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+.dn-pagination {
+    margin-top: 24px;
+}
+
+/* A listing's cover, or its initial on the wash when it has none — the same
+   fallback the avatar discs use. */
+.dn-product-thumb {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--dn-radius-md);
+    object-fit: cover;
+    background: var(--dn-wash);
+}
+
+.dn-product-thumb.is-empty {
+    display: grid;
+    place-items: center;
+    font-family: var(--dn-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--dn-muted);
+}
+
+/* The delete-account zone: the one place on a settings page that is red, and
+   the only one that asks for a confirmation. */
+.dn-danger-zone {
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--dn-destructive) 25%, transparent);
+    border-radius: var(--dn-radius-lg);
+    background: color-mix(in srgb, var(--dn-destructive) 4%, transparent);
+}
+
+.dn-danger-zone :where(h2, h3) {
+    color: var(--dn-ink);
+}
+
+/* --- Module pages --------------------------------------------------------- */
+/* The blog, the directory, the AI hub, Ideas and the Dev Lab: the log's frame
+   with a list of entries instead of a rail. One row per thing, a hairline
+   between, no cards — the same rule the feed keeps. */
+
+.dn-module-note {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+    font-size: 14px;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-entries {
+    display: block;
+}
+
+.dn-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+    transition: background-color 150ms ease;
+}
+
+.dn-entry:hover {
+    background: color-mix(in srgb, var(--dn-wash) 55%, transparent);
+}
+
+.dn-entry-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dn-muted);
+}
+
+.dn-entry-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-entry-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.dn-entry-eyebrow {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-entry-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.dn-entry-desc {
+    display: block;
+    margin-top: 3px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-entry-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-entry-meta > span + span::before {
+    content: '·';
+    margin-right: 6px;
+}
+
+.dn-entry-arrow {
+    flex: none;
+    margin-top: 4px;
+    color: var(--dn-muted);
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.dn-entry:hover .dn-entry-arrow,
+.dn-entry:focus-visible .dn-entry-arrow {
+    opacity: 1;
+}
+
+/* A module's own filter row reuses `.dn-filters`; these are the two controls
+   that sit above a list and are not tabs. */
+.dn-module-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-module-tools .dn-search-field {
+    max-width: 320px;
+}
+
+.dn-module-empty {
+    padding: 40px 16px;
+    text-align: center;
+}
+
+.dn-module-empty .dn-empty-command {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: var(--dn-muted);
+}
+
+.dn-module-empty .dn-empty-text {
+    max-width: 24rem;
+    margin: 10px auto 0;
+    font-size: 15px;
+}
+
+/* --- Sections ------------------------------------------------------------- */
+/* A titled group of entries. The heading is a rail-less label with a count and
+   a link out; the rows under it are ordinary entries, so a section is a
+   divider in the column rather than a box inside it. */
+
+.dn-section {
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 14px 16px 8px;
+}
+
+.dn-section-heading {
+    min-width: 0;
+}
+
+.dn-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--dn-ink);
+}
+
+.dn-section-description {
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-section-actions {
+    flex: none;
+    margin-left: auto;
+}
+
+.dn-section-count {
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-section-link {
+    margin-left: auto;
+    flex: none;
+    white-space: nowrap;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    transition: color 150ms ease;
+}
+
+.dn-section-link:hover {
+    color: var(--dn-primary);
+}
+
+/* A group's rows sit flush against the section, so the last one carries the
+   section's bottom rule rather than a second hairline. */
+.dn-section .dn-entry:last-child {
+    border-bottom: 0;
+}
+
+/* The nav's second group: the reading surfaces. A hairline above it and a
+   mono label, so the log's own rows stay a block and the eye knows these are
+   somewhere else. */
+.dn-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-nav-group-label {
+    padding: 0 16px 2px;
+    font-family: var(--dn-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+    opacity: 0.75;
+}
+
+/* The label has no room in the collapsed rail, so it is hidden rather than
+   clipped — the icons carry the group. */
+.dn-shell[data-nav='collapsed'] .dn-nav-group-label {
+    display: none;
+}
+
+/* A module's own totals, printed to the right of its search field. Mono and
+   small, like every other count in the frame. */
+.dn-module-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-left: auto;
+}
+
+.dn-module-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.dn-module-stat-label {
+    font-family: var(--dn-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-module-stat-value {
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dn-ink);
+}
+
+.dn-module-stat-suffix {
+    margin-left: 2px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--dn-muted);
+}
+
+/* A filter that is applied, echoed back with a way to take it off. The label
+   is mono and muted, the value is the filter's own text, and the × is the
+   only control. */
+.dn-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 18rem;
+    padding: 3px 4px 3px 8px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-wash);
+    font-size: 13px;
+}
+
+.dn-filter-chip > span:not(.dn-field-key) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dn-filter-chip button {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--dn-radius-sm);
+    color: var(--dn-muted);
+    font-size: 14px;
+    line-height: 1;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dn-filter-chip button:hover {
+    background: var(--dn-surface);
+    color: var(--dn-ink);
+}
+
+/* --- The lab -------------------------------------------------------------- */
+/* The showcase: an offer, then a frame and a console. The code ground stays
+   dark in both themes, because the reader is looking at a shell rather than at
+   the page — the same rule the site's own code surfaces follow. */
+
+.dn-lab-offer {
+    padding: 16px;
+}
+
+.dn-lab-offer-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dn-lab-text {
+    max-width: 34rem;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-lab-note {
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-lab-details {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+.dn-lab-summary {
+    cursor: pointer;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-lab-summary:hover {
+    color: var(--dn-ink);
+}
+
+.dn-lab-panes {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.dn-lab-pane-label {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-lab-pane-bytes {
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 0.8;
+}
+
+/* The code ground: dark in both themes. */
+.dn-lab-code {
+    max-height: 12rem;
+    margin-top: 6px;
+    padding: 10px 12px;
+    overflow: auto;
+    border-radius: var(--dn-radius-md);
+    background: #0d0d0c;
+    color: #e8e8e6;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.dn-lab-running {
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+}
+
+@media (min-width: 900px) {
+    .dn-lab-running {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 19rem);
+    }
+}
+
+.dn-lab-frame-column,
+.dn-lab-console-column {
+    min-width: 0;
+}
+
+.dn-lab-pane-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 6px;
+}
+
+.dn-lab-pane-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dn-lab-link {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+    transition: color 150ms ease;
+}
+
+.dn-lab-link:hover {
+    color: var(--dn-ink);
+}
+
+.dn-lab-frame {
+    padding: 10px;
+    border-radius: var(--dn-radius-lg);
+    background: var(--dn-wash);
+}
+
+.dn-lab-iframe {
+    display: block;
+    width: 100%;
+    height: 22rem;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: #fff;
+}
+
+.dn-lab-console {
+    max-height: 24rem;
+    padding: 10px 12px;
+    overflow-y: auto;
+    border-radius: var(--dn-radius-md);
+    background: #0d0d0c;
+    color: #e8e8e6;
+}
+
+.dn-lab-console-list {
+    display: grid;
+    gap: 4px;
+}
+
+.dn-lab-console-line {
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.dn-lab-console-at {
+    margin-right: 6px;
+    color: #6f6f6a;
+}
+
+.dn-lab-console-line.is-error {
+    color: #ff8080;
+}
+
+.dn-lab-console-line.is-warn {
+    color: #f0c674;
+}
+
+.dn-lab-console-line.is-log {
+    color: #e8e8e6;
+}
+
+/* The capabilities: a group of bullets under a label, with a tick for what is
+   true today and a dash for what is a statement about the roadmap. */
+.dn-capability {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-capability:last-child {
+    border-bottom: 0;
+}
+
+.dn-capability-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dn-capability-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--dn-ink);
+}
+
+.dn-capability-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.dn-capability-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--dn-muted);
+}
+
+.dn-capability-marker {
+    flex: none;
+    margin-top: 3px;
+    color: var(--dn-lane-1);
+}
+
+.dn-capability-marker.is-pending {
+    color: var(--dn-muted);
+}
+
+/* The audience band: what this visitor can do with the module. */
+.dn-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-band-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.dn-band-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--dn-ink);
+}
+
+.dn-band-text {
+    margin-top: 3px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+.dn-band-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* --- Reading -------------------------------------------------------------- */
+/* The prose of an article, a post, an idea or a snippet, in the log's palette.
+   The site's `prose-editorial` cannot be reused here: it paints with the `ink-*`
+   scale, which the log's dark theme does not invert, so a heading would print
+   near-black on a near-black surface. This is the same typographic system
+   re-pointed at the log's own tokens. */
+
+.dn-prose {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--dn-ink);
+}
+
+.dn-prose > * + * {
+    margin-top: 20px;
+}
+
+.dn-prose p {
+    line-height: 1.7;
+}
+
+.dn-prose > p:first-of-type {
+    font-size: 18px;
+    color: var(--dn-muted);
+}
+
+.dn-prose h2 {
+    margin-top: 44px;
+    margin-bottom: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    scroll-margin-top: 80px;
+}
+
+.dn-prose h3 {
+    margin-top: 32px;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    scroll-margin-top: 80px;
+}
+
+/* The monospace marker before a heading — the site's signature. */
+.dn-prose h2::before {
+    content: '##';
+    margin-right: 8px;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--dn-primary);
+    opacity: 0.65;
+}
+
+.dn-prose h3::before {
+    content: '###';
+    margin-right: 6px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--dn-primary);
+    opacity: 0.55;
+}
+
+.dn-prose a {
+    font-weight: 500;
+    color: var(--dn-primary);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--dn-primary) 45%, transparent);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 150ms ease;
+}
+
+.dn-prose a:hover {
+    text-decoration-color: var(--dn-primary);
+}
+
+.dn-prose strong {
+    font-weight: 600;
+}
+
+.dn-prose em {
+    font-style: italic;
+}
+
+.dn-prose :where(p, li, blockquote) code {
+    padding: 2px 6px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: 4px;
+    background: var(--dn-wash);
+    font-family: var(--dn-mono);
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.dn-prose ul {
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.dn-prose ul > li {
+    position: relative;
+    padding-left: 22px;
+}
+
+.dn-prose ul > li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    font-family: var(--dn-mono);
+    color: var(--dn-primary);
+    opacity: 0.7;
+}
+
+.dn-prose ol {
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+    counter-reset: dn-prose-ol;
+}
+
+.dn-prose ol > li {
+    position: relative;
+    padding-left: 28px;
+    counter-increment: dn-prose-ol;
+}
+
+.dn-prose ol > li::before {
+    content: counter(dn-prose-ol) '.';
+    position: absolute;
+    left: 0;
+    width: 20px;
+    text-align: right;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--dn-primary);
+}
+
+.dn-prose blockquote {
+    padding-left: 18px;
+    border-left: 2px solid var(--dn-primary);
+    font-size: 17px;
+    color: var(--dn-muted);
+}
+
+.dn-prose blockquote p {
+    margin: 0;
+}
+
+.dn-prose hr {
+    margin: 40px 0;
+    border: 0;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+/* The code ground: dark in both themes, because the reader is looking at a
+   shell rather than at the page. */
+.dn-prose pre {
+    position: relative;
+    margin: 28px 0;
+    padding: 18px;
+    overflow-x: auto;
+    border-radius: var(--dn-radius-md);
+    background: #0d0d0c;
+    color: #e8e8e6;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    line-height: 1.65;
+    tab-size: 4;
+}
+
+.dn-prose pre code {
+    display: block;
+    padding: 0;
+    background: transparent;
+    font-family: var(--dn-mono);
+    font-size: 13px;
+    color: inherit;
+    white-space: pre;
+}
+
+.dn-prose pre[data-language]::before {
+    content: attr(data-language);
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-family: var(--dn-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6f6f6a;
+}
+
+.dn-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.dn-prose th {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--dn-rail);
+    text-align: left;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-prose td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-prose img {
+    border-radius: var(--dn-radius-lg);
+}
+
+/* The reader's own chrome: a back link, a title, and the meta line. */
+.dn-reader-head {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+    transition: color 150ms ease;
+}
+
+.dn-back:hover {
+    color: var(--dn-primary);
+}
+
+.dn-reader-title {
+    margin-top: 12px;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.18;
+    letter-spacing: -0.028em;
+    text-wrap: balance;
+}
+
+.dn-reader-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-family: var(--dn-mono);
+    font-size: 12px;
+    color: var(--dn-muted);
+}
+
+.dn-reader-body {
+    padding: 24px 16px 64px;
+}
+
+/* The table of contents, when a document has one. */
+.dn-toc {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+.dn-toc-title {
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-toc-list {
+    display: grid;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.dn-toc-list a {
+    display: block;
+    font-size: 14px;
+    color: var(--dn-muted);
+    transition: color 150ms ease;
+}
+
+.dn-toc-list a:hover {
+    color: var(--dn-ink);
+}
+
+/* The TOC's links: a hairline rail with the active heading lit. The observer
+   that writes `data-active` is the site's own, so the two read the same
+   attribute. */
+.dn-toc-list {
+    margin-top: 8px;
+    padding-left: 12px;
+    border-left: 1px solid var(--dn-hairline);
+}
+
+.dn-toc-link {
+    display: block;
+    padding: 3px 0 3px 10px;
+    margin-left: -13px;
+    border-left: 2px solid transparent;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--dn-muted);
+    transition: color 150ms ease, border-color 150ms ease;
+}
+
+.dn-toc-link:hover {
+    border-color: var(--dn-rail);
+    color: var(--dn-ink);
+}
+
+.dn-toc-link[data-active='true'] {
+    border-color: var(--dn-primary);
+    color: var(--dn-primary);
+}
+
+.dn-toc-link[data-depth='3'] {
+    padding-left: 22px;
+    font-size: 13px;
+}
+
+/* A reader's lead paragraph: the summary, larger than the prose. */
+.dn-reader-lead {
+    margin-bottom: 20px;
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--dn-muted);
+    text-wrap: pretty;
+}
+
+/* The topics an article is filed under, below the prose. */
+.dn-reader-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--dn-hairline);
+}
+
+/* A section inside a reader: the reading column's own hairline rules. */
+.dn-reader-section {
+    margin-top: 32px;
+}
+
+/* A section's own filter row: the controls that narrow the rows below it. */
+.dn-section-filters {
+    padding: 0 16px 12px;
+}
+
+/* The share bar sits between the lead and the prose. */
+.dn-share {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--dn-hairline);
+}
+
+/* The comment form: the same fields the settings pages use. */
+.dn-comment-form {
+    padding: 16px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+}
+
+.dn-comment-form-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.dn-comment-form-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    color: var(--dn-muted);
+}
+
+/* The thread: a rail of comments with replies indented under their parent. */
+.dn-thread {
+    display: grid;
+    gap: 20px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dn-thread-replies {
+    display: grid;
+    gap: 16px;
+    margin: 16px 0 0;
+    padding: 0 0 0 18px;
+    list-style: none;
+    border-left: 2px solid var(--dn-hairline);
+}
+
+.dn-reader-edit {
+    margin-top: 20px;
+}
+
+/* The second copy of the outline, for a reader who has scrolled: collapsed
+   until opened, and without the top block's border. */
+.dn-toc-details {
+    padding: 0 16px 14px;
+}
+
+.dn-toc-details summary {
+    cursor: pointer;
+}
+
+.dn-toc-details .dn-toc {
+    border-bottom: 0;
+    padding: 8px 0 0;
+}
+
+/* A snippet's source: the filename row above a fixed code ground. */
+.dn-code {
+    overflow: hidden;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-lg);
+}
+
+.dn-code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--dn-hairline);
+    background: var(--dn-wash);
+}
+
+.dn-preview {
+    margin-top: 16px;
+}

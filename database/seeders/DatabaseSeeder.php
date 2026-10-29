@@ -68,6 +68,8 @@ class DatabaseSeeder extends Seeder
             PostSeeder::class,
             CommentSeeder::class,
             FeedPostSeeder::class,
+            FeedReplySeeder::class,
+            LogActivitySeeder::class,
         ]);
 
         $this->call([

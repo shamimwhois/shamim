@@ -5,6 +5,7 @@ use App\Services\AiHubContent;
 use App\Support\Seo;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -23,7 +24,7 @@ use Livewire\WithPagination;
  * is the service's, not this component's, so a card can never promise more
  * reading than the topic page it links to can deliver.
  */
-new #[Title('Topics — AI Knowledge Hub')] class extends Component
+new #[Title('Topics — AI Knowledge Hub')] #[Layout('layouts::feed')] class extends Component
 {
     use WithPagination;
 
@@ -54,86 +55,37 @@ new #[Title('Topics — AI Knowledge Hub')] class extends Component
         return app(AiHubContent::class)->topicChips()->count();
     }
 }; ?>
-
-<div data-test="ai-hub-topics">
-    {{-- ================================================================== --
-     | 01 — Header
-     --}}
-    <section class="relative overflow-hidden border-b border-ink-200 dark:border-ink-800">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-0 grid-field"></div>
-
-        <div class="shell relative py-12 lg:py-16">
-            <x-app.ui.section-marker :number="1" label="Topics" accent />
-
-            <nav aria-label="{{ __('Breadcrumb') }}" class="mt-8">
-                <ol class="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-400 dark:text-ink-500">
-                    <li>
-                        <a href="{{ route('ai-hub.index') }}" wire:navigate class="transition-colors hover:text-signal-700 dark:hover:text-signal-400">
-                            {{ __('AI Knowledge Hub') }}
-                        </a>
-                    </li>
-                    <li aria-hidden="true">/</li>
-                    <li class="text-ink-600 dark:text-ink-300">{{ __('Topics') }}</li>
-                </ol>
-            </nav>
-
-            <h1 class="mt-6 max-w-3xl text-[clamp(2rem,4.5vw,3.25rem)] font-semibold leading-[1.05] tracking-tightest text-ink-900 dark:text-ink-50">
-                {{ __('The subject map') }}
-            </h1>
-
-            <p class="mt-5 max-w-2xl text-base leading-relaxed text-ink-600 dark:text-ink-300">
-                {{ __('Topics hold the articles; learning paths sequence them. A topic that is switched off disappears from the whole hub, not just from this page.') }}
-            </p>
-
-            <dl class="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
-                @foreach ([
-                    ['label' => __('Root topics'), 'value' => $this->topics->total()],
-                    ['label' => __('Topics and subtopics'), 'value' => $this->subjectCount],
-                ] as $stat)
-                    <div>
-                        <dt class="font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500">{{ $stat['label'] }}</dt>
-                        <dd class="mt-0.5 text-lg font-semibold tabular-nums text-ink-900 dark:text-ink-50">{{ number_format($stat['value']) }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-        </div>
-    </section>
-
-    {{-- ================================================================== --
-     | 02 — Grid
-     --}}
-    <section data-reveal class="shell py-14 lg:py-16" aria-labelledby="hub-topics-grid-heading">
-        <x-app.ui.section-marker :number="2" label="The grid" />
-
-        <div class="mt-8 flex flex-wrap items-end justify-between gap-6">
-            <h2 id="hub-topics-grid-heading" class="text-3xl font-semibold tracking-tightest text-ink-900 dark:text-ink-50">
-                {{ __('Every active topic') }}
-            </h2>
-
-            <p class="shrink-0 font-mono text-2xs uppercase tracking-widest text-ink-400 dark:text-ink-500" aria-live="polite">
-                {{ trans_choice(':count topic|:count topics', $this->topics->total()) }}
+<x-log.module
+    active="ai-hub"
+    data-test="ai-hub-topics"
+    :title="__('Topics')"
+    :meta="trans_choice(':count subject|:count subjects', $this->subjectCount, ['count' => $this->subjectCount])"
+    :note="__('The subject map of the hub. A topic is maintained by hand, and a count on it is a count of published articles — so it always describes what you can actually read.')"
+>
+    @if ($this->topics->isEmpty())
+        <div class="dn-module-empty" data-test="ai-hub-topics-empty">
+            <p class="dn-empty-command">fatal: no topics are active</p>
+            <p class="dn-empty-text">
+                {{ __('Topics stay hidden until an editor activates them. Nothing here is broken.') }}
             </p>
         </div>
+    @else
+        <div class="dn-entries">
+            @foreach ($this->topics as $topic)
+                <x-log.entry
+                    :href="route('ai-hub.topic', ['topic' => $topic->slug])"
+                    :title="$topic->name"
+                    :description="$topic->description"
+                    :meta="[
+                        trans_choice(':count article|:count articles', (int) $topic->articles_count, ['count' => (int) $topic->articles_count]),
+                        $topic->parent_id !== null ? __('subtopic') : __('root topic'),
+                    ]"
+                    :glyph="mb_substr((string) $topic->name, 0, 2)"
+                    :wire:key="'hub-topic-'.$topic->id"
+                />
+            @endforeach
+        </div>
 
-        @if ($this->topics->isNotEmpty())
-            <div class="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                @foreach ($this->topics as $topic)
-                    <x-app.ai-hub.topic-card :topic="$topic" wire:key="topic-{{ $topic->id }}" />
-                @endforeach
-            </div>
-
-            <x-app.ui.pagination :paginator="$this->topics" label="{{ __('Topics pagination') }}" class="mt-10" />
-        @else
-            <x-app.ui.empty-state
-                class="mt-8"
-                icon="tag"
-                :title="__('No topics are active yet')"
-                :description="__('Topics are created by an editor in the hub console. Until one exists and is switched on, the shelves above stay empty.')"
-            >
-                <flux:button :href="route('ai-hub.index')" wire:navigate icon="sparkles">
-                    {{ __('Back to the hub') }}
-                </flux:button>
-            </x-app.ui.empty-state>
-        @endif
-    </section>
-</div>
+        <x-app.ui.pagination :paginator="$this->topics" label="{{ __('AI hub topic pagination') }}" class="dn-pagination" />
+    @endif
+</x-log.module>

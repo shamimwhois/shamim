@@ -112,7 +112,7 @@ Visit `http://localhost:8000`.
 
 | Email | Role | Lands on |
 | --- | --- | --- |
-| `test@example.com` | `admin` | `/admin/dashboard` |
+| `shamimstack@gmail.com` | `admin` | `/admin/dashboard` |
 | `seller@example.com` | `seller` | `/seller/dashboard` |
 | `user@example.com` | `user` | `/dashboard` |
 

@@ -43,7 +43,7 @@ it('stops the feed motion for a reader who prefers reduced motion', function () 
     $this->extraChromeFlags = ['--force-prefers-reduced-motion'];
 
     /** @var User $author */
-    $author = User::query()->where('email', 'test@example.com')->firstOrFail();
+    $author = User::query()->where('email', 'shamimstack@gmail.com')->firstOrFail();
 
     $this->browse(function (Browser $browser) use ($author) {
         $browser

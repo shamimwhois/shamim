@@ -1,3 +1,0 @@
-X
-            ->paginate((int) config('ai_hub.per_page.articles'));
-Y

@@ -12,8 +12,8 @@ use Illuminate\Database\Seeder;
  *
  * Three accounts, one per role, so every dashboard in the access model is
  * reachable immediately after `composer setup` without hand-editing the
- * database. The author account keeps Laravel's starter default credentials so
- * the documented setup path lands on a known login; the seller and admin
+ * database. The author account is the site owner's real account — name, email
+ * and handle all match `config('portfolio.author')` — and the seller and admin
  * accounts are additional and clearly labelled.
  *
  * PostSeeder resolves its author from the first user, so the admin account is
@@ -23,9 +23,9 @@ use Illuminate\Database\Seeder;
  * exactly like a test account.
  *
  * The author account is also a feed persona: {@see FeedPersonas} holds its
- * handle, so a corpus post written by `Shamim Hossain` and the login at
- * `test@example.com` are the same person rather than two records that happen
- * to agree. The other two accounts have no public handle to carry.
+ * handle, so a corpus post written by `Md Shamim Hossain` and the login at
+ * `shamimstack@gmail.com` are the same person rather than two records that
+ * happen to agree. The other two accounts have no public handle to carry.
  */
 class UserSeeder extends Seeder
 {
@@ -34,7 +34,7 @@ class UserSeeder extends Seeder
         $accounts = [
             [
                 'name' => config('portfolio.author.name', 'Test User'),
-                'email' => 'test@example.com',
+                'email' => 'shamimstack@gmail.com',
                 'role' => AccountRole::Admin,
                 'password' => 'password',
             ],

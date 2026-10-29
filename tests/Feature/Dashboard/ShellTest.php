@@ -203,7 +203,11 @@ test('the wordmark is one component rendered in every sidenav position', functio
 })->group('shell');
 
 test('the guest layout renders the public chrome and carries no workspace scope', function () {
-    $response = $this->get(route('blog.index'));
+    // The landing page is the sample, not the blog: the blog index wears the
+    // log's application frame (`x-log.module`), exactly like the community
+    // directory, the AI hub, Ideas and the Dev Lab, so it is a public *route*
+    // inside an application shell rather than a page of the marketing site.
+    $response = $this->get(route('home'));
 
     $response->assertOk()
         ->assertSee('id="main"', false)
