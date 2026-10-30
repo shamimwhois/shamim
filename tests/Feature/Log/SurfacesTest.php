@@ -58,7 +58,7 @@ it('draws the inbox on the rail and marks what it showed as read', function (): 
     get(route('notifications.index'))
         ->assertOk()
         ->assertSee('data-test="notification"', false)
-        ->assertSee('starred your commit');
+        ->assertSee('starred your post');
 
     expect($notification->fresh()->read_at)->not->toBeNull();
 });

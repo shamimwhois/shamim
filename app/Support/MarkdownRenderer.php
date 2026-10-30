@@ -370,15 +370,42 @@ class MarkdownRenderer
 
     /**
      * Determine whether a URL uses a scheme that can execute script.
+     *
+     * The value is first reduced to the string a browser will actually read,
+     * because the scheme is judged here and executed there. Per the URL
+     * standard, a browser trims leading and trailing C0 controls and spaces and
+     * removes tab, newline and carriage return from anywhere in the value — and
+     * only those. A tab between the letters of `javascript:` therefore becomes a
+     * live scheme in the browser while reading as a relative reference to
+     * `parse_url()`, which is the discrepancy this reduction closes. Controls
+     * that a browser does *not* remove (0x01–0x08, 0x0B, 0x0C, 0x0E–0x1F
+     * mid-string) break the URL for the browser rather than forming a scheme, so
+     * they need no special handling here.
      */
     protected function isUnsafeUrl(string $url): bool
     {
-        $scheme = strtolower((string) parse_url(trim($url), PHP_URL_SCHEME));
+        $url = $this->asTheBrowserReadsIt($url);
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
 
         if ($scheme === '') {
             return false;
         }
 
         return ! in_array($scheme, ['http', 'https', 'mailto'], true);
+    }
+
+    /**
+     * Reduce a URL to the string a browser resolves.
+     *
+     * Two removals, both from the URL standard's parser rather than invented
+     * here: leading and trailing C0 control or space are trimmed, and tab,
+     * newline and carriage return are removed from anywhere in the value.
+     */
+    protected function asTheBrowserReadsIt(string $url): string
+    {
+        $trimmed = preg_replace('/^[\x00-\x20]+|[\x00-\x20]+$/', '', $url) ?? $url;
+
+        return preg_replace('/[\x09\x0A\x0D]+/', '', $trimmed) ?? $trimmed;
     }
 }

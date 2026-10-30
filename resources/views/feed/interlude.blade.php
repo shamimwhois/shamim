@@ -20,20 +20,35 @@
 
         <div class="dn-who">
             @foreach ($authors as $author)
-                <a
-                    class="dn-who-row"
-                    href="{{ route('profile.show', ['handle' => $author['handle']]) }}"
-                    wire:navigate
-                >
-                    <span class="dn-avatar" style="--dn-lane: {{ $author['lane'] }};">{{ $author['initials'] }}</span>
-                    <span class="dn-who-body">
-                        <span class="dn-who-name">{{ $author['name'] }}</span>
-                        <span class="dn-who-meta">
-                            {{ '@'.$author['handle'] }} ·
-                            {{ trans_choice(':count commit|:count commits', $author['commits'], ['count' => $author['commits']]) }}
+                {{-- A corpus handle with no account behind it has nothing to
+                     open, so it prints as a row without a link. --}}
+                @if ($author['profileUrl'] !== null)
+                    <a
+                        class="dn-who-row"
+                        href="{{ $author['profileUrl'] }}"
+                        wire:navigate
+                    >
+                        <span class="dn-avatar" style="--dn-lane: {{ $author['lane'] }};">{{ $author['initials'] }}</span>
+                        <span class="dn-who-body">
+                            <span class="dn-who-name">{{ $author['name'] }}</span>
+                            <span class="dn-who-meta">
+                                {{ '@'.$author['handle'] }} ·
+                                {{ trans_choice(':count post|:count posts', $author['commits'], ['count' => $author['commits']]) }}
+                            </span>
+                        </span>
+                    </a>
+                @else
+                    <span class="dn-who-row">
+                        <span class="dn-avatar" style="--dn-lane: {{ $author['lane'] }};">{{ $author['initials'] }}</span>
+                        <span class="dn-who-body">
+                            <span class="dn-who-name">{{ $author['name'] }}</span>
+                            <span class="dn-who-meta">
+                                {{ '@'.$author['handle'] }} ·
+                                {{ trans_choice(':count post|:count posts', $author['commits'], ['count' => $author['commits']]) }}
+                            </span>
                         </span>
                     </span>
-                </a>
+                @endif
             @endforeach
         </div>
 

@@ -73,9 +73,19 @@
     --dn-radius-lg: 8px;
     --dn-rail-column: 4rem;
     --dn-feed-column: 620px;
-    --dn-nav-column: 256px;
     --dn-aside-column: 320px;
     --dn-shell-max: 1264px;
+
+    /* The nav column is the one piece of geometry the reader can change:
+       the collapse control swaps `--dn-nav-column` for `--dn-nav-collapsed`.
+       Everything that used to read `--dn-nav-column` now reads
+       `--dn-nav-live`, so a single assignment moves the rail *and* lets the
+       feed column reclaim what the rail gives up. Keep the two constants
+       separate from the live value — a var cannot reference itself. */
+    --dn-nav-column: 256px;
+    --dn-nav-collapsed: 76px;
+    --dn-nav-live: var(--dn-nav-column);
+    --dn-nav-transition: 240ms var(--dn-ease-slide);
 
     /* Type */
     --dn-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
@@ -164,7 +174,14 @@
 
 /* --- Shell ---------------------------------------------------------------- */
 /* A centred 1264px shell: sticky nav, the 620px feed column, sticky aside.
-   Below md the nav becomes a bottom bar and the aside disappears. */
+   Below md the nav becomes a bottom bar and the aside disappears.
+
+   The nav is the only column whose width the reader controls. `--dn-nav-live`
+   carries whichever width the shell is currently in, so the rail and the feed
+   column read one variable and can never disagree; collapsing is a single
+   property change, not a re-layout. The transition lives here, on the widths
+   themselves, so the label fade (below) and the column shrink share one clock
+   — a rail that snaps while its labels glide reads as two events. */
 
 .dn-shell {
     display: flex;
@@ -216,18 +233,32 @@
 
 @media (min-width: 1024px) {
     .dn-nav {
-        width: var(--dn-nav-column);
+        width: var(--dn-nav-live);
+        transition: width var(--dn-nav-transition);
     }
 
-    /* The feed column widens as the nav collapses: the shell stays 1264px. */
+    /* The feed column widens as the nav collapses: the shell stays 1264px, and
+       the pixels the rail hands back land here rather than as gap. */
     .dn-main {
-        max-width: calc(876px - var(--dn-nav-column));
+        max-width: calc(876px - var(--dn-nav-live));
+        transition: max-width var(--dn-nav-transition);
     }
 }
 
 @media (min-width: 1280px) {
     .dn-aside {
         display: flex;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dn-nav,
+    .dn-main,
+    .dn-nav-label,
+    .dn-user-meta,
+    .dn-brand-text,
+    .dn-brand-tag {
+        transition: none;
     }
 }
 
@@ -259,6 +290,14 @@
     padding: 24px 14px;
     overflow: hidden;
     white-space: nowrap;
+}
+
+/* The collapsed rail is an icon rail: 76px minus the 14px gutters leaves a 48px
+   lane, which is exactly a 44px row plus its own breathing room. The padding
+   tightens with it so the icons stay centred in the column rather than drifting
+   left. */
+.dn-shell[data-nav='collapsed'] .dn-nav-inner {
+    padding-inline: 14px;
 }
 
 .dn-brand {
@@ -351,6 +390,23 @@
     flex: none;
 }
 
+/* In the collapsed rail the icon is the whole row, so the row centres on it and
+   the label's 12px gap goes with it — otherwise the icon sits 16px off-centre,
+   which is the tell that a rail was collapsed by hiding text rather than by
+   resizing. */
+.dn-shell[data-nav='collapsed'] .dn-nav-item {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
+}
+
+/* A centred row leaves no room for a badge's negative inset, so in the rail the
+   badge rides the icon's top-right corner instead of the row's. */
+.dn-shell[data-nav='collapsed'] .dn-nav-badge {
+    top: -5px;
+    right: -6px;
+}
+
 .dn-nav-primary {
     justify-content: flex-start;
     margin-top: 4px;
@@ -361,6 +417,21 @@
 .dn-nav-primary:hover {
     background: var(--dn-primary-hover);
     color: var(--dn-primary-ink);
+}
+
+.dn-shell[data-nav='collapsed'] .dn-nav-primary {
+    justify-content: center;
+}
+
+/* The collapse control's own icon promises the direction it will move the rail:
+   it points left to close, and mirrors to point right once closed — so the same
+   row reads as "reopen" without a label. */
+.dn-nav-collapse svg {
+    transition: transform var(--dn-nav-transition);
+}
+
+.dn-shell[data-nav='collapsed'] .dn-nav-collapse svg {
+    transform: rotate(180deg);
 }
 
 .dn-nav-badge {
@@ -397,12 +468,20 @@
 }
 
 .dn-shell[data-nav='expanded'] .dn-nav-label,
-.dn-shell[data-nav='expanded'] .dn-brand-text,
-.dn-shell[data-nav='expanded'] .dn-brand-tag,
 .dn-shell[data-nav='expanded'] .dn-nav-count,
 .dn-shell[data-nav='expanded'] .dn-user-meta,
 .dn-shell[data-nav='expanded'] .dn-nav-kbd {
     max-width: 160px;
+    opacity: 1;
+}
+
+/* The wordmark is the owner's handle, so it is longer than a nav label and
+   needs its own cap. Measured in Chrome: `~/shamimstack` is 192.2px at
+   1.75rem/700/-0.03em, and the rail gives it 256px minus 12px padding a side
+   = 232px, so the cap has to clear 192px or the handle renders clipped. */
+.dn-shell[data-nav='expanded'] .dn-brand-text,
+.dn-shell[data-nav='expanded'] .dn-brand-tag {
+    max-width: 232px;
     opacity: 1;
 }
 
@@ -414,11 +493,25 @@
     display: block;
 }
 
+/* The mark is the whole brand in the rail, so it centres like the icons below
+   it. `.dn-brand` is a padding-inline: 12px grid, and in a centred column that
+   pushes the mark 12px off-axis — zero it here. */
+.dn-shell[data-nav='collapsed'] .dn-brand {
+    padding-inline: 0;
+    justify-items: center;
+}
+
 .dn-shell[data-nav='collapsed'] .dn-brand-text,
 .dn-shell[data-nav='collapsed'] .dn-brand-tag {
     max-width: 0;
     overflow: hidden;
     opacity: 0;
+}
+
+/* The one assignment the whole collapse turns on. Both the rail width and the
+   feed column read `--dn-nav-live`, so this single swap moves them together. */
+.dn-shell[data-nav='collapsed'] {
+    --dn-nav-live: var(--dn-nav-collapsed);
 }
 
 .dn-nav-collapse {
@@ -446,6 +539,14 @@
 
 .dn-user:hover {
     background: var(--dn-wash);
+}
+
+/* The chip is avatar-only in the rail, so it centres on the avatar like every
+   row above it. */
+.dn-shell[data-nav='collapsed'] .dn-user {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
 }
 
 .dn-user-meta {
@@ -1024,21 +1125,125 @@
     color: var(--dn-muted);
 }
 
+/* The row under the body: attach cluster on the left, send corner on the
+   right. `space-between` is what puts the verb at the far edge and frees the
+   left half for the tools — the two groups are the only children, so the gap
+   between them is the whole empty middle and no spacer element is needed.
+
+   `width: 100%` is load-bearing, not decorative. A flex container with
+   `flex-wrap: wrap` derives its own width from its children's max-content
+   widths, so the row sized itself to (tools + send) and reported *wider than
+   its parent* while no child did — the tell that the container, not a child,
+   was overflowing. Pinning the width and giving the tools a zero basis lets
+   the left group absorb the slack instead of the row growing past the panel. */
 .dn-composer-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: 8px 16px;
+    width: 100%;
+    min-width: 0;
     margin-top: 8px;
 }
 
 .dn-composer-tools {
     display: flex;
     align-items: center;
-    gap: 4px;
-    flex: 1;
+    gap: 2px;
+    flex: 1 1 0;
     min-width: 0;
+}
+
+/* The send corner. Held together so the counter never drifts away from the
+   verb it counts for when the row wraps on a phone. No `margin-left: auto`:
+   the row's `space-between` already parks it at the far edge, and a second
+   auto margin would give the group two competing push rules. */
+.dn-composer-send {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+}
+
+/* The verb. Accent fill, so its text takes `-ink` — the colour *on* a primary
+   fill — and never `--dn-primary`, which would be unreadable in dark mode. */
+.dn-btn-send {
+    min-width: 96px;
+    padding-inline: 14px 12px;
+}
+
+.dn-send-label {
+    /* Nothing between the two loading states may shift the button's width:
+       the labels are the same element in two states, and the icon beside them
+       is removed while the request is in flight. */
+    line-height: 1;
+}
+
+.dn-send-icon {
+    flex: none;
+    opacity: 0.85;
+}
+
+.dn-btn-send:disabled .dn-send-icon {
+    opacity: 0.5;
+}
+
+/* --- The overflow menu -------------------------------------------------- */
+
+/* The one glyph that holds what will not fit on a phone row. Absolutely
+   positioned inside a relative wrapper so opening it never reflows the tools
+   beside it, and anchored to the *bottom* because the row sits at the foot of
+   the panel — a panel opening downward would be clipped by the composer's
+   own edge on a short viewport. */
+.dn-composer-more {
+    position: relative;
+    flex: none;
+}
+
+.dn-composer-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    min-width: 216px;
+    padding: 4px;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-surface);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.32);
+}
+
+.dn-composer-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: var(--dn-radius-sm);
+    color: var(--dn-ink);
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms var(--dn-ease-out), color 140ms var(--dn-ease-out);
+}
+
+.dn-composer-menu-item:hover {
+    background: var(--dn-wash);
+}
+
+/* An active tool keeps the accent *soft* fill, so its label stays on a wash
+   and takes `--dn-primary` — the readable pair in both themes. */
+.dn-composer-menu-item.is-on {
+    background: var(--dn-primary-soft);
+    color: var(--dn-primary);
+}
+
+.dn-composer-menu-item svg {
+    flex: none;
+    color: currentColor;
 }
 
 .dn-icon-btn {
@@ -1466,17 +1671,28 @@
     opacity: 0;
 }
 
-/* A commit's own delete affordance, revealed on hover or focus. */
-.dn-delete {
+/* A commit's own verbs (edit, delete), revealed on hover or focus.
+   The GROUP is the absolutely positioned thing, not each button: two
+   `.dn-delete` buttons each anchored at `right: -6px` land on the same pixel
+   and the later one paints over the earlier, so the pencil becomes unclickable.
+   Flow them inside the anchor instead, and let the row size itself. */
+.dn-row-verbs {
     position: absolute;
     top: 50%;
     right: -6px;
     translate: 0 -50%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.dn-delete {
     padding: 6px;
     border-radius: var(--dn-radius-md);
     color: var(--dn-muted);
-    opacity: 0;
-    transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+    transition: background-color 150ms ease, color 150ms ease;
 }
 
 .dn-delete:hover {
@@ -1484,8 +1700,9 @@
     color: var(--dn-destructive);
 }
 
-.dn-commit:hover .dn-delete,
-.dn-commit:focus-within .dn-delete,
+.dn-commit:hover .dn-row-verbs,
+.dn-commit:focus-within .dn-row-verbs,
+.dn-row-verbs:focus-within,
 .dn-delete:focus-visible {
     opacity: 1;
 }
@@ -1625,6 +1842,13 @@
     font-size: 13px;
 }
 
+/* A shared post is marked by colour, not by filling the glyph. `is-on` fills
+   the icon, which reads correctly for a star — a closed shape — and wrongly for
+   the share arrow, whose whole identity is the outline. */
+.dn-share .dn-action.is-on svg {
+    fill: none;
+}
+
 .dn-replies-link {
     color: var(--dn-primary);
 }
@@ -1632,6 +1856,52 @@
 .dn-replies-link:hover {
     background: var(--dn-primary-soft);
     color: var(--dn-primary);
+}
+
+/* --- The inline editor ---------------------------------------------------- */
+
+/* The editor takes the body's place, so it is dimensioned like a body: same
+   width, same rhythm, one hairline frame to say "this is a field". The text is
+   the post's own, at the size the row already uses, because a reader fixing a
+   typo should be looking at their words and not at a form. */
+.dn-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--dn-primary);
+    border-radius: var(--dn-radius-md);
+    background: var(--dn-surface);
+}
+
+.dn-edit-input {
+    display: block;
+    width: 100%;
+    min-height: 76px;
+    max-height: 60vh;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    resize: vertical;
+    background: transparent;
+    color: var(--dn-ink);
+    font-family: var(--dn-sans);
+    font-size: 15px;
+    line-height: 1.625;
+}
+
+.dn-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dn-edit-hint {
+    margin-right: auto;
+    font-family: var(--dn-mono);
+    font-size: 11.5px;
+    color: var(--dn-muted);
 }
 
 /* --- Replies -------------------------------------------------------------- */
@@ -2334,10 +2604,14 @@
 
 /* --- The commit's own record ---------------------------------------------- */
 
+/* The post's type, inline in its header. It carries no box: the row is already
+   a grid of hairlines and a second outline around one word reads as a control
+   competing with the row it labels. The hover still colours it, which is the
+   affordance — the border was never doing the work. */
 .dn-type {
     flex: none;
     padding: 1px 6px;
-    border: 1px solid var(--dn-hairline);
+    border: none;
     border-radius: var(--dn-radius-sm);
     font-family: var(--dn-mono);
     font-size: 10.5px;
@@ -2346,7 +2620,6 @@
 }
 
 .dn-type:hover {
-    border-color: var(--dn-primary);
     color: var(--dn-primary);
 }
 
@@ -2616,13 +2889,19 @@
     gap: 5px;
 }
 
+/* A poll answer sits on the wash, not in a box. The row carried a full 1px
+   hairline, which put four outlined rectangles inside a post that is otherwise
+   a column of text — the answer read as a form control competing with the post
+   it belongs to. The bar behind the label already shows the share, and the
+   reader's own choice keeps its accent border, so nothing is lost: the outline
+   was never the thing carrying the information. */
 .dn-poll-row {
     position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 5px 9px;
-    border: 1px solid var(--dn-hairline);
+    border: none;
     border-radius: var(--dn-radius-sm);
     overflow: hidden;
 }
@@ -2679,12 +2958,14 @@
     cursor: pointer;
 }
 
+/* The states that do want an outline have to declare its width: the resting row
+   is `border: none`, and a `border-color` on its own paints nothing. */
 .dn-poll-row:has(.dn-poll-radio:focus-visible) {
-    border-color: var(--dn-primary);
+    border: 1px solid var(--dn-primary);
 }
 
 .dn-poll-row.is-mine {
-    border-color: var(--dn-primary);
+    border: 1px solid var(--dn-primary);
 }
 
 /* The reader's own choice gets the accent wash, so the eye finds it in a
@@ -3349,7 +3630,8 @@
     }
 
     .dn-main:has(> .dn-remotes) {
-        max-width: calc(var(--dn-shell-max) - var(--dn-nav-column));
+        max-width: calc(var(--dn-shell-max) - var(--dn-nav-live));
+        transition: max-width var(--dn-nav-transition);
     }
 }
 

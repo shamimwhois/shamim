@@ -169,13 +169,13 @@ new #[Title('Profile settings')] #[Layout('layouts::feed')] class extends Compon
 <x-log.settings tab="profile">
     <section class="dn-settings-section" aria-labelledby="settings-profile">
         <h2 id="settings-profile" class="dn-settings-title">{{ __('Profile') }}</h2>
-        <p class="dn-settings-note">{{ __('Update the name and handle your commits are signed with.') }}</p>
+        <p class="dn-settings-note">{{ __('Update the name and handle your posts are signed with.') }}</p>
 
         {{-- The signature the log will print. Live, because the reader is
              editing exactly the words it is built from — and it is the reason
              the name and handle fields exist at all. --}}
         <div class="dn-byline-preview" data-test="byline-preview">
-            <p class="dn-byline-preview__label">{{ __('How your commits are signed') }}</p>
+            <p class="dn-byline-preview__label">{{ __('How your posts are signed') }}</p>
 
             <div class="dn-byline-preview__row">
                 <span

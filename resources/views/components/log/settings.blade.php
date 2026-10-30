@@ -17,6 +17,7 @@
         ['key' => 'terminal', 'title' => __('Terminal'), 'href' => route('settings.terminal')],
         ['key' => 'safety', 'title' => __('Safety'), 'href' => route('settings.safety')],
         ['key' => 'devices', 'title' => __('Devices'), 'href' => route('settings.devices')],
+        ['key' => 'billing', 'title' => __('Billing'), 'href' => route('settings.billing')],
         ['key' => 'security', 'title' => __('Security'), 'href' => route('security.edit')],
     ];
 

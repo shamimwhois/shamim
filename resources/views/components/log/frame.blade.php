@@ -19,6 +19,7 @@
     use App\Models\FeedPost;
     use App\Models\LogNotification;
     use App\Models\RemoteMessage;
+    use App\Models\User;
     use App\Support\LogIdentity;
 
     $reader = auth()->user();
@@ -84,15 +85,35 @@
         ['key' => 'dev-lab', 'title' => __('Dev Lab'), 'href' => route('dev-lab.index'), 'icon' => 'dev-lab'],
     ];
 
+    /*
+     * "Active in the log" — the three most-posting authors, minus whoever is
+     * reading.
+     *
+     * The handle in `feed_posts` is a display string, not a key: a corpus post
+     * carries `@priya`, the account table carries `priya`, and the two only agree
+     * because a seeder made it so. A handle that no account owns — a retired
+     * corpus author, a row written before the seed — still groups and still
+     * sorts, and the aside would then link `/@ghost` and land the reader on a
+     * 404. So the suggestion list is filtered against `users` before it is
+     * rendered, not after: one column of real handles, then the count query
+     * constrained to those.
+     */
+    $knownHandles = User::query()
+        ->whereNotNull('handle')
+        ->pluck('handle')
+        ->map(fn (string $candidate): string => mb_strtolower($candidate))
+        ->all();
+
     $suggestions = FeedPost::query()
         ->visible()
         ->selectRaw('handle, author, avatar, count(*) as commits')
         ->groupBy('handle', 'author', 'avatar')
         ->orderByDesc('commits')
-        ->limit(3)
         ->get()
+        ->reject(fn (FeedPost $post): bool => ! in_array(mb_strtolower(LogIdentity::handle($post->handle)), $knownHandles, true))
         ->reject(fn (FeedPost $post): bool => $reader !== null
             && LogIdentity::handle($post->handle) === $handle)
+        ->take(3)
         ->values();
 @endphp
 
@@ -122,13 +143,13 @@
 >
     <nav class="dn-nav" aria-label="{{ __('Main') }}">
         <div class="dn-nav-inner">
-            <a href="{{ route('feed.index') }}" class="dn-brand" aria-label="{{ __('The Log') }}">
+            <a href="{{ route('feed.index') }}" class="dn-brand" aria-label="{{ config('portfolio.author.short_name') }}">
                 <svg class="dn-brand-mark" viewBox="0 0 28 28" aria-hidden="true">
                     <path d="M14 0v9M14 19v9" stroke="currentColor" stroke-width="2" />
                     <circle cx="14" cy="14" r="5" fill="none" stroke="currentColor" stroke-width="2.5" />
                 </svg>
                 <span class="dn-brand-text">
-                    <span class="dn-wordmark">~<span class="dn-wordmark-accent">/</span>feed</span>
+                    <span class="dn-wordmark">~<span class="dn-wordmark-accent">/</span>{{ config('portfolio.author.short_name') }}</span>
                 </span>
                 <span class="dn-brand-tag">{{ __('the community log') }}</span>
             </a>
@@ -206,14 +227,15 @@
                     @endif
                 >
                     <x-feed.icon name="pen" />
-                    <span class="dn-nav-label">{{ __('Commit') }}</span>
+                    <span class="dn-nav-label">{{ __('Post') }}</span>
                 </button>
 
                 <button
                     type="button"
                     class="dn-nav-item dn-nav-collapse"
                     data-test="nav-collapse"
-                    x-on:click="$el.closest('.dn-shell').dataset.nav = $el.closest('.dn-shell').dataset.nav === 'expanded' ? 'collapsed' : 'expanded'"
+                    x-on:click="toggleNav()"
+                    x-bind:aria-expanded="$el.closest('.dn-shell').dataset.nav === 'expanded'"
                     aria-label="{{ __('Collapse navigation') }}"
                 >
                     <x-feed.icon name="collapse" />
@@ -274,8 +296,8 @@
 
     <main class="dn-main" id="main">
         <div class="dn-mobile-header">
-            <a href="{{ route('feed.index') }}" aria-label="{{ __('The Log') }}">
-                <span class="dn-wordmark">~/feed</span>
+            <a href="{{ route('feed.index') }}" aria-label="{{ config('portfolio.author.short_name') }}">
+                <span class="dn-wordmark">~/{{ config('portfolio.author.short_name') }}</span>
             </a>
             <div class="dn-mobile-actions">
                 <button type="button" class="dn-icon-btn" x-on:click="openSearch()" aria-label="{{ __('Search developers') }}">
@@ -335,7 +357,7 @@
 
                     <dl class="dn-stats">
                         <div class="dn-stat">
-                            <dt>{{ __('commits') }}</dt>
+                            <dt>{{ __('posts') }}</dt>
                             <dd>{{ $reader->feedPosts()->count() }}</dd>
                         </div>
                         <div class="dn-stat">
@@ -351,7 +373,7 @@
             @else
                 <section class="dn-card" aria-labelledby="aside-sign-in">
                     <h2 id="aside-sign-in" class="dn-aside-title">{{ __('New here?') }}</h2>
-                    <p>{{ __('Sign in to commit, star what you like, and reply. Reading needs no account.') }}</p>
+                    <p>{{ __('Sign in to post, star what you like, and reply. Reading needs no account.') }}</p>
                     <a
                         href="{{ route('login') }}"
                         x-on:click="$flux.modal('login').show(); $event.preventDefault()"
@@ -380,7 +402,7 @@
                                 <span class="dn-who-body">
                                     <span class="dn-who-name">{{ $author->author }}</span>
                                     <span class="dn-who-meta">
-                                        {{ '@'.LogIdentity::handle($author->handle) }} · {{ trans_choice(':count commit|:count commits', (int) $author->commits, ['count' => (int) $author->commits]) }}
+                                        {{ '@'.LogIdentity::handle($author->handle) }} · {{ trans_choice(':count post|:count posts', (int) $author->commits, ['count' => (int) $author->commits]) }}
                                     </span>
                                 </span>
                             </a>
@@ -470,7 +492,7 @@
                     </span>
                     <span style="min-width: 0;">
                         <span class="dn-result-name">{{ __('Search everything for') }} '<span x-text="search"></span>'</span>
-                        <span class="dn-result-handle">{{ __('commits, posts, ideas, articles and snippets') }}</span>
+                        <span class="dn-result-handle">{{ __('posts, ideas, articles and snippets') }}</span>
                     </span>
                 </a>
 
@@ -489,7 +511,7 @@
                                 <span x-text="'@' + result.handle"></span>
                             </span>
                         </span>
-                        <span class="dn-result-bio" style="margin-left: auto;" x-text="result.commits + ' commits'"></span>
+                        <span class="dn-result-bio" style="margin-left: auto;" x-text="result.commits + (result.commits === 1 ? ' post' : ' posts')"></span>
                     </a>
                 </template>
             </div>
@@ -525,10 +547,10 @@
                 <div class="dn-sheet-section">
                     <p class="dn-sheet-title">{{ __('Log') }}</p>
                     @foreach ([
-                        [['j', 'k'], __('Move between commits')],
+                        [['j', 'k'], __('Move between posts')],
                         [['c'], __('Focus the composer')],
-                        [['s'], __('Star the focused commit')],
-                        [['r'], __('Reply to the focused commit')],
+                        [['s'], __('Star the focused post')],
+                        [['r'], __('Reply to the focused post')],
                         [['o'], __('Show or hide its replies')],
                     ] as [$keys, $label])
                         <div class="dn-sheet-row">

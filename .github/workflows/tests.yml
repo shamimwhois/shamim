@@ -34,5 +34,47 @@ jobs:
       - name: Setup Application
         run: composer setup
 
+      # Guard against the defect that once hid three gates behind one: a file
+      # committed with CRLF endings makes Pint's line_ending rule fail, and
+      # because Pint runs first, PHPStan and the test suite never execute.
+      # A red first gate trains people to ignore red, so this reports the
+      # offender in one line instead of burying it in Pint's output.
+      # See docs/CODE-REVIEW-STANDARD.md §3.2.
+      #
+      # Column 2 of `git ls-files --eol` is the WORKING-TREE ending. Only
+      # `w/crlf` is a defect: `w/-text` is a binary and `w/none` is empty,
+      # and both are legitimate.
+      - name: Check line endings match .gitattributes
+        run: |
+          offenders="$(git ls-files --eol | awk '$2 == "w/crlf"')"
+          if [ -n "$offenders" ]; then
+            echo "::error::These files have CRLF endings; .gitattributes requires LF:"
+            echo "$offenders"
+            echo ""
+            echo "Fix: rewrite the offending file with LF endings."
+            exit 1
+          fi
+          echo "All tracked text files use LF."
+
+      # Pint's directory discovery does not descend into filenames containing
+      # the U+26A1 "⚡" character, so every Livewire single-file component in
+      # resources/views/pages is INVISIBLE to `pint --test` — it reports PASS
+      # over them. As of 2026-10-30 that hides 28 real violations across 80
+      # components. Passing the paths explicitly DOES check them.
+      # See docs/CODE-REVIEW-STANDARD.md §3.4.
+      #
+      # This step currently reports without failing (continue-on-error), because
+      # 28 pre-existing violations would otherwise turn main red on day one.
+      # Flip it to blocking — delete continue-on-error — once the team has
+      # decided to reformat the 28 files or exclude `class_definition` for ⚡
+      # paths. Until then a green CI run is NOT evidence of style compliance
+      # for any ⚡ component.
+      - name: Check style of Livewire single-file components (⚡)
+        continue-on-error: true
+        run: |
+          mapfile -d '' files < <(find resources/views -name "*⚡*" -print0)
+          echo "Found ${#files[@]} single-file components."
+          vendor/bin/pint --test "${files[@]}"
+
       - name: Run CI Checks
         run: composer ci:check

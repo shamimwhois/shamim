@@ -48,7 +48,7 @@ new #[Title('Starred')] #[Layout('layouts::feed')] class extends Component
 
         app(Seo::class)->set([
             'title' => 'Starred',
-            'description' => __('The commits you kept, newest star first.'),
+            'description' => __('The posts you kept, newest star first.'),
         ]);
     }
 
@@ -154,7 +154,7 @@ new #[Title('Starred')] #[Layout('layouts::feed')] class extends Component
             <div class="dn-page-head">
                 <h1 class="dn-page-title">{{ __('Starred') }}</h1>
                 <p class="dn-page-meta">
-                    {{ trans_choice(':count commit|:count commits', $this->commits->count(), ['count' => $this->commits->count()]) }}
+                    {{ trans_choice(':count post|:count posts', $this->commits->count(), ['count' => $this->commits->count()]) }}
                 </p>
             </div>
         </div>
@@ -166,7 +166,7 @@ new #[Title('Starred')] #[Layout('layouts::feed')] class extends Component
         <div class="dn-empty" data-test="starred-empty">
             <p class="dn-empty-command">fatal: no commits are starred</p>
             <p class="dn-empty-text">
-                {{ __('Star a commit and it lands here. The star is the only bookmark this log has.') }}
+                {{ __('Star a post and it lands here. The star is the only bookmark this log has.') }}
                 <a href="{{ route('feed.index') }}" wire:navigate>{{ __('Back to the log') }}</a>.
             </p>
         </div>
@@ -188,6 +188,7 @@ new #[Title('Starred')] #[Layout('layouts::feed')] class extends Component
                     'commit' => $row,
                     'isLast' => $loop->last && ! $this->hasMore,
                     'maxReply' => 1000,
+                    'maxEdit' => 4000,
                 ])
             @endforeach
 

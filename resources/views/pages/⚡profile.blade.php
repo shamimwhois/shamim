@@ -52,7 +52,7 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
 
         app(Seo::class)->set([
             'title' => $this->profile->name.' (@'.LogIdentity::handleFor($this->profile).')',
-            'description' => __('The commits :name shipped, newest first.', ['name' => $this->profile->name]),
+            'description' => __('The posts :name shipped, newest first.', ['name' => $this->profile->name]),
         ]);
     }
 
@@ -227,7 +227,7 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
                 <dl class="dn-profile-stats">
                     <div>
                         <dd>{{ $this->totals['commits'] }}</dd>
-                        <dt>{{ trans_choice('commit|commits', $this->totals['commits']) }}</dt>
+                        <dt>{{ trans_choice('post|posts', $this->totals['commits']) }}</dt>
                     </div>
                     <div>
                         <dd>{{ $this->totals['stars'] }}</dd>
@@ -251,17 +251,17 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
             <div class="dn-activity-head">
                 <p class="dn-activity-total">
                     <strong>{{ $this->totals['commits'] }}</strong>
-                    {{ trans_choice('commit|commits', $this->totals['commits']) }}
+                    {{ trans_choice('post|posts', $this->totals['commits']) }}
                     <span>{{ __('in the last 30 days') }}</span>
                 </p>
             </div>
 
-            <div class="dn-activity-strip" role="img" aria-label="{{ __('Commits per day for the last 30 days') }}">
+            <div class="dn-activity-strip" role="img" aria-label="{{ __('Posts per day for the last 30 days') }}">
                 @foreach ($this->activity as $cell)
                     <span
                         class="dn-cell"
                         data-level="{{ $cell['level'] }}"
-                        title="{{ trans_choice(':count commit on :day|:count commits on :day', $cell['count'], ['count' => $cell['count'], 'day' => $cell['label']]) }}"
+                        title="{{ trans_choice(':count post on :day|:count posts on :day', $cell['count'], ['count' => $cell['count'], 'day' => $cell['label']]) }}"
                     ></span>
                 @endforeach
             </div>
@@ -277,9 +277,9 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
 
     @if ($rows === [])
         <div class="dn-empty" data-test="profile-empty">
-            <p class="dn-empty-command">fatal: no commits yet</p>
+            <p class="dn-empty-command">fatal: no posts yet</p>
             <p class="dn-empty-text">
-                {{ $isSelf ? __('You have not committed anything yet.') : __(':name has not committed anything yet.', ['name' => $this->profile->name]) }}
+                {{ $isSelf ? __('You have not posted anything yet.') : __(':name has not posted anything yet.', ['name' => $this->profile->name]) }}
                 <a href="{{ route('feed.index') }}" wire:navigate>{{ __('The log is this way') }}</a>.
             </p>
         </div>
@@ -301,6 +301,7 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
                     'commit' => $row,
                     'isLast' => $loop->last && ! $this->hasMore,
                     'maxReply' => 1000,
+                    'maxEdit' => 4000,
                 ])
             @endforeach
 
@@ -311,7 +312,7 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
                     </div>
                     <div class="dn-marker-content" style="border-bottom: 0">
                         <button type="button" class="dn-btn dn-btn-outline dn-btn-sm" wire:click="loadMore">
-                            {{ __('Load older commits') }}
+                            {{ __('Load older posts') }}
                         </button>
                     </div>
                 </div>
@@ -322,7 +323,7 @@ new #[Title('Profile')] #[Layout('layouts::feed')] class extends Component
                             <span class="dn-node is-root"></span>
                         </span>
                     </div>
-                    <p class="dn-root-text">{{ __("That's the root commit. There's nothing before it.") }}</p>
+                    <p class="dn-root-text">{{ __("That's the root post. There's nothing before it.") }}</p>
                 </div>
             @endif
         </div>

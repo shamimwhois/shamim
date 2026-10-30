@@ -357,7 +357,7 @@ new #[Title('Search')] #[Layout('layouts::feed')] class extends Component
                 @endif
             </p>
             <p class="dn-empty-text">
-                {{ __('Type at least two characters. Commits, posts, ideas, hub articles and snippets are all searched as plain text.') }}
+                {{ __('Type at least two characters. Posts, ideas, hub articles and snippets are all searched as plain text.') }}
             </p>
         </div>
     @elseif ($this->sections === [])

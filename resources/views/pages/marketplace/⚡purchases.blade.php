@@ -10,8 +10,8 @@ use App\Support\BillingCountry;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -44,7 +44,7 @@ use Livewire\WithPagination;
  * a receipt already issued cannot be restated by a later rename or address
  * change. The snapshot, not this table, is what the invoice renders.
  */
-new #[Title('Purchases')] class extends Component
+new #[Title('Purchases')] #[Layout('layouts::feed')] class extends Component
 {
     use WithPagination;
 
@@ -139,7 +139,8 @@ new #[Title('Purchases')] class extends Component
             $this->billing,
         );
 
-        $validated = $this->validate($this->billingRules());
+        // One profile means one rule set: the rules live on the action.
+        $validated = $this->validate(SaveBillingProfile::rules());
 
         $saveBillingProfile->handle(auth()->user(), $validated['billing']);
 
@@ -209,25 +210,6 @@ new #[Title('Purchases')] class extends Component
         };
 
         return $query;
-    }
-
-    /**
-     * @return array<string, array{attribute: string, rules: array<int, mixed>}>
-     */
-    protected function billingRules(): array
-    {
-        return [
-            'billing.legal_name' => ['required', 'string', 'max:255'],
-            'billing.company' => ['nullable', 'string', 'max:255'],
-            'billing.tax_id' => ['nullable', 'string', 'max:32'],
-            'billing.email' => ['required', 'email', 'max:255'],
-            'billing.phone' => ['nullable', 'string', 'max:32'],
-            'billing.address_line1' => ['required', 'string', 'max:255'],
-            'billing.address_line2' => ['nullable', 'string', 'max:255'],
-            'billing.city' => ['required', 'string', 'max:120'],
-            'billing.postal_code' => ['nullable', 'string', 'max:16'],
-            'billing.country' => ['nullable', 'string', Rule::in(array_keys(BillingCountry::options()))],
-        ];
     }
 
     /**
@@ -320,12 +302,6 @@ new #[Title('Purchases')] class extends Component
 }; ?>
 
 @php
-    $tabLabels = [
-        'orders' => __('Orders'),
-        'payments' => __('Payments'),
-        'billing' => __('Billing'),
-    ];
-
     $statusLabels = [
         'all' => __('All orders'),
         'owned' => __('Owned'),
@@ -342,265 +318,221 @@ new #[Title('Purchases')] class extends Component
     $countryOptions = BillingCountry::options();
 @endphp
 
-<div class="v96 mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 lg:py-14">
-    <p class="v96-eyebrow">{{ __('Purchases') }}</p>
-
-    {{-- ============================================================= --
-     | Views
-     --}}
-    <div class="mt-4 border-b border-ink-200 dark:border-ink-800">
-        <nav aria-label="{{ __('Purchase sections') }}" class="-mb-px flex gap-1 overflow-x-auto">
-            @foreach ($tabLabels as $key => $label)
-                <button
-                    type="button"
-                    wire:click="showTab('{{ $key }}')"
-                    @class([
-                        'focus-ring v96-mono shrink-0 border-b-2 px-4 py-4 text-[13px] font-medium uppercase tracking-[0.08em] transition-colors',
-                        'border-(--v96-purple) font-bold text-(--v96-ink) dark:border-(--v96-purple-lift)' => $tab === $key,
-                        'border-transparent text-(--v96-body) hover:border-[#D8CCF4] hover:text-[#211A31] dark:text-ink-400 dark:hover:border-[#3A3152] dark:hover:text-ink-200' => $tab !== $key,
-                    ])
-                    @if ($tab === $key) aria-current="page" @endif
-                >
-                    {{ $label }}
-                </button>
-            @endforeach
-        </nav>
-    </div>
-
-    {{-- ============================================================= --
-     | Orders
-     --}}
-    @if ($tab === 'orders')
-        @if ($this->orders->isEmpty())
-            <div class="v96-card mt-4 !h-auto p-10 text-center">
-                <p class="text-sm text-ink-500 dark:text-ink-400">
-                    {{ $status === 'all' ? __('Nothing bought yet.') : __('No orders match this filter.') }}
-                </p>
-
-                @if ($status === 'all')
-                    <a href="{{ route('marketplace.index') }}" wire:navigate class="focus-ring v96-btn mt-5 inline-flex">
-                        {{ __('Browse the marketplace') }}
-                    </a>
-                @else
-                    <button type="button" wire:click="filterStatus('all')" class="focus-ring v96-btn v96-btn--ghost mt-5 inline-flex">
-                        {{ __('Show all orders') }}
-                    </button>
-                @endif
+<x-log.frame active="marketplace" data-test="purchases">
+    <x-slot:header>
+        <div class="dn-header">
+            <div class="dn-page-head">
+                <h1 class="dn-page-title">{{ __('Purchases') }}</h1>
+                <p class="dn-page-meta">{{ __('What this account has bought, paid for and been refunded.') }}</p>
             </div>
-        @else
-            <div class="mt-6 flex flex-wrap gap-1.5" role="group" aria-label="{{ __('Filter orders by status') }}">
-                @foreach ($statusLabels as $value => $label)
+
+            {{-- The same rail the settings tabs use: three views of one panel. --}}
+            <nav class="dn-filters" aria-label="{{ __('Purchase sections') }}">
+                @foreach (['orders' => __('Orders'), 'payments' => __('Payments'), 'billing' => __('Billing')] as $key => $label)
                     <button
                         type="button"
-                        wire:click="filterStatus('{{ $value }}')"
-                        class="v96-chip v96-chip-sm"
-                        @if ($status === $value) aria-pressed="true" @endif
-                    >
-                        {{ $label }}
-                    </button>
+                        wire:click="showTab('{{ $key }}')"
+                        class="dn-filter {{ $tab === $key ? 'is-active' : '' }}"
+                        @if ($tab === $key) aria-current="page" @endif
+                    >{{ $label }}</button>
                 @endforeach
-            </div>
-
-            <div class="mt-4 space-y-3">
-                @foreach ($this->orders as $order)
-                    <a
-                        href="{{ route('purchases.show', $order) }}"
-                        wire:navigate
-                        class="v96-card flex flex-wrap items-center gap-x-4 gap-y-2 !h-auto p-5 transition hover:ring-1 hover:ring-sui-accent/40"
-                        wire:key="purchase-{{ $order->id }}"
-                    >
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium text-ink-900 dark:text-ink-50">{{ $order->product_name }}</p>
-
-                            <p class="mt-0.5 font-mono text-2xs text-ink-400">{{ $order->order_number }}</p>
-                        </div>
-
-                        <span class="text-xs tabular-nums text-ink-500 dark:text-ink-400">
-                            {{ $order->price_cents === 0 ? __('Free') : $order->formattedAmount() }}
-                        </span>
-
-                        <flux:badge :color="$order->status->badgeColor()" size="sm">
-                            {{ $order->status->label() }}
-                        </flux:badge>
-
-                        <span class="text-2xs text-ink-400">{{ $order->created_at->format('j M Y') }}</span>
-                    </a>
-                @endforeach
-            </div>
-
-            <div class="mt-6">
-                <x-app.ui.pagination :paginator="$this->orders" label="{{ __('Purchases pagination') }}" />
-            </div>
-        @endif
-    @elseif ($tab === 'payments')
-        {{-- ========================================================= --
-         | Ledger
-         --}}
-        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap gap-1.5" role="group" aria-label="{{ __('Choose which half of the ledger to show') }}">
-                @foreach ($kindLabels as $value => $label)
-                    <button
-                        type="button"
-                        wire:click="showKind('{{ $value }}')"
-                        class="v96-chip v96-chip-sm"
-                        @if ($kind === $value) aria-pressed="true" @endif
-                    >
-                        {{ $label }}
-                    </button>
-                @endforeach
-            </div>
-
-            <p class="v96-mono text-2xs uppercase tracking-[0.13em] text-ink-400 dark:text-ink-500" aria-live="polite">
-                {{ trans_choice(':count entry|:count entries', $this->ledger->total()) }}
-            </p>
+            </nav>
         </div>
+    </x-slot:header>
 
-        @if ($this->ledger->isEmpty())
-            <div class="v96-card mt-4 !h-auto p-10 text-center">
-                <p class="text-sm text-ink-500 dark:text-ink-400">
-                    {{ $kind === 'payments' ? __('No payment attempts yet.') : __('Nothing refunded yet.') }}
-                </p>
-
-                <a href="{{ route('purchases.index') }}" wire:navigate class="focus-ring v96-btn v96-btn--ghost mt-5 inline-flex">
-                    {{ __('Back to orders') }}
-                </a>
-            </div>
-        @else
-            <div class="v96-card mt-4 !h-auto overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <caption class="sr-only">{{ __('Payment history') }}</caption>
-                    <thead class="border-b border-ink-200 dark:border-ink-800">
-                        <tr>
-                            <th scope="col" class="px-5 py-3 text-left font-mono text-2xs uppercase tracking-widest font-normal text-ink-400">{{ __('Date') }}</th>
-                            <th scope="col" class="px-5 py-3 text-left font-mono text-2xs uppercase tracking-widest font-normal text-ink-400">{{ __('Order') }}</th>
-                            <th scope="col" class="hidden px-5 py-3 text-left font-mono text-2xs uppercase tracking-widest font-normal text-ink-400 sm:table-cell">{{ $kind === 'payments' ? __('Method') : __('Reason') }}</th>
-                            <th scope="col" class="px-5 py-3 text-left font-mono text-2xs uppercase tracking-widest font-normal text-ink-400">{{ __('Status') }}</th>
-                            <th scope="col" class="px-5 py-3 text-right font-mono text-2xs uppercase tracking-widest font-normal text-ink-400">{{ __('Amount') }}</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach ($this->ledger as $row)
-                            <tr class="border-b border-ink-100 last:border-0 dark:border-ink-900" wire:key="ledger-{{ $kind }}-{{ $row['id'] }}">
-                                <td class="px-5 py-3 whitespace-nowrap text-xs text-ink-500 dark:text-ink-400">
-                                    {{ $row['date']->format('j M Y, H:i') }}
-                                </td>
-
-                                <td class="px-5 py-3">
-                                    <a
-                                        href="{{ route('purchases.show', $row['order_id']) }}"
-                                        wire:navigate
-                                        class="focus-ring font-mono text-2xs text-ink-900 underline-offset-4 hover:underline dark:text-ink-50"
-                                    >
-                                        {{ $row['order_number'] }}
-                                    </a>
-
-                                    @if ($row['reference'])
-                                        <p class="mt-1 max-w-48 truncate font-mono text-2xs text-ink-400">{{ $row['reference'] }}</p>
-                                    @endif
-                                </td>
-
-                                <td class="hidden px-5 py-3 text-xs text-ink-500 dark:text-ink-400 sm:table-cell">
-                                    {{ $row['method'] }}
-                                </td>
-
-                                <td class="px-5 py-3">
-                                    <flux:badge :color="$row['badge']" size="sm">{{ $row['status'] }}</flux:badge>
-                                </td>
-
-                                <td class="px-5 py-3 text-right whitespace-nowrap tabular-nums text-ink-900 dark:text-ink-50">
-                                    {{ $row['amount'] }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-6">
-                <x-app.ui.pagination :paginator="$this->ledger" label="{{ __('Payment history pagination') }}" />
-            </div>
-        @endif
-    @else
-        {{-- ========================================================= --
-         | Billing identity
+    <div class="dn-settings">
+        {{-- ============================================================= --
+         | Orders
          --}}
-        <form wire:submit="saveBilling" class="mt-6 space-y-6">
-            <div class="v96-card !h-auto p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-ink-900 dark:text-ink-50">{{ __('Billing details') }}</h2>
+        @if ($tab === 'orders')
+            <section class="dn-settings-section" aria-labelledby="purchases-orders">
+                <h2 id="purchases-orders" class="dn-settings-title">{{ __('Orders') }}</h2>
 
-                <p class="mt-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
+                @if ($this->orders->isEmpty())
+                    <p class="dn-settings-note" style="margin-top: 8px;">
+                        {{ $status === 'all' ? __('Nothing bought yet.') : __('No orders match this filter.') }}
+                    </p>
+
+                    <p style="margin-top: 10px;">
+                        @if ($status === 'all')
+                            <a href="{{ route('marketplace.index') }}" wire:navigate class="dn-link">
+                                {{ __('Browse the marketplace') }}
+                            </a>
+                        @else
+                            <button type="button" wire:click="filterStatus('all')" class="dn-link" style="background: none; border: 0; padding: 0; cursor: pointer;">
+                                {{ __('Show all orders') }}
+                            </button>
+                        @endif
+                    </p>
+                @else
+                    <div class="dn-categories" role="group" aria-label="{{ __('Filter orders by status') }}">
+                        <div class="dn-filter-row">
+                            @foreach ($statusLabels as $value => $label)
+                                <button
+                                    type="button"
+                                    wire:click="filterStatus('{{ $value }}')"
+                                    class="dn-chip {{ $status === $value ? 'is-on' : '' }}"
+                                    @if ($status === $value) aria-pressed="true" @endif
+                                >{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="dn-fields" style="margin-top: 12px;">
+                        @foreach ($this->orders as $order)
+                            <a
+                                href="{{ route('purchases.show', $order) }}"
+                                wire:navigate
+                                wire:key="purchase-{{ $order->id }}"
+                                class="dn-field"
+                                style="text-decoration: none;"
+                            >
+                                <span class="dn-field-key">{{ $order->created_at->format('M j') }}</span>
+
+                                <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0;">
+                                    <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        <span style="font-size: 14px; font-weight: 500; color: var(--dn-ink);">{{ $order->product_name }}</span>
+                                        <span class="dn-field-key" style="margin-left: 6px;">{{ $order->order_number }}</span>
+                                    </span>
+
+                                    <span style="flex: none; display: inline-flex; align-items: center; gap: 8px;">
+                                        <span class="dn-status-chip">{{ $order->status->label() }}</span>
+                                        <span style="font-family: var(--dn-mono); font-size: 13px;">
+                                            {{ $order->price_cents === 0 ? __('Free') : $order->formattedAmount() }}
+                                        </span>
+                                    </span>
+                                </span>
+                            </a>
+                        @endforeach
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <x-app.ui.pagination :paginator="$this->orders" label="{{ __('Purchases pagination') }}" />
+                    </div>
+                @endif
+            </section>
+
+        {{-- ========================================================= --}}
+        @elseif ($tab === 'payments')
+            <section class="dn-settings-section" aria-labelledby="purchases-payments">
+                <h2 id="purchases-payments" class="dn-settings-title">
+                    {{ $kind === 'payments' ? __('Payment attempts') : __('Refunds') }}
+                </h2>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px;">
+                    <div class="dn-categories" role="group" aria-label="{{ __('Choose which half of the ledger to show') }}">
+                        <div class="dn-filter-row">
+                            @foreach ($kindLabels as $value => $label)
+                                <button
+                                    type="button"
+                                    wire:click="showKind('{{ $value }}')"
+                                    class="dn-chip {{ $kind === $value ? 'is-on' : '' }}"
+                                    @if ($kind === $value) aria-pressed="true" @endif
+                                >{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <p class="dn-field-key" aria-live="polite">
+                        {{ trans_choice(':count entry|:count entries', $this->ledger->total()) }}
+                    </p>
+                </div>
+
+                @if ($this->ledger->isEmpty())
+                    <p class="dn-settings-note" style="margin-top: 8px;">
+                        {{ $kind === 'payments' ? __('No payment attempts yet.') : __('Nothing refunded yet.') }}
+                    </p>
+
+                    <p style="margin-top: 10px;">
+                        <button type="button" wire:click="showTab('orders')" class="dn-link" style="background: none; border: 0; padding: 0; cursor: pointer;">
+                            {{ __('Back to orders') }}
+                        </button>
+                    </p>
+                @else
+                    <div class="dn-fields" style="margin-top: 12px;">
+                        @foreach ($this->ledger as $row)
+                            <div class="dn-field" wire:key="ledger-{{ $kind }}-{{ $row['id'] }}">
+                                <span class="dn-field-key">{{ \Illuminate\Support\Str::of($row['date'])->before(',')->toString() }}</span>
+
+                                <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0;">
+                                    <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        <a href="{{ route('purchases.show', $row['order_id']) }}" wire:navigate class="dn-link" style="font-family: var(--dn-mono); font-size: 12px;">{{ $row['order_number'] }}</a>
+                                        <span class="dn-field-key" style="margin-left: 6px;">{{ $row['method'] }}</span>
+                                        @if ($row['reference'])
+                                            <span class="dn-field-key" style="margin-left: 6px;">{{ \Illuminate\Support\Str::limit($row['reference'], 18) }}</span>
+                                        @endif
+                                    </span>
+
+                                    <span style="flex: none; display: inline-flex; align-items: center; gap: 8px;">
+                                        <span class="dn-status-chip">{{ $row['status'] }}</span>
+                                        <span style="font-family: var(--dn-mono); font-size: 13px;">{{ $row['amount'] }}</span>
+                                    </span>
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <x-app.ui.pagination :paginator="$this->ledger" label="{{ __('Payment history pagination') }}" />
+                    </div>
+                @endif
+            </section>
+
+        {{-- ========================================================= --}}
+        @else
+            <section class="dn-settings-section" aria-labelledby="purchases-billing">
+                <h2 id="purchases-billing" class="dn-settings-title">{{ __('Billing details') }}</h2>
+                <p class="dn-settings-note">
                     {{ __('Invoices are issued to the details on file when an order is placed. Change them here and the next receipt carries the change; every receipt already issued keeps the wording it was printed with.') }}
                 </p>
 
-                <div class="mt-6 grid gap-5 sm:grid-cols-2">
+                <form wire:submit="saveBilling" class="dn-fields" style="margin-top: 16px;">
                     @foreach ($this->billingFields() as $column => $field)
-                        @if ($column === 'country')
-                            <div class="sm:col-span-2">
-                                <label for="billing-country" class="sui-label">
-                                    {{ $field['label'] }}
+                        <div class="dn-field">
+                            <label class="dn-field-key" for="billing-{{ $column }}">
+                                {{ $field['label'] }}@if (! $field['required']) <span title="{{ __('optional') }}">·</span>@endif
+                            </label>
 
-                                    @if (! $field['required'])
-                                        <span class="font-normal normal-case tracking-normal text-ink-400">{{ __('(optional)') }}</span>
-                                    @endif
-                                </label>
-
-                                <div class="relative">
-                                    <select id="billing-country" wire:model="billing.country" class="v96-select mt-2 w-full appearance-none pr-9">
-                                        <option value="">{{ __('Not specified') }}</option>
-                                        @foreach ($countryOptions as $code => $name)
-                                            <option value="{{ $code }}">{{ $name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <flux:icon name="chevron-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-                                </div>
-
-                                @error("billing.$column")
-                                    <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        @else
-                            <div @class(['sm:col-span-2' => in_array($column, ['legal_name', 'address_line1', 'address_line2'], true)])>
-                                <label for="billing-{{ $column }}" class="sui-label">
-                                    {{ $field['label'] }}
-
-                                    @if (! $field['required'])
-                                        <span class="font-normal normal-case tracking-normal text-ink-400">{{ __('(optional)') }}</span>
-                                    @endif
-                                </label>
-
+                            @if ($column === 'country')
+                                <select id="billing-country" wire:model="billing.country" class="dn-input">
+                                    <option value="">{{ __('Not specified') }}</option>
+                                    @foreach ($countryOptions as $code => $name)
+                                        <option value="{{ $code }}" @selected($billing[$column] === $code)>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            @else
                                 <input
                                     id="billing-{{ $column }}"
                                     type="{{ $column === 'email' ? 'email' : 'text' }}"
                                     wire:model="billing.{{ $column }}"
                                     maxlength="{{ in_array($column, ['tax_id', 'phone', 'postal_code'], true) ? 32 : 255 }}"
-                                    class="focus-ring mt-2 min-h-10 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 dark:border-ink-800 dark:bg-ink-950 dark:text-ink-50"
+                                    class="dn-input"
                                 >
+                            @endif
 
-                                @if ($field['hint'] !== '')
-                                    <p class="mt-1 text-2xs text-ink-400 dark:text-ink-500">{{ $field['hint'] }}</p>
-                                @endif
+                            @if ($field['hint'] !== '')
+                                <p class="dn-field-key" style="grid-column: 2; margin: 0;">{{ $field['hint'] }}</p>
+                            @endif
 
-                                @error("billing.$column")
-                                    <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        @endif
+                            @error("billing.$column")
+                                <p class="dn-field-key" style="grid-column: 2; margin: 0; color: var(--dn-destructive);">{{ $message }}</p>
+                            @enderror
+                        </div>
                     @endforeach
-                </div>
 
-                <div class="mt-8 flex flex-wrap items-center gap-3">
-                    <flux:button type="submit" variant="primary" data-test="billing-save">
-                        {{ $this->hasBillingProfile() ? __('Update billing details') : __('Save billing details') }}
-                    </flux:button>
+                    <div class="dn-field" style="justify-content: flex-end; display: flex;">
+                        <button type="submit" class="dn-btn" data-test="billing-save">
+                            {{ $this->hasBillingProfile() ? __('Update billing details') : __('Save billing details') }}
+                        </button>
+                    </div>
+                </form>
 
-                    @if (! $this->hasBillingProfile())
-                        <span class="text-2xs text-ink-400 dark:text-ink-500">
-                            {{ __('Purchases you already made keep the details they were billed with.') }}
-                        </span>
-                    @endif
-                </div>
-            </div>
-        </form>
-    @endif
-</div>
+                @if (! $this->hasBillingProfile())
+                    <p class="dn-settings-note" style="margin-top: 10px;">
+                        {{ __('Purchases you already made keep the details they were billed with.') }}
+                    </p>
+                @endif
+            </section>
+        @endif
+    </div>
+</x-log.frame>

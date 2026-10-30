@@ -33,12 +33,55 @@ final class LogRow
     public const FOLD_AFTER = 700;
 
     /**
+     * Which handles own an account, memoised for the request.
+     *
+     * A page draws twenty rows and most of them share an author, so resolving
+     * "does this handle have a profile" per row would be twenty `exists()`
+     * calls answering three questions. One `pluck` of every handle, keyed by
+     * the lower-cased value the comparison uses, settles all of them.
+     *
+     * @var array<string, bool>|null
+     */
+    private static ?array $knownHandles = null;
+
+    /**
+     * The URL of the author behind a commit handle, or null when nobody owns it.
+     *
+     * Muscle memory says a commit always has a profile to open, and for a
+     * seeded corpus that is true. It stops being true the moment a corpus
+     * author is retired or a row outlives the account it was written against —
+     * and then the row must not offer a door to a 404.
+     */
+    private static function profileUrlFor(string $handle): ?string
+    {
+        $normalised = mb_strtolower(LogIdentity::handle($handle));
+
+        if ($normalised === '') {
+            return null;
+        }
+
+        self::$knownHandles ??= User::query()
+            ->whereNotNull('handle')
+            ->pluck('handle')
+            ->mapWithKeys(fn (string $candidate): array => [mb_strtolower($candidate) => true])
+            ->all();
+
+        if (! isset(self::$knownHandles[$normalised])) {
+            return null;
+        }
+
+        return route('profile.show', ['handle' => $normalised]);
+    }
+
+    /**
      * Every row of a page of commits, in order.
      *
      * @param  Collection<int, FeedPost>  $posts
      * @param  array<int, bool>  $starred
      * @param  array<int, int>  $freshIds
      * @param  array<int, bool>  $reportedIds
+     * @param  array<int, bool>  $sharedIds
+     * @param  array<int, int>  $shareCounts
      * @param  array<int, array{counts: array<string, int>, mine: string|null}>  $pollVotes
      * @return array<int, array<string, mixed>>
      */
@@ -53,6 +96,10 @@ final class LogRow
         ?int $interludeAfter = null,
         array $reportedIds = [],
         array $pollVotes = [],
+        array $sharedIds = [],
+        array $shareCounts = [],
+        ?int $editingId = null,
+        string $editDraft = '',
     ): array {
         $rows = [];
         $previous = null;
@@ -76,9 +123,27 @@ final class LogRow
             $totals[$key]['stars'] += (int) ($post->stars_count ?? 0);
             $totals[$key]['replies'] += (int) ($post->replies_count ?? 0);
         }
-
         foreach ($posts->values() as $index => $post) {
-            $row = self::make($post, $previous, $starred, $threadId, $replyTo, $reader, $freshIds, $reportedIds, $pollVotes);
+            // Named, not positional: this argument list is long enough that a
+            // positional call silently mis-files an array into the wrong slot
+            // (a 7-arg call once put the report and poll arrays into
+            // `$lastVisitId`/`$interludeAfter` and raised a TypeError at the
+            // first string comparison).
+            $row = self::make(
+                post: $post,
+                previous: $previous,
+                starred: $starred,
+                threadId: $threadId,
+                replyTo: $replyTo,
+                reader: $reader,
+                freshIds: $freshIds,
+                reportedIds: $reportedIds,
+                pollVotes: $pollVotes,
+                sharedIds: $sharedIds,
+                shareCounts: $shareCounts,
+                editingId: $editingId,
+                editDraft: $editDraft,
+            );
 
             $row['authorCard'] = $totals[LogIdentity::handle($post->handle)] ?? null;
 
@@ -116,6 +181,8 @@ final class LogRow
      * @param  array<int, bool>  $starred
      * @param  array<int, int>  $freshIds
      * @param  array<int, bool>  $reportedIds
+     * @param  array<int, bool>  $sharedIds
+     * @param  array<int, int>  $shareCounts
      * @param  array<int, array{counts: array<string, int>, mine: string|null}>  $pollVotes
      * @return array<string, mixed>
      */
@@ -129,6 +196,10 @@ final class LogRow
         array $freshIds = [],
         array $reportedIds = [],
         array $pollVotes = [],
+        array $sharedIds = [],
+        array $shareCounts = [],
+        ?int $editingId = null,
+        string $editDraft = '',
     ): array {
         $createdAt = $post->posted_at ?? $post->created_at;
         $isOpen = $threadId === $post->id;
@@ -140,6 +211,18 @@ final class LogRow
             'slug' => $post->slug,
             'name' => $post->author,
             'handle' => LogIdentity::handle($post->handle),
+            /*
+             * The author's profile, or null when no account owns the handle.
+             *
+             * A commit's `handle` is a display string, not a key: a corpus row
+             * carries `@priya` while the account table carries `priya`, and a
+             * retired corpus author carries a handle no account ever claimed.
+             * `route('profile.show')` would still build `/@ghost` for it and the
+             * reader would land on a 404 — so the row answers "is there anyone
+             * to open" here, once, and the markup renders the link only when
+             * there is.
+             */
+            'profileUrl' => self::profileUrlFor($post->handle),
             'initials' => $post->avatar,
             'role' => $post->role,
             'lane' => LogIdentity::lane($post->handle),
@@ -162,6 +245,19 @@ final class LogRow
             'threadOpen' => $isOpen,
             'replyOpen' => $replyTo === $post->id,
             'repliesList' => $isOpen ? self::replies($post) : [],
+            // Sharing is a row count, never a column, so the number printed
+            // here and the ledger behind it cannot disagree.
+            'shares' => $shareCounts[$post->id] ?? 0,
+            'shared' => isset($sharedIds[$post->id]),
+            // An edit is inline, so the row carries both the fact that it is
+            // being edited and the text being edited — the form has to open
+            // holding the current body, and a second round trip to fetch it
+            // would blank the row while it arrived.
+            'editing' => $editingId === $post->id,
+            'editDraft' => $editingId === $post->id ? $editDraft : '',
+            // The body as plain text, for the editor to start from: the
+            // rendered `body` is HTML and would put markup in the textarea.
+            'rawBody' => $post->body,
             'tags' => array_values($post->tags ?? []),
             'topic' => $post->topic,
             'type' => $post->type,

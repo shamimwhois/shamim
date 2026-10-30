@@ -63,17 +63,24 @@
                 x-on:keydown.escape.stop="open = false"
                 data-test="author-hover"
             >
-                <a
-                    href="{{ route('profile.show', ['handle' => $commit['handle']]) }}"
-                    class="dn-name"
-                    wire:navigate
-                >{{ $commit['name'] }}</a>
+                @if ($commit['profileUrl'] !== null)
+                    <a
+                        href="{{ $commit['profileUrl'] }}"
+                        class="dn-name"
+                        wire:navigate
+                    >{{ $commit['name'] }}</a>
 
-                <a
-                    href="{{ route('profile.show', ['handle' => $commit['handle']]) }}"
-                    class="dn-handle"
-                    wire:navigate
-                >{{ '@'.$commit['handle'] }}</a>
+                    <a
+                        href="{{ $commit['profileUrl'] }}"
+                        class="dn-handle"
+                        wire:navigate
+                    >{{ '@'.$commit['handle'] }}</a>
+                @else
+                    {{-- No account owns this handle, so there is nothing to open.
+                         Rendered as text rather than a link to a 404. --}}
+                    <span class="dn-name">{{ $commit['name'] }}</span>
+                    <span class="dn-handle">{{ '@'.$commit['handle'] }}</span>
+                @endif
 
                 <div
                     class="dn-hovercard"
@@ -97,7 +104,7 @@
                     @if ($commit['authorCard'] !== null)
                         <dl class="dn-hovercard__stats">
                             <div class="dn-hovercard__stat">
-                                <dt>{{ __('commits') }}</dt>
+                                <dt>{{ __('posts') }}</dt>
                                 <dd>{{ $commit['authorCard']['commits'] }}</dd>
                             </div>
                             <div class="dn-hovercard__stat">
@@ -111,15 +118,17 @@
                         </dl>
                     @endif
 
-                    <p class="dn-hovercard__go">
-                        <a
-                            href="{{ route('profile.show', ['handle' => $commit['handle']]) }}"
-                            wire:navigate
-                            x-on:click="open = false"
-                        >{{ __('Open profile') }}
-                            <x-feed.icon name="chevron-right" :size="12" />
-                        </a>
-                    </p>
+                    @if ($commit['profileUrl'] !== null)
+                        <p class="dn-hovercard__go">
+                            <a
+                                href="{{ $commit['profileUrl'] }}"
+                                wire:navigate
+                                x-on:click="open = false"
+                            >{{ __('Open profile') }}
+                                <x-feed.icon name="chevron-right" :size="12" />
+                            </a>
+                        </p>
+                    @endif
                 </div>
             </span>
 
@@ -146,14 +155,14 @@
             >{{ $commit['type'] }}</a>
 
             @if ($commit['pinned'])
-                <span class="dn-badge is-pin" title="{{ __('Pinned commit') }}" data-test="commit-pinned">
+                <span class="dn-badge is-pin" title="{{ __('Pinned post') }}" data-test="commit-pinned">
                     <x-feed.icon name="pin" :size="11" />
                     {{ __('pinned') }}
                 </span>
             @endif
 
             @if ($commit['featured'])
-                <span class="dn-badge is-featured" title="{{ __('Featured commit') }}" data-test="commit-featured">
+                <span class="dn-badge is-featured" title="{{ __('Featured post') }}" data-test="commit-featured">
                     <x-feed.icon name="spark" :size="11" />
                     {{ __('featured') }}
                 </span>
@@ -171,20 +180,33 @@
                     href="{{ $commit['url'] }}"
                     class="dn-hash"
                     tabindex="-1"
-                    title="{{ __('Commit :hash', ['hash' => $commit['hash']]) }}"
+                    title="{{ __('Post :hash', ['hash' => $commit['hash']]) }}"
                 >{{ $commit['hash'] }}</a>
 
                 @if ($commit['isOwn'])
-                    <button
-                        type="button"
-                        class="dn-delete"
-                        aria-label="{{ __('Revert commit') }}"
-                        title="{{ __('Revert commit') }}"
-                        x-on:click="confirming = true"
-                        data-test="delete-commit"
-                    >
-                        <x-feed.icon name="trash" :size="16" />
-                    </button>
+                    <span class="dn-row-verbs">
+                        <button
+                            type="button"
+                            class="dn-delete"
+                            aria-label="{{ __('Edit post') }}"
+                            title="{{ __('Edit post') }}"
+                            wire:click="openEdit({{ $commit['id'] }})"
+                            data-test="edit-commit"
+                        >
+                            <x-feed.icon name="pencil" :size="16" />
+                        </button>
+
+                        <button
+                            type="button"
+                            class="dn-delete"
+                            aria-label="{{ __('Delete post') }}"
+                            title="{{ __('Delete post') }}"
+                            x-on:click="confirming = true"
+                            data-test="delete-commit"
+                        >
+                            <x-feed.icon name="trash" :size="16" />
+                        </button>
+                    </span>
                 @endif
             </span>
         </div>
@@ -196,9 +218,9 @@
         @endif
 
         <div class="dn-body-wrap" x-data="{ open: false }">
-            <div class="dn-body {{ $commit['long'] ? 'is-folded' : '' }}" x-bind:class="{ 'is-open': open }">{!! $commit['body'] !!}</div>
+            <div class="dn-body {{ $commit['long'] ? 'is-folded' : '' }}" x-bind:class="{ 'is-open': open }" @if ($commit['editing']) hidden @endif>{!! $commit['body'] !!}</div>
 
-            @if ($commit['long'])
+            @if ($commit['long'] && ! $commit['editing'])
                 <button
                     type="button"
                     class="dn-fold"
@@ -211,6 +233,59 @@
                 </button>
             @endif
         </div>
+
+        {{-- The inline editor. It replaces the body rather than sitting beside
+             it, because two copies of the same paragraph on one row is a row
+             nobody can read — and the form has to open holding the current
+             text, so the row carries it (`editDraft`) instead of fetching it. --}}
+        @if ($commit['editing'])
+            <form
+                class="dn-edit"
+                wire:submit="saveEdit"
+                data-test="edit-form"
+            >
+                <label for="edit-{{ $commit['id'] }}" class="sr-only">{{ __('Post body') }}</label>
+
+                <textarea
+                    id="edit-{{ $commit['id'] }}"
+                    wire:model="editDraft"
+                    rows="3"
+                    maxlength="{{ $maxEdit }}"
+                    class="dn-edit-input"
+                    aria-label="{{ __('Post body') }}"
+                    x-on:keydown.escape.prevent="$wire.cancelEdit()"
+                    x-on:keydown.meta.enter.prevent="$el.form.requestSubmit()"
+                    x-on:keydown.ctrl.enter.prevent="$el.form.requestSubmit()"
+                    data-test="edit-input"
+                ></textarea>
+
+                @error('editDraft')
+                    <p class="dn-composer-error" data-test="edit-error">{{ $message }}</p>
+                @enderror
+
+                <div class="dn-edit-actions">
+                    <span class="dn-edit-hint">{{ __('Editing :hash', ['hash' => $commit['hash']]) }}</span>
+                    <button
+                        type="button"
+                        class="dn-btn dn-btn-ghost dn-btn-sm"
+                        wire:click="cancelEdit"
+                        data-test="edit-cancel"
+                    >
+                        {{ __('Cancel') }}
+                    </button>
+                    <button
+                        type="submit"
+                        class="dn-btn dn-btn-sm"
+                        wire:loading.attr="disabled"
+                        wire:target="saveEdit"
+                        data-test="edit-save"
+                    >
+                        <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
+                        <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
+                    </button>
+                </div>
+            </form>
+        @endif
 
         @if ($commit['attachments'] !== [])
             <div class="dn-media" data-test="commit-media">
@@ -354,7 +429,7 @@
                     class="dn-action {{ $commit['starred'] ? 'is-on' : '' }}"
                     wire:click="toggleStar({{ $commit['id'] }})"
                     aria-pressed="{{ $commit['starred'] ? 'true' : 'false' }}"
-                    aria-label="{{ __('Star this commit') }}"
+                    aria-label="{{ __('Star this post') }}"
                     data-test="star"
                 >
                     <x-feed.icon name="star" />
@@ -402,21 +477,46 @@
                 @endif
             </div>
 
-            <button
-                type="button"
-                class="dn-action"
-                aria-label="{{ __('Copy link to commit') }}"
-                x-data="{ copied: false }"
-                x-on:click="
-                    navigator.clipboard?.writeText(@js($commit['url'])).then(() => {
-                        copied = true;
-                        setTimeout(() => (copied = false), 2000);
-                    });
-                "
-            >
-                <x-feed.icon name="link" x-show="! copied" />
-                <x-feed.icon name="check" x-show="copied" x-cloak style="color: var(--dn-primary)" />
-            </button>
+            {{-- Share. One control, two routes: the OS sheet where the platform
+                 has one, the clipboard everywhere else. Both record the share —
+                 a share is a row in `feed_shares`, so the count printed here is
+                 a row count and cannot drift from what actually happened.
+
+                 The count is a ledger read, not a column on the post: sharing
+                 twice is the same row, so the number means "how many accounts
+                 passed this on", not "how many times a button was pressed". --}}
+            <div class="dn-share" x-data="{ copied: false }">
+                <button
+                    type="button"
+                    class="dn-action {{ $commit['shared'] ? 'is-on' : '' }}"
+                    aria-label="{{ __('Share this post') }}"
+                    title="{{ __('Share this post') }}"
+                    data-test="share"
+                    x-on:click="
+                        const url = @js($commit['url']);
+                        const title = @js($commit['title'] ?: $commit['plain']);
+
+                        if (navigator.share) {
+                            navigator.share({ title, url }).then(() => {
+                                $wire.shareCommit({{ $commit['id'] }}, 'sheet');
+                            }).catch(() => {});
+                        } else {
+                            navigator.clipboard?.writeText(url).then(() => {
+                                copied = true;
+                                setTimeout(() => (copied = false), 2000);
+                            });
+                            $wire.shareCommit({{ $commit['id'] }}, 'link');
+                        }
+                    "
+                >
+                    <x-feed.icon name="share" x-show="! copied" />
+                    <x-feed.icon name="check" x-show="copied" x-cloak style="color: var(--dn-primary)" />
+
+                    @if ($commit['shares'] > 0)
+                        <span class="dn-action-count">{{ $commit['shares'] }}</span>
+                    @endif
+                </button>
+            </div>
 
             {{-- Reporting asks why. "Reported" on its own is not a triage, and a
                  report with no reason is one nobody can act on. A reader reports
@@ -427,7 +527,7 @@
                     @if ($commit['reported'])
                         <span
                             class="dn-action is-reported"
-                            title="{{ __('You reported this commit') }}"
+                            title="{{ __('You reported this post') }}"
                             data-test="commit-reported"
                         >
                             <x-feed.icon name="flag" />
@@ -436,7 +536,7 @@
                         <button
                             type="button"
                             class="dn-action"
-                            aria-label="{{ __('Report commit') }}"
+                            aria-label="{{ __('Report post') }}"
                             x-on:click="open = ! open"
                             x-bind:aria-expanded="open"
                             data-test="report-commit"
@@ -451,7 +551,7 @@
                             x-on:click.outside="open = false"
                             data-test="report-reasons"
                         >
-                            <p class="dn-pop-head">{{ __('Why are you reporting this commit?') }}</p>
+                            <p class="dn-pop-head">{{ __('Why are you reporting this post?') }}</p>
                             @foreach ($commit['reportReasons'] as $key => $label)
                                 <button
                                     type="button"
@@ -524,7 +624,7 @@
         {{-- Deleting is inline: a soft red strip, then the row collapses. --}}
         <template x-if="confirming">
             <div class="dn-confirm" role="group" aria-label="{{ __('Confirm delete') }}">
-                <span style="margin-right: auto;">{{ __("Delete this commit? You can undo for 30 seconds.") }}</span>
+                <span style="margin-right: auto;">{{ __("Delete this post? You can undo for 30 seconds.") }}</span>
                 <button type="button" class="dn-btn dn-btn-ghost dn-btn-sm" x-on:click="confirming = false">
                     {{ __('Cancel') }}
                 </button>

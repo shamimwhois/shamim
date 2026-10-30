@@ -65,7 +65,7 @@ new #[Title('Notifications')] #[Layout('layouts::feed')] class extends Component
 
         app(Seo::class)->set([
             'title' => 'Notifications',
-            'description' => __('Stars, replies and mentions on your commits.'),
+            'description' => __('Stars, replies and mentions on your posts.'),
         ]);
 
         if (! array_key_exists($this->filter, self::FILTERS)) {
@@ -178,11 +178,11 @@ new #[Title('Notifications')] #[Layout('layouts::feed')] class extends Component
     private function action(LogNotification $notification): string
     {
         return match ($notification->type) {
-            LogNotification::Starred => __('starred your commit'),
-            LogNotification::Replied => __('replied to your commit'),
+            LogNotification::Starred => __('starred your post'),
+            LogNotification::Replied => __('replied to your post'),
             LogNotification::Mentioned => __('mentioned you'),
             LogNotification::Followed => __('started following you'),
-            LogNotification::Moderated => __('reviewed your commit'),
+            LogNotification::Moderated => __('reviewed your post'),
             default => __('did something'),
         };
     }
@@ -240,7 +240,7 @@ new #[Title('Notifications')] #[Layout('layouts::feed')] class extends Component
             <p class="dn-empty-command">{{ $this->emptyCommand }}</p>
             <p class="dn-empty-text">
                 @if ($filter === 'all')
-                    {{ __('Stars, replies and mentions on your commits show up here.') }}
+                    {{ __('Stars, replies and mentions on your posts show up here.') }}
                 @else
                     {{ __('Nothing has happened in this filter yet.') }}
                 @endif

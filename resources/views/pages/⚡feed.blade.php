@@ -5,6 +5,7 @@ use App\Actions\Feed\ComposeFeedPost;
 use App\Actions\Feed\DetachFeedMedia;
 use App\Actions\Feed\ScheduleFeedPost;
 use App\Concerns\ReportsCommits;
+use App\Concerns\SharesCommits;
 use App\Concerns\VotesInPolls;
 use App\Enums\FeedPostAudience;
 use App\Models\FeedPost;
@@ -45,6 +46,7 @@ use Livewire\WithFileUploads;
 new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
 {
     use ReportsCommits;
+    use SharesCommits;
     use VotesInPolls;
     use WithFileUploads;
 
@@ -122,6 +124,18 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
 
     /** The reply being written. */
     public string $replyDraft = '';
+
+    /**
+     * The commit being edited inline, if any.
+     *
+     * Only one row edits at a time. A log where three rows stood open would
+     * lose track of which body belongs to which commit, and the reader would
+     * have to close the others by hand.
+     */
+    public ?int $editingId = null;
+
+    /** The body as the reader is rewriting it. */
+    public string $editDraft = '';
 
     /** How many commits the stream currently renders. */
     public int $visible = self::PAGE_SIZE;
@@ -301,7 +315,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
 
         $this->validate([
             'draft' => ['required', 'string', 'max:'.self::MAX_BODY],
-        ], attributes: ['draft' => __('commit')]);
+        ], attributes: ['draft' => __('post')]);
 
         $data = [
             'body' => trim($this->draft),
@@ -445,7 +459,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
             ],
         ], [
-            'uploads.*.image' => __('Only image files can be attached to a commit.'),
+            'uploads.*.image' => __('Only image files can be attached to a post.'),
         ]);
 
         if ($this->tempKey === '') {
@@ -638,6 +652,94 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         $this->replyDraft = '';
 
         unset($this->commits, $this->stats);
+    }
+
+    /**
+     * Open the inline editor on a commit the reader wrote.
+     *
+     * Gated on ownership the same way the delete is, and for the same reason:
+     * the button is only drawn on an own row, but the action has to be safe on
+     * its own — a wire call is a public endpoint, so the guard belongs here and
+     * not in the template.
+     */
+    public function openEdit(int $id): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null) {
+            return;
+        }
+
+        $post = FeedPost::query()->visible()->where('user_id', $reader->id)->find($id);
+
+        if ($post === null) {
+            return;
+        }
+
+        $this->editingId = $post->id;
+        $this->editDraft = (string) $post->body;
+
+        // Editing and replying to the same row at once would put two forms in
+        // the same column, and the reader would not know which one submits.
+        $this->threadId = null;
+        $this->replyTo = null;
+        $this->replyDraft = '';
+    }
+
+    /** Put the editor away without writing anything. */
+    public function cancelEdit(): void
+    {
+        $this->editingId = null;
+        $this->editDraft = '';
+    }
+
+    /**
+     * Write the edit back.
+     *
+     * `UpdateFeedPost` owns the two questions an edit raises that a first write
+     * does not — the publishing state is kept, and a changed audience is
+     * checked against the owner-only `publish` grant — so this method only has
+     * to establish that the reader may edit *this* row at all.
+     */
+    public function saveEdit(): void
+    {
+        $reader = $this->reader();
+
+        if ($reader === null || $this->editingId === null) {
+            return;
+        }
+
+        $post = FeedPost::query()->visible()->where('user_id', $reader->id)->find($this->editingId);
+
+        if ($post === null) {
+            $this->cancelEdit();
+
+            return;
+        }
+
+        $this->validate([
+            'editDraft' => ['required', 'string', 'max:'.self::MAX_BODY],
+        ], attributes: ['editDraft' => __('post')]);
+
+        app(\App\Actions\Feed\UpdateFeedPost::class)->handle($reader, [
+            'body' => trim($this->editDraft),
+            'title' => $post->title,
+            'type' => $post->type,
+            'topic' => $post->topic,
+            'tags' => array_values($post->tags ?? []),
+            'community_id' => $post->community_id,
+            'ai_label' => $post->ai_label,
+            'code' => $post->code,
+            'code_file' => $post->code_file,
+            'activity' => $post->activity,
+        ], $post);
+
+        $this->editingId = null;
+        $this->editDraft = '';
+
+        unset($this->commits, $this->rows, $this->stats);
+
+        $this->toast = 'amend '.CommitBody::shortHash($post->slug).' → HEAD';
     }
 
     /**
@@ -886,11 +988,23 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     /**
      * Every author in the corpus, busiest first.
      *
-     * @return \Illuminate\Support\Collection<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null}>
+     * A corpus handle is a display string, not a foreign key, so it can outlive
+     * the account it was written against — a retired author, a row seeded
+     * before the account existed. `profileUrl` is null for those, and the
+     * interlude prints the name without a link rather than sending the reader
+     * to a 404.
+     *
+     * @return \Illuminate\Support\Collection<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null, profileUrl: string|null}>
      */
     #[Computed]
     public function activeAuthors(): \Illuminate\Support\Collection
     {
+        $known = User::query()
+            ->whereNotNull('handle')
+            ->pluck('handle')
+            ->map(fn (string $candidate): string => mb_strtolower($candidate))
+            ->all();
+
         $authors = [];
 
         foreach ($this->commits as $post) {
@@ -904,6 +1018,9 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                     'lane' => $this->lane($post->handle),
                     'commits' => 0,
                     'role' => $post->role,
+                    'profileUrl' => in_array($key, $known, true)
+                        ? route('profile.show', ['handle' => $key])
+                        : null,
                 ];
             }
 
@@ -918,7 +1035,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     /**
      * The three developers the aside suggests, excluding the reader.
      *
-     * @return array<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null}>
+     * @return array<int, array{name: string, handle: string, initials: string, lane: string, commits: int, role: string|null, profileUrl: string|null}>
      */
     #[Computed]
     public function whoToFollow(): array
@@ -928,6 +1045,9 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         return $this->activeAuthors
             ->reject(fn (array $author): bool => $reader !== null
                 && mb_strtolower($author['handle']) === mb_strtolower((string) $reader->handle))
+            // Only authors who can actually be opened: a suggestion whose link
+            // 404s is worse than a shorter list.
+            ->filter(fn (array $author): bool => $author['profileUrl'] !== null)
             ->take(3)
             ->values()
             ->all();
@@ -994,7 +1114,20 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
      */
     protected function commitStateChanged(): void
     {
-        unset($this->commits, $this->rendered, $this->starredIds, $this->stats, $this->rows);
+        unset(
+            $this->commits,
+            $this->rendered,
+            $this->starredIds,
+            $this->stats,
+            $this->rows,
+            // Sharing is a write to a ledger the page reads back, so both the
+            // "did I share this" lookup and the per-row counts are stale the
+            // moment the row lands.
+            $this->sharedCommitIds,
+            $this->shareCounts,
+            // Reporting has the same shape and the same problem.
+            $this->reportedCommitIds,
+        );
     }
 
     /**
@@ -1039,6 +1172,14 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
             $this->reportedCommitIds,
             // The votes cast on this install, by poll and by option.
             $this->pollVotes,
+            // The commits this reader has passed on, and how many accounts
+            // have passed on each — both read from `feed_shares`, never a
+            // column that could drift.
+            $this->sharedCommitIds,
+            $this->shareCounts,
+            // The row being edited, and the text it is being edited into.
+            $this->editingId,
+            $this->editDraft,
         );
     }
 
@@ -1154,7 +1295,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 built its own link would silently drop the other three.
             --}}
             <div class="dn-categories" data-test="log-filters">
-                <div class="dn-filter-row" role="group" aria-label="{{ __('Commit type') }}">
+                <div class="dn-filter-row" role="group" aria-label="{{ __('Post type') }}">
                     <a
                         href="{{ $this->filterUrl(['type' => 'all']) }}"
                         wire:navigate
@@ -1235,7 +1376,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                     @endforeach
                 </span>
 
-                {{ trans_choice(':count new commit|:count new commits', $pendingNew, ['count' => $pendingNew]) }}
+                {{ trans_choice(':count new post|:count new posts', $pendingNew, ['count' => $pendingNew]) }}
             </button>
         </div>
     @endif
@@ -1257,7 +1398,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     @if ($rows === [])
         <div class="dn-empty" data-test="log-empty">
             @if ($log === 'following')
-                <p class="dn-empty-command">fatal: your log does not have any commits yet</p>
+                <p class="dn-empty-command">fatal: your log does not have any posts yet</p>
                 <p class="dn-empty-text">
                     {{ __('Your log shows the topics of the communities you joined.') }}
                     @if ($this->reader() === null)
@@ -1278,9 +1419,9 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                     {{ __('is chronological and always full.') }}
                 </p>
             @else
-                <p class="dn-empty-command">fatal: no commits yet</p>
+                <p class="dn-empty-command">fatal: no posts yet</p>
                 <p class="dn-empty-text">
-                    {{ __('Nobody has committed anything. Be the first. It is just plain text; you will be fine.') }}
+                    {{ __('Nobody has posted anything. Be the first. It is just plain text; you will be fine.') }}
                 </p>
             @endif
         </div>
@@ -1294,7 +1435,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                     <div
                         class="dn-marker is-visit"
                         role="separator"
-                        aria-label="{{ __('Commits above are new since your last visit') }}"
+                        aria-label="{{ __('Posts above are new since your last visit') }}"
                         data-test="last-visit"
                     >
                         <div class="dn-rail">
@@ -1326,6 +1467,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                     'commit' => $row,
                     'isLast' => $loop->last && ! $this->hasMore,
                     'maxReply' => self::MAX_REPLY,
+                    'maxEdit' => self::MAX_BODY,
                 ])
 
                 @if ($row['interlude'] && $this->whoToFollow !== [])
@@ -1364,7 +1506,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                             wire:loading.attr="disabled"
                             data-test="load-older"
                         >
-                            {{ __('Load older commits') }}
+                            {{ __('Load older posts') }}
                         </button>
                     </div>
                 </div>
@@ -1376,7 +1518,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                         </span>
                     </div>
                     <p class="dn-root-text" data-test="log-root">
-                        {{ __("That's the root commit. There's nothing before it.") }}
+                        {{ __("That's the root post. There's nothing before it.") }}
                     </p>
                 </div>
             @endif

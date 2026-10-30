@@ -66,7 +66,7 @@ new #[Title('Terminal settings')] #[Layout('layouts::feed')] class extends Compo
     <section class="dn-settings-section" aria-labelledby="settings-keys">
         <h2 id="settings-keys" class="dn-settings-title">{{ __('Keys') }}</h2>
         <p class="dn-settings-note">
-            {{ __('A key lets the terminal post commits as you. Only the fingerprint is stored.') }}
+            {{ __('A key lets the terminal post as you. Only the fingerprint is stored.') }}
         </p>
 
         <div class="dn-list">
@@ -118,7 +118,7 @@ new #[Title('Terminal settings')] #[Layout('layouts::feed')] class extends Compo
 
     <section class="dn-settings-section" aria-labelledby="settings-terminal-script">
         <h2 id="settings-terminal-script" class="dn-settings-title">{{ __('The terminal script') }}</h2>
-        <p class="dn-settings-note">{{ __('Install it once, then commit from any repository.') }}</p>
+        <p class="dn-settings-note">{{ __('Install it once, then post from any repository.') }}</p>
 
         <div class="dn-code-filename"><span>sh</span></div>
         <pre class="dn-code"><code>curl -fsSL {{ url('/install.sh') }} | sh

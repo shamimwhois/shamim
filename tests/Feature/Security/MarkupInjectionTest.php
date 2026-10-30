@@ -187,6 +187,29 @@ function schemeOf(?string $url): string
 }
 
 /**
+ * The scheme a browser resolves for a raw attribute value.
+ *
+ * Models the URL standard's preprocessing, which is narrower than "strip all
+ * control characters": leading and trailing C0 controls and spaces are trimmed,
+ * and *only* tab, newline and carriage return are removed from anywhere else.
+ * A value whose remaining controls make it unresolvable yields the empty string,
+ * which is what an unresolvable href is — not a `javascript:` URL.
+ */
+function browserSchemeOf(string $value): string
+{
+    $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    $trimmed = (string) preg_replace('/^[\x00-\x20]+|[\x00-\x20]+$/', '', $decoded);
+    $cleaned = (string) preg_replace('/[\x09\x0A\x0D]+/', '', $trimmed);
+
+    if (preg_match('/^[a-z][a-z0-9+.\-]*:/i', $cleaned, $matches) !== 1) {
+        return '';
+    }
+
+    return strtolower(rtrim($matches[0], ':'));
+}
+
+/**
  * The subtree of a page that is printed from somebody else's text.
  *
  * A page-level scan that looked at the whole document would report the theme's
@@ -332,6 +355,54 @@ test('a scheme broken by whitespace is not a link at all', function (): void {
     // because a future link regex that allows whitespace reopens it.
     expect(rendered("[x](<java\tscript:alert(1)>)"))->not->toContain('href')
         ->and(rendered("[x](java\tscript:alert(1))"))->not->toContain('href');
+});
+
+test('tab, newline and carriage return are stripped before the scheme is judged', function (): void {
+    // These three are the code points the URL standard removes from anywhere in
+    // a URL, so they are the ones that genuinely turn a broken-looking value into
+    // a live `javascript:` scheme. The link pattern blocks them inside a
+    // destination, and this pins that the second wall — the scheme check — would
+    // also refuse them if a future pattern admitted them. A value with the break
+    // in the *attribute* rather than the markdown is what the scheme check sees.
+    foreach (["\t", "\n", "\r"] as $break) {
+        $renderer = new ReflectionMethod(MarkdownRenderer::class, 'isUnsafeUrl');
+
+        /** @var MarkdownRenderer $instance */
+        $instance = app(MarkdownRenderer::class);
+
+        $brokenScheme = 'java'.$break.'script:alert(1)';
+
+        expect($renderer->invoke($instance, $brokenScheme))
+            ->toBeTrue(sprintf('0x%02X did not resolve to an unsafe scheme', ord($break)));
+    }
+});
+
+test('a scheme broken by a non-whitespace control character is still refused', function (): void {
+    // The whitespace case above is closed by the link pattern. This sweeps the
+    // rest of the C0 range, which the pattern admits because those code points
+    // are not whitespace. The question is deliberately a browser's question and
+    // not `parse_url()`'s: the URL standard trims leading/trailing C0 controls
+    // and spaces and removes tab, newline and carriage return anywhere, and
+    // nothing else. A control a browser leaves in place makes the URL
+    // unresolvable rather than turning it into a scheme, so the assertion is
+    // that no rendered attribute is a `javascript:` URL *as a browser reads it*.
+    foreach (range(0x01, 0x1F) as $point) {
+        $break = chr($point);
+
+        foreach ([
+            '[x](java'.$break.'script:alert(1))' => 'href',
+            '![x](java'.$break.'script:alert(1))' => 'src',
+        ] as $markdown => $attribute) {
+            $html = rendered($markdown);
+
+            if (preg_match('/'.$attribute.'="([^"]*)"/', $html, $matches) !== 1) {
+                continue;
+            }
+
+            expect(browserSchemeOf($matches[1]))
+                ->not->toBe('javascript', sprintf('0x%02X produced a live %s scheme', $point, $attribute));
+        }
+    }
 });
 
 test('an ordinary url survives, because the wall is a block list and not a refusal to link', function (): void {

@@ -32,6 +32,28 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             this.searchOpen = Boolean(options.searchOpen);
+            this.restoreNav();
+        },
+
+        /**
+         * The rail's collapse is a preference, not a page state: a reader who
+         * wants the icons picks them once. `init()` runs on every `wire:navigate`
+         * swap too, because the shell is re-rendered with the page — so the
+         * stored value is reapplied rather than the markup's `expanded` default,
+         * or the rail would spring back open on every link.
+         */
+        restoreNav() {
+            const stored = window.localStorage.getItem('dn.nav');
+
+            if (stored === 'collapsed' || stored === 'expanded') {
+                this.$el.dataset.nav = stored;
+            }
+        },
+
+        toggleNav() {
+            const next = this.$el.dataset.nav === 'expanded' ? 'collapsed' : 'expanded';
+            this.$el.dataset.nav = next;
+            window.localStorage.setItem('dn.nav', next);
         },
 
         rows() {
@@ -244,6 +266,120 @@ document.addEventListener('alpine:init', () => {
             } else {
                 window.localStorage.setItem(this.key, value);
             }
+        },
+
+        /*
+         * Take what the clipboard is holding.
+         *
+         * A paste is the one attach path that costs the reader nothing: the
+         * bytes never touch the filesystem picker. The panel's upload state is
+         * a Livewire array property, so a clipboard image has to arrive the
+         * same way a picked file does — `$wire.uploadMultiple` performs that
+         * transfer and `updatedUploads` stages it exactly as if the picker had
+         * been used.
+         *
+         * Non-image clipboard payloads (a string, plain text) are deliberately
+         * dropped: the disk and the validator both accept images only, so
+         * forwarding them would buy a round trip and an error message.
+         */
+        async paste() {
+            if (! navigator.clipboard?.read) {
+                this.openPicker();
+
+                return;
+            }
+
+            let items = [];
+
+            try {
+                items = await navigator.clipboard.read();
+            } catch {
+                // Permission denied, or the document is not focused. Fall back
+                // to the picker rather than doing nothing.
+                this.openPicker();
+
+                return;
+            }
+
+            const files = [];
+
+            for (const item of items) {
+                const type = item.types.find((candidate) => candidate.startsWith('image/'));
+
+                if (type === undefined) {
+                    continue;
+                }
+
+                const blob = await item.getType(type);
+                const extension = (type.split('/')[1] ?? 'png').replace('jpeg', 'jpg');
+
+                files.push(new File([blob], `pasted-${Date.now()}.${extension}`, { type }));
+            }
+
+            this.stage(files);
+        },
+
+        /*
+         * A paste into the body — the path a screenshot actually takes.
+         *
+         * `clipboardData.files` covers the screenshot case in every browser
+         * that matters; when it is empty the paste is text and belongs to the
+         * textarea, so the event is left alone and the reader's words land
+         * where they expect.
+         */
+        onPaste(event) {
+            const files = Array.from(event.clipboardData?.files ?? [])
+                .filter((file) => file.type.startsWith('image/'));
+
+            if (files.length === 0) {
+                return;
+            }
+
+            event.preventDefault();
+            this.stage(files);
+        },
+
+        /*
+         * Hand images to the component's upload property.
+         *
+         * One route for both clipboard paths, and the same route the picker
+         * takes: `uploads` is an array property, so `uploadMultiple` is what
+         * transfers it, and `updatedUploads` is the component hook that stages
+         * what arrived. The explicit `call` is what the wire protocol does for
+         * a plain `wire:model` change — without it the files would sit in the
+         * property and never be validated or stored.
+         */
+        stage(files) {
+            if (files.length === 0) {
+                return;
+            }
+
+            this.$wire.uploadMultiple('uploads', files, null, null, () => {
+                this.$wire.call('updatedUploads');
+            });
+        },
+
+        /*
+         * Open the picker the panel already owns.
+         *
+         * There is one real `<input type=file>` on the row; every attach button
+         * is a label away from it. `accept` is narrowed per button so the
+         * dialog opens already filtered, but the field itself stays
+         * `wire:model`led to the component — the picker is the only place the
+         * bytes enter, and the validator remains the thing that decides.
+         */
+        openPicker(accept = null) {
+            const picker = this.$el.querySelector('[data-composer-picker]');
+
+            if (picker === null) {
+                return;
+            }
+
+            if (accept !== null) {
+                picker.setAttribute('accept', accept);
+            }
+
+            picker.click();
         },
 
         togglePreview() {

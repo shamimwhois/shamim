@@ -31,7 +31,7 @@ it('renders the log as a graph of commits', function (): void {
         ->assertSee('data-test="log"', false)
         ->assertSee('data-test="commit"', false)
         ->assertSee('data-test="log-root"', false)
-        ->assertSee("That's the root commit. There's nothing before it.")
+        ->assertSee("That's the root post. There's nothing before it.")
         ->assertSee('Following')
         ->assertSee('Latest')
         ->assertSee('Trending');
@@ -81,7 +81,7 @@ it('ranks the trending log by its engagement', function (): void {
 it('gives a guest an honest empty following log', function (): void {
     get(route('feed.index', ['log' => 'following']))
         ->assertOk()
-        ->assertSee('fatal: your log does not have any commits yet')
+        ->assertSee('fatal: your log does not have any posts yet')
         ->assertSee('data-test="log-empty"', false);
 });
 

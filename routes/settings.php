@@ -22,6 +22,7 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('settings/terminal', 'pages::settings.terminal')->name('settings.terminal');
     Route::livewire('settings/safety', 'pages::settings.safety')->name('settings.safety');
     Route::livewire('settings/devices', 'pages::settings.devices')->name('settings.devices');
+    Route::livewire('settings/billing', 'pages::settings.billing')->name('settings.billing');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

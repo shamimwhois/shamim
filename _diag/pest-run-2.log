@@ -1,6 +1,0 @@
-pest_exit=1
---- stdout tail ---
-
-  [37;44;1m INFO [39;49;22m No tests found.
-
---- stderr tail ---

@@ -153,7 +153,7 @@ it('drops a who-to-follow interlude into the stream, once', function (): void {
     expect(substr_count($html, 'data-test="log-interlude"'))->toBe(1);
 });
 
-it('pages the log from a sentinel and ends at the root commit', function (): void {
+it('pages the log from a sentinel and ends at the root post', function (): void {
     FeedPost::factory()->count(20)->create(['posted_at' => now()->subDay()]);
 
     $component = Livewire::test('pages::feed');
@@ -192,7 +192,7 @@ it('restores a commit it deleted, with its thread intact', function (): void {
     expect($post->fresh()->deleted)->toBeFalse();
 });
 
-it('announces new commits with the people who wrote them', function (): void {
+it('announces new posts with the people who wrote them', function (): void {
     $component = Livewire::test('pages::feed');
 
     FeedPost::factory()->create(['posted_at' => now()->addMinute()]);
