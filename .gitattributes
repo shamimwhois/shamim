@@ -9,3 +9,29 @@
 CHANGELOG.md export-ignore
 README.md export-ignore
 .github/workflows/browser-tests.yml export-ignore
+
+# Nothing below belongs on the production host. These rules are consumed by
+# `git archive`, which the deploy workflow uses to assemble the release
+# artifact, so they are what actually keeps tests and project docs off the
+# server — not a --exclude list someone has to remember to update.
+#
+# `deploy/` is deliberately NOT ignored: the workflow runs those scripts on
+# the host after uploading.
+/tests export-ignore
+/docs export-ignore
+/.github export-ignore
+/.editorconfig export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/phpunit.xml export-ignore
+/phpstan.neon export-ignore
+/pint.json export-ignore
+/package.json export-ignore
+/package-lock.json export-ignore
+/vite.config.js export-ignore
+/AGENTS.md export-ignore
+/CHANGELOG.md export-ignore
+/opencode.json export-ignore
+/boost.json export-ignore
+shamim.zip export-ignore
+
