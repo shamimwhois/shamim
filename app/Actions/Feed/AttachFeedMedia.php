@@ -50,12 +50,36 @@ class AttachFeedMedia
     public function handle(?FeedPost $post, User $uploader, array $files, ?string $tempKey = null): Collection
     {
         $stored = Collection::make();
+        $offset = $this->nextSortOrder($post, $uploader, $tempKey);
 
         foreach ($files as $file) {
-            $stored->push($this->storeOne($post, $uploader, $file, $tempKey, $stored->count()));
+            $stored->push($this->storeOne($post, $uploader, $file, $tempKey, $offset++));
         }
 
         return $stored;
+    }
+
+    /**
+     * The ordinal the next stored file should carry.
+     *
+     * Both halves matter. A post resumed with images on it must continue past
+     * them, and a composer that stages one file, then a second, must continue
+     * past the first — otherwise every staged row carries `0`, the grid's
+     * `orderBy('sort_order')` cannot tell them apart, and a two-image post
+     * renders in whatever order the database happens to return. Ties are the
+     * one thing an explicit ordering must never contain.
+     */
+    private function nextSortOrder(?FeedPost $post, User $uploader, ?string $tempKey): int
+    {
+        if ($post !== null) {
+            return (int) $post->attachments()->max('sort_order') + 1;
+        }
+
+        return (int) FeedAttachment::query()
+            ->unattached()
+            ->where('temp_key', $tempKey)
+            ->where('user_id', $uploader->id)
+            ->max('sort_order') + 1;
     }
 
     /**
@@ -130,7 +154,7 @@ class AttachFeedMedia
             'width' => $dimensions['width'],
             'height' => $dimensions['height'],
             'alt_text' => null,
-            'sort_order' => $post !== null ? $offset : 0,
+            'sort_order' => $offset,
             'temp_key' => $post !== null ? null : $tempKey,
         ]);
 

@@ -296,3 +296,75 @@ test('the send corner holds the counter and the verb, in that order', function (
 
     expect(substr_count($form, 'type="submit"'))->toBe(1);
 });
+
+test('no attach control promises a file type the disk would refuse', function () {
+    [, $html] = composerContext();
+
+    /*
+     * The paperclip used to be labelled "Attach a file" while opening an
+     * images-only filter: a control whose accessible name was a promise the
+     * validator had to break. The helper text was honest about the intent
+     * ("the label names the capability the reader is looking for") but a
+     * reader who could not see the icon heard a claim the backend could not
+     * honour — and the refusal arrived only after they had chosen a file.
+     *
+     * The fix is not to widen what the disk takes (a product decision, and
+     * `ACCEPTED_MIMES` is the single source of truth for it). It is to stop
+     * the label from naming a format the disk does not accept.
+     *
+     * A bare "file" in an accessible name is the thing to catch: it is the
+     * word that turns an images-only control into an anything control. The
+     * assertion is on a word boundary so "profile" or "filesystem" would not
+     * trip it, and scoped to the labels rather than the prose, because the
+     * comments legitimately *discuss* files.
+     */
+    $labels = [];
+
+    preg_match_all('/aria-label="([^"]*)"/', $html, $matches);
+
+    foreach ($matches[1] as $label) {
+        $labels[] = $label;
+    }
+
+    expect($labels)->not->toBeEmpty();
+
+    $attachLabels = array_values(array_filter(
+        $labels,
+        fn (string $label): bool => preg_match('/attach|choose|pick/i', $label) === 1,
+    ));
+
+    expect($attachLabels)->not->toBeEmpty();
+
+    foreach ($attachLabels as $label) {
+        expect(preg_match('/\bfiles?\b/i', $label))->toBe(
+            0,
+            "the attach control [{$label}] names a plain file, but the media disk takes images only"
+        );
+    }
+});
+
+test('the attach controls open the picker on a filter the disk accepts', function () {
+    [, $html] = composerContext();
+
+    // Every `openPicker(...)` on the page is an invitation; each one must be a
+    // subset of what the disk will take. This reads the Alpine source, which
+    // is where the argument actually lives.
+    $source = file_get_contents(resource_path('js/log-shell.js'));
+    expect($source)->not->toBeFalse();
+
+    // The button arguments are in the Blade markup, not the JS.
+    preg_match_all("/openPicker\('([^']+)'\)/", $html, $matches);
+
+    $invited = $matches[1] ?? [];
+    expect($invited)->not->toBeEmpty();
+
+    $disk = (new ReflectionClass(AttachFeedMedia::class))->getConstant('ACCEPTED_MIMES');
+
+    foreach ($invited as $list) {
+        foreach (array_filter(array_map('trim', explode(',', $list))) as $mime) {
+            expect(in_array($mime, $disk, true))->toBeTrue(
+                "an attach control opens the picker on [{$mime}], which the disk refuses"
+            );
+        }
+    }
+});

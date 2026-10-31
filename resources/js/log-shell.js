@@ -348,15 +348,36 @@ document.addEventListener('alpine:init', () => {
          * what arrived. The explicit `call` is what the wire protocol does for
          * a plain `wire:model` change — without it the files would sit in the
          * property and never be validated or stored.
+         *
+         * The argument order is `(name, files, finish, error, progress)`. The
+         * staging call used to sit in the *fifth* position — where `progress`
+         * lives — so `updatedUploads` ran on every progress tick of the
+         * transfer, dozens of requests where one was meant. It survived
+         * review because the hook already nulled `uploads` by the time each
+         * later call ran, so every extra call found nothing to stage and the
+         * waste was invisible in behaviour; only the round trips were real,
+         * and the error path had no callback at all. The component's own
+         * clearing is not a licence to leave a callback in the wrong slot
+         * (it now clears in a `finally`, on every path), so this stays the
+         * correct position.
+         *
+         * A failed transfer reports through the component's own `uploads`
+         * error rather than an event of its own, because that is the one
+         * channel the panel already renders (`data-test="composer-media-error"`)
+         * and a second way to say "that didn't attach" is a second thing to
+         * keep in step.
          */
         stage(files) {
             if (files.length === 0) {
                 return;
             }
 
-            this.$wire.uploadMultiple('uploads', files, null, null, () => {
-                this.$wire.call('updatedUploads');
-            });
+            this.$wire.uploadMultiple(
+                'uploads',
+                files,
+                () => this.$wire.call('updatedUploads'),
+                () => this.$wire.call('reportAttachFailure'),
+            );
         },
 
         /*

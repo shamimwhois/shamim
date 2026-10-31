@@ -154,17 +154,21 @@
                         <x-feed.icon name="image" />
                     </button>
 
-                    {{-- Files. The disk takes images, so the picker is opened on
-                         the images filter — exactly what the backend will
-                         accept — and the label names the capability the reader
-                         is looking for. Anything else the browser offers is
-                         refused by the validator with a message, not silently. --}}
+                    {{-- Paperclip. Named for what the picker will actually
+                         open, not for the generic idea of a file: the disk
+                         takes images only, so a control that said "Attach a
+                         file" would be an invitation the validator refuses.
+                         The distinction from the icon button beside it is the
+                         *source*, not the format — this one opens the system
+                         browser, that one is the plainest expression of "an
+                         image from this device". Anything the browser still
+                         offers is refused with a message, not silently. --}}
                     <button
                         type="button"
                         class="dn-icon-btn"
                         x-on:click="openPicker('image/jpeg,image/png,image/webp,image/gif')"
-                        aria-label="{{ __('Attach a file') }}"
-                        title="{{ __('Attach a file') }}"
+                        aria-label="{{ __('Choose an image from your device') }}"
+                        title="{{ __('Choose an image from your device') }}"
                         data-test="composer-files"
                     >
                         <x-feed.icon name="paperclip" />
@@ -400,9 +404,17 @@
                 @enderror
             @endif
 
-            @error('uploads')
+            {{-- Any upload refusal, whichever key it landed on.
+                 `uploads` is the slot for a refusal the hook raises itself (the
+                 post-wide cap, a transfer that never arrived), but a per-file
+                 rule — `image`, `mimes`, `dimensions` — fails as `uploads.0`,
+                 `uploads.1`, and so on. Only the bare key was rendered, so the
+                 most likely refusal of all, an undersized or wrong-format
+                 image, dropped the file and said nothing. `$errors->first()`
+                 with a wildcard covers both without a second write path. --}}
+            @if ($message = $errors->first('uploads.*') ?: $errors->first('uploads'))
                 <p class="dn-composer-error" data-test="composer-media-error">{{ $message }}</p>
-            @enderror
+            @endif
         </div>
     </div>
 </form>

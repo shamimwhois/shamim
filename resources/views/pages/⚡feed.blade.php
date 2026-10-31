@@ -449,53 +449,71 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
             return;
         }
 
+        /*
+         * Everything the hook is handed has to be dropped by the time it
+         * returns, whatever the outcome — and `validate()` throws on a refusal,
+         * so the drop belongs in a `finally` rather than at the end.
+         *
+         * Livewire's staging copies are single-use: they are moved onto the
+         * media disk on success and gone by the end of the request either way,
+         * so a survivor is a live object pointing at a file that is no longer
+         * there. That is not a harmless leak, because `validate()` reads the
+         * whole property: the dead entries were re-decided on every later pick,
+         * so one undersized image drew its error again and again and each try
+         * appended a key instead of replacing the last. A reader who picked a
+         * bad file once could not get a clean error list back.
+         *
+         * The batch is deliberately *left on the property* until validation has
+         * run, so Laravel can still key each failure by its own index
+         * (`uploads.0`, not a single `uploads`). Only then is it cleared.
+         */
         $files = collect($this->uploads ?? [])->filter()->values()->all();
 
-        if ($files === []) {
-            return;
-        }
+        try {
+            if ($files === []) {
+                return;
+            }
 
-        /** @var int $cap */
-        $cap = (int) config('feed.composer.max_attachments', 8);
+            /** @var int $cap */
+            $cap = (int) config('feed.composer.max_attachments', 8);
 
-        /*
-         * The cap belongs to the post, not to one turn of the file picker.
-         * `max:` on the incoming array only ever sees this batch, so eight
-         * staged images plus eight more would sail through as two legal
-         * batches and publish sixteen. The modal composer has always checked
-         * the total; this path did not.
-         */
-        if ($this->stagedMedia->count() + count($files) > $cap) {
+            /*
+             * The cap belongs to the post, not to one turn of the file picker.
+             * `max:` on the incoming array only ever sees this batch, so eight
+             * staged images plus eight more would sail through as two legal
+             * batches and publish sixteen. The modal composer has always
+             * checked the total; this path did not.
+             */
+            if ($this->stagedMedia->count() + count($files) > $cap) {
+                $this->addError('uploads', __('A post can carry at most :count images.', ['count' => $cap]));
+
+                return;
+            }
+
+            $this->validate([
+                'uploads' => ['array', 'max:'.$cap],
+                'uploads.*' => [
+                    'image',
+                    'mimes:jpg,jpeg,png,webp,gif',
+                    'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
+                    // A 1×1 transparent PNG is a valid image and a useless one,
+                    // and a 12000 px panorama will blow the card layout. The
+                    // modal has always refused both; this path accepted them.
+                    'dimensions:min_width=16,min_height=16,max_width=6000,max_height=6000',
+                ],
+            ], [
+                'uploads.*.image' => __('Only image files can be attached to a post.'),
+                'uploads.*.dimensions' => __('That image is too small or too large to attach.'),
+            ]);
+
+            if ($this->tempKey === '') {
+                $this->tempKey = (string) Str::uuid();
+            }
+
+            app(AttachFeedMedia::class)->handle(null, $reader, $files, $this->tempKey);
+        } finally {
             $this->uploads = null;
-
-            $this->addError('uploads', __('A post can carry at most :count images.', ['count' => $cap]));
-
-            return;
         }
-
-        $this->validate([
-            'uploads' => ['array', 'max:'.$cap],
-            'uploads.*' => [
-                'image',
-                'mimes:jpg,jpeg,png,webp,gif',
-                'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
-                // A 1×1 transparent PNG is a valid image and a useless one, and
-                // a 12000 px panorama will blow the card layout. The modal has
-                // always refused both; this path accepted them.
-                'dimensions:min_width=16,min_height=16,max_width=6000,max_height=6000',
-            ],
-        ], [
-            'uploads.*.image' => __('Only image files can be attached to a post.'),
-            'uploads.*.dimensions' => __('That image is too small or too large to attach.'),
-        ]);
-
-        if ($this->tempKey === '') {
-            $this->tempKey = (string) Str::uuid();
-        }
-
-        app(AttachFeedMedia::class)->handle(null, $reader, $files, $this->tempKey);
-
-        $this->uploads = null;
 
         unset($this->stagedMedia);
     }
