@@ -102,11 +102,16 @@
                 ></textarea>
             </div>
 
-            {{-- The draft, rendered where the posted commit will sit. --}}
-            <div class="dn-composer-preview" x-show="previewing" x-cloak x-text="draftText"></div>
-            <div class="dn-composer-preview-url" x-show="previewing && link" x-cloak>
-                <span x-text="link"></span>
-                <span style="display: block; margin-top: 4px;">{{ __('Unfurls into a link card after you post.') }}</span>
+            {{-- The draft, rendered where the posted commit will sit. Both
+                 preview fragments live in one region so the menu's toggle has
+                 a single target to point `aria-controls` at — the body text and
+                 the link note are one answer to "show me the post". --}}
+            <div id="composer-preview" data-test="composer-preview" x-show="previewing" x-cloak>
+                <div class="dn-composer-preview" x-text="draftText"></div>
+                <div class="dn-composer-preview-url" x-show="link" x-cloak>
+                    <span x-text="link"></span>
+                    <span style="display: block; margin-top: 4px;">{{ __('Unfurls into a link card after you post.') }}</span>
+                </div>
             </div>
 
             <div class="dn-composer-row">
@@ -212,7 +217,8 @@
                                 class="dn-composer-menu-item"
                                 x-bind:class="{ 'is-on': previewing }"
                                 x-on:click="togglePreview()"
-                                aria-pressed="false"
+                                x-bind:aria-expanded="previewing ? 'true' : 'false'"
+                                aria-controls="composer-preview"
                                 data-test="preview-toggle"
                             >
                                 <x-feed.icon name="eye" :size="16" />
@@ -243,12 +249,19 @@
                                 <span>{{ __('Schedule this post') }}</span>
                             </button>
 
+                            {{-- Discard. Only reachable while there is something
+                                 to bin, because `count` is Alpine's own tally of
+                                 the body — the same number the reader sees beside
+                                 the verb. The confirmation is the browser's own,
+                                 so the destructive press is never one mis-tap
+                                 away from the neighbours that open panels. --}}
                             <button
                                 type="button"
                                 class="dn-composer-menu-item"
                                 x-on:click="if (confirm('{{ __('Clear this draft?') }}')) drop(true)"
                                 x-show="count > 0"
                                 x-cloak
+                                data-test="composer-discard"
                             >
                                 <x-feed.icon name="trash" :size="16" />
                                 <span>{{ __('Discard draft') }}</span>

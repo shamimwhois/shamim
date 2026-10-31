@@ -14,8 +14,8 @@ use App\Models\FeedStar;
 use App\Models\User;
 use App\Support\CommitBody;
 use App\Support\Seo;
-use Illuminate\Database\Eloquent\Collection;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -306,7 +306,6 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     {
         $reader = $this->reader();
 
-
         if ($reader === null) {
             $this->redirectRoute('feed.index', ['signin' => 'required']);
 
@@ -387,6 +386,13 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
      *
      * The words and the images are spent; the schedule choice is a preference
      * about the *next* commit and stays where the reader left it.
+     *
+     * The poll flag closes with the poll. Leaving it open was the quiet bug: the
+     * choices were cleared but the mode was not, so the next post — written as
+     * an ordinary thought — was filed as a poll and refused by the write path
+     * with "a poll needs two choices that differ". The author saw a poll error
+     * for a post that was never meant to be one. A mode without its fields is
+     * not a neutral state; it is a half-open editor.
      */
     private function resetComposer(): void
     {
@@ -394,6 +400,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         $this->uploads = null;
         $this->tempKey = '';
         $this->scheduledAt = '';
+        $this->askingPoll = false;
         $this->pollOptions = ['', ''];
         $this->pollCloses = '';
 
@@ -451,15 +458,35 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         /** @var int $cap */
         $cap = (int) config('feed.composer.max_attachments', 8);
 
+        /*
+         * The cap belongs to the post, not to one turn of the file picker.
+         * `max:` on the incoming array only ever sees this batch, so eight
+         * staged images plus eight more would sail through as two legal
+         * batches and publish sixteen. The modal composer has always checked
+         * the total; this path did not.
+         */
+        if ($this->stagedMedia->count() + count($files) > $cap) {
+            $this->uploads = null;
+
+            $this->addError('uploads', __('A post can carry at most :count images.', ['count' => $cap]));
+
+            return;
+        }
+
         $this->validate([
             'uploads' => ['array', 'max:'.$cap],
             'uploads.*' => [
                 'image',
                 'mimes:jpg,jpeg,png,webp,gif',
                 'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
+                // A 1×1 transparent PNG is a valid image and a useless one, and
+                // a 12000 px panorama will blow the card layout. The modal has
+                // always refused both; this path accepted them.
+                'dimensions:min_width=16,min_height=16,max_width=6000,max_height=6000',
             ],
         ], [
             'uploads.*.image' => __('Only image files can be attached to a post.'),
+            'uploads.*.dimensions' => __('That image is too small or too large to attach.'),
         ]);
 
         if ($this->tempKey === '') {
@@ -471,6 +498,20 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         $this->uploads = null;
 
         unset($this->stagedMedia);
+    }
+
+    /**
+     * Tell the reader an attach failed on the wire.
+     *
+     * The picker path reports through `uploads` because a validation failure is
+     * something the server decides. A transfer that never arrives is different:
+     * no file reached the server, so nothing there can describe it, and the
+     * only honest message is the one the browser can raise. Both land on the
+     * same error slot so the panel needs one place to look.
+     */
+    public function reportAttachFailure(): void
+    {
+        $this->addError('uploads', __('That upload did not finish. Try attaching it again.'));
     }
 
     /**
@@ -1275,6 +1316,17 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     <x-slot:header>
         <div class="dn-header">
             <h1 class="sr-only">{{ __('The Log') }}</h1>
+
+            {{-- The page's opening rule: a monospace label with a hairline
+                 running to the edge. It is the motif every page in the product
+                 now opens with, and on the log it doubles as the only visible
+                 statement of what the surface is — the `h1` above is for the
+                 screen reader, this line is for the eye. --}}
+            <div class="dn-head-rule" aria-hidden="true">
+                <span class="dn-head-rule-label">{{ __('The Log') }}</span>
+                <span class="dn-head-rule-line"></span>
+            </div>
+
             <nav class="dn-tabs" aria-label="{{ __('Logs') }}">
                 @foreach (['following' => __('Following'), 'latest' => __('Latest'), 'trending' => __('Trending')] as $key => $label)
                     <a
@@ -1428,15 +1480,36 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     @else
         <div class="dn-feed" data-test="log-feed">
             @foreach ($rows as $row)
-                {{-- Where the reader stopped last time. It is claimed once, above
-                     the first commit they had not seen, so the log reads as
-                     "these are new" rather than as a ruler. --}}
+                {{-- Every top-level node in this loop carries a `wire:key`.
+                     The loop emits up to four different elements per row — a
+                     visit line, a day marker, the commit itself, and the
+                     follow interlude — and which of them appear changes from
+                     render to render (the visit line is claimed once, the day
+                     marker only when the day turns over, the interlude only
+                     after the fifth commit).
+
+                     Without a key Livewire morphs siblings by *position*: the
+                     first child on the new page is matched to the first child
+                     on the old one. Remove one row in the middle and every
+                     commit below it shifts up a slot, so the node that used to
+                     hold post 34 gets rewritten to describe post 35 — but its
+                     `wire:click="deleteCommit(34)"` and `data-commit="34"`
+                     and the new `data-commit="35"` on a different attribute
+                     pass land out of step. The reader then presses Delete on
+                     one row and a *different post is deleted*: a data-integrity
+                     bug that is invisible in a static render and that every
+                     server-side test passes, because `call()` never touched
+                     the DOM.
+
+                     The key is the row's identity plus the node's kind, so a
+                     marker and the commit under it can never swap places. --}}
                 @if ($row['lastVisit'])
                     <div
                         class="dn-marker is-visit"
                         role="separator"
                         aria-label="{{ __('Posts above are new since your last visit') }}"
                         data-test="last-visit"
+                        wire:key="visit-{{ $row['id'] }}"
                     >
                         <div class="dn-rail">
                             <span class="dn-rail-line is-down is-dashed"></span>
@@ -1453,7 +1526,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 @endif
 
                 @if ($loop->first || $row['day'] !== $rows[$loop->index - 1]['day'])
-                    <div class="dn-marker">
+                    <div class="dn-marker" wire:key="day-{{ $row['id'] }}">
                         <div class="dn-rail">
                             <span class="dn-rail-line is-down is-dashed"></span>
                         </div>
@@ -1471,7 +1544,10 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 ])
 
                 @if ($row['interlude'] && $this->whoToFollow !== [])
-                    @include('feed.interlude', ['authors' => $this->whoToFollow])
+                    @include('feed.interlude', [
+                        'authors' => $this->whoToFollow,
+                        'keyFor' => 'interlude-'.$row['id'],
+                    ])
                 @endif
             @endforeach
 

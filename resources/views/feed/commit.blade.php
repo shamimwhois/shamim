@@ -28,6 +28,7 @@
     data-commit="{{ $commit['id'] }}"
     data-permalink="{{ $commit['url'] }}"
     data-test="commit"
+    wire:key="commit-{{ $commit['id'] }}"
     style="--dn-lane: {{ $commit['lane'] }}"
     tabindex="-1"
     x-data="{ confirming: false }"

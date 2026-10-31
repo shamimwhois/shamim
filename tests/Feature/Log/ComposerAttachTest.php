@@ -171,7 +171,7 @@ test('the clipboard paths feed the same upload property a picked file uses', fun
     // One shared staging route, and it targets the array property the picker
     // writes to — not a second upload path.
     expect(str_contains($source, 'stage(files)'))->toBeTrue();
-    expect(str_contains($source, "uploadMultiple('uploads'"))->toBeTrue();
+    expect(preg_match("/uploadMultiple\(\s*'uploads'/s", $source))->toBe(1);
 
     // `updatedUploads` is the component hook that stages what arrived; without
     // the explicit call the files would sit in the property untriaged.
@@ -179,6 +179,35 @@ test('the clipboard paths feed the same upload property a picked file uses', fun
 
     // Non-image clipboard payloads must be dropped rather than forwarded.
     expect(str_contains($source, "startsWith('image/')"))->toBeTrue();
+});
+
+test('the staging call sits in the finish slot, not the progress one', function () {
+    /* Presence is not enough. `uploadMultiple(name, files, finish, error,
+       progress, cancel)` takes six slots and the staging call used to sit in
+       the fifth — `progress` — so `updatedUploads` fired on every progress tick
+       of the transfer instead of once when it landed. A search for the method
+       name passes in both shapes, which is exactly why this asserts position.
+
+       Nothing about the wrong slot was visible: the hook nulls `uploads` on its
+       first run, so every later call found nothing and the composer still
+       worked. It just did dozens of round trips to get there. */
+    $source = file_get_contents(resource_path('js/log-shell.js'));
+
+    expect(preg_match(
+        "/uploadMultiple\(\s*'uploads',\s*[^,]+,\s*\(\)\s*=>\s*this\.\\\$wire->call|"
+        ."uploadMultiple\(\s*'uploads',\s*[^,]+,\s*\(\)\s*=>\s*this\.\\\$wire\.call/s",
+        $source,
+    ))->toBe(1, 'the finish callback must be the third argument, immediately after the files');
+
+    // And a failure must be reported rather than swallowed: the fifth-slot
+    // shape left the error callback as `null`, so a refused transfer said
+    // nothing at all.
+    expect(str_contains($source, 'reportAttachFailure'))->toBeTrue(
+        'a transfer that never arrives must reach the reader'
+    );
+
+    $component = file_get_contents(resource_path('views/pages/⚡feed.blade.php'));
+    expect(str_contains($component, 'public function reportAttachFailure()'))->toBeTrue();
 });
 
 test('the paste handler is bound to the body field', function () {
@@ -210,11 +239,37 @@ test('the overflow menu holds preview, poll, schedule and discard', function () 
     expect(str_contains($menu, 'composer-poll-toggle'))->toBeTrue();
     expect(str_contains($menu, 'composer-schedule-toggle'))->toBeTrue();
     expect(str_contains($menu, 'preview-toggle'))->toBeTrue();
+    expect(str_contains($menu, 'composer-discard'))->toBeTrue();
 
     // And the panel wires to the methods behind them.
     expect(str_contains($menu, '$wire.togglePoll()'))->toBeTrue();
     expect(str_contains($menu, '$wire.toggleScheduling()'))->toBeTrue();
     expect(str_contains($menu, 'togglePreview()'))->toBeTrue();
+});
+
+test('the preview toggle announces the state it paints', function () {
+    [, $html] = composerContext();
+
+    $at = strpos($html, 'data-test="preview-toggle"');
+    expect($at)->not->toBeFalse();
+
+    // The button's `is-on` class is painted from `previewing`; the accessible
+    // name is not. Three siblings toggle a panel, and the other two bind
+    // `aria-expanded` — the preview toggle used to hardcode `aria-pressed`,
+    // so a screen reader heard a permanently-unpressed control while the eye
+    // watched the preview appear.
+    $open = strrpos(substr($html, 0, $at), '<button');
+    $toggle = substr($html, $open, $at - $open + 200);
+
+    expect(str_contains($toggle, "x-bind:aria-expanded=\"previewing ? 'true' : 'false'\""))
+        ->toBeTrue('the preview toggle must bind aria-expanded to `previewing`');
+    expect(str_contains($toggle, 'aria-pressed'))->toBeFalse(
+        'a hardcoded aria-pressed is a control that never announces its state'
+    );
+
+    // And it names the panel it opens, which must exist and be reachable.
+    expect(str_contains($toggle, 'aria-controls="composer-preview"'))->toBeTrue();
+    expect(str_contains($html, 'id="composer-preview"'))->toBeTrue();
 });
 
 test('the send corner holds the counter and the verb, in that order', function () {

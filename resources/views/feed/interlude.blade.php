@@ -10,7 +10,7 @@
      */
 @endphp
 
-<div class="dn-interlude" data-test="log-interlude">
+<div class="dn-interlude" data-test="log-interlude" @isset ($keyFor) wire:key="{{ $keyFor }}" @endisset>
     <div class="dn-rail" aria-hidden="true">
         <span class="dn-rail-line is-down is-dashed"></span>
     </div>
