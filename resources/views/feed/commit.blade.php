@@ -264,6 +264,59 @@
                     <p class="dn-composer-error" data-test="edit-error">{{ $message }}</p>
                 @enderror
 
+                {{-- The images on this row, and the way to change them.
+                     An edit is text-first, but a post whose picture is wrong is
+                     a post that is wrong, so the editor carries the same media
+                     controls the composer does. Removing writes immediately
+                     (the bytes are on the disk and the row knows them); adding
+                     borrows the composer's one file field rather than opening a
+                     second, which is why the button dispatches an event instead
+                     of holding an input. --}}
+                <ul class="dn-edit-media" data-test="edit-media">
+                    @foreach ($this->editingMedia as $attachment)
+                        <li class="dn-edit-media-item">
+                            <img
+                                src="{{ $attachment->url() }}"
+                                alt="{{ $attachment->alt() }}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                            <button
+                                type="button"
+                                class="dn-composer-media-remove dn-edit-media-remove"
+                                wire:click="removeEditMedia({{ $attachment->id }})"
+                                wire:loading.attr="disabled"
+                                wire:target="removeEditMedia"
+                                aria-label="{{ __('Remove this image') }}"
+                                data-test="edit-remove-media"
+                            >
+                                <x-feed.icon name="close" :size="12" />
+                            </button>
+                        </li>
+                    @endforeach
+
+                    <li class="dn-edit-media-item is-add">
+                        <button
+                            type="button"
+                            class="dn-edit-media-add"
+                            x-on:click="$dispatch('composer-attach-requested')"
+                            aria-label="{{ __('Add an image to this post') }}"
+                            title="{{ __('Add an image') }}"
+                            data-test="edit-add-media"
+                        >
+                            <x-feed.icon name="image" :size="14" />
+                            <span>{{ __('Add image') }}</span>
+                        </button>
+                    </li>
+                </ul>
+
+                {{-- The upload refusal, in the same slot the composer uses. A
+                     per-file rule fails as `uploads.0`, so the bare key would
+                     render nothing and the file would vanish unexplained. --}}
+                @if ($message = $errors->first('uploads.*') ?: $errors->first('uploads'))
+                    <p class="dn-composer-error" data-test="edit-media-error">{{ $message }}</p>
+                @endif
+
                 <div class="dn-edit-actions">
                     <span class="dn-edit-hint">{{ __('Editing :hash', ['hash' => $commit['hash']]) }}</span>
                     <button

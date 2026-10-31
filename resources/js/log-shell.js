@@ -237,7 +237,26 @@ document.addEventListener('alpine:init', () => {
         link: '',
         key: `dn.stash.${options.userId}`,
 
+        /*
+         * The component's root, captured once.
+         *
+         * `this.$el` is only trustworthy while a method is called *directly*
+         * from an Alpine expression: Alpine evaluates `x-on:click="paste()"`
+         * against the element's scope, so `this.$el` is the element that owns
+         * the handler. Cross an `await` and that binding is gone — the
+         * continuation is handed the raw receiver, which for `paste()` is the
+         * paste *button*. Every method below that resumes after an `await`
+         * (`paste`, `onPaste`) then reads `this.$el.querySelector(…)` inside a
+         * button, finds nothing, and returns at the null guard in silence.
+         *
+         * So the root is taken from `init()`, which Alpine calls synchronously
+         * with the correct scope, and every lookup goes through it.
+         */
+        root: null,
+
         init() {
+            this.root = this.$el;
+
             const stashed = window.localStorage.getItem(this.key) ?? '';
 
             if (stashed !== '') {
@@ -245,6 +264,12 @@ document.addEventListener('alpine:init', () => {
                 this.measure(stashed);
                 this.restored = true;
             }
+
+            this.listenForAttachRequests();
+        },
+
+        destroy() {
+            window.removeEventListener('composer-attach-requested', this.attachRequestHandler);
         },
 
         measure(value) {
@@ -278,13 +303,18 @@ document.addEventListener('alpine:init', () => {
          * transfer and `updatedUploads` stages it exactly as if the picker had
          * been used.
          *
-         * Non-image clipboard payloads (a string, plain text) are deliberately
-         * dropped: the disk and the validator both accept images only, so
-         * forwarding them would buy a round trip and an error message.
+         * A non-image clipboard payload (a string, plain text) is not forwarded:
+         * the disk and the validator both accept images only, so sending it
+         * would buy a round trip and an error message. But it does not vanish
+         * either — the picker opens, which is also what happens when the
+         * Clipboard API is missing or permission is refused. Every branch of
+         * this method ends in the image being attached or the reader being
+         * offered a way to attach one, because the alternative is a button that
+         * appears to do nothing.
          */
         async paste() {
             if (! navigator.clipboard?.read) {
-                this.openPicker();
+                this.openPicker('image/jpeg,image/png,image/webp,image/gif');
 
                 return;
             }
@@ -296,7 +326,7 @@ document.addEventListener('alpine:init', () => {
             } catch {
                 // Permission denied, or the document is not focused. Fall back
                 // to the picker rather than doing nothing.
-                this.openPicker();
+                this.openPicker('image/jpeg,image/png,image/webp,image/gif');
 
                 return;
             }
@@ -310,10 +340,37 @@ document.addEventListener('alpine:init', () => {
                     continue;
                 }
 
-                const blob = await item.getType(type);
-                const extension = (type.split('/')[1] ?? 'png').replace('jpeg', 'jpg');
+                /*
+                 * One unreadable item must not lose the ones around it. The
+                 * clipboard can hold several entries and a browser is within
+                 * its rights to refuse a single `getType` — a screenshot that
+                 * the page is not allowed to decode, or an entry another app
+                 * owns. The old loop let that throw out of the whole function,
+                 * so an image the reader *did* have on the clipboard was dropped
+                 * because a different entry could not be read.
+                 */
+                try {
+                    const blob = await item.getType(type);
+                    const extension = (type.split('/')[1] ?? 'png').replace('jpeg', 'jpg');
 
-                files.push(new File([blob], `pasted-${Date.now()}.${extension}`, { type }));
+                    files.push(new File([blob], `pasted-${Date.now()}-${files.length}.${extension}`, { type }));
+                } catch {
+                    continue;
+                }
+            }
+
+            /*
+             * Nothing image-shaped was on the clipboard, so the button opens the
+             * picker. The refusal path above already falls back for the same
+             * reason: a reader who pressed "paste" wants an image attached, and
+             * the one thing this must never do is return in silence. Before the
+             * fix a clipboard holding text gave a button that looked broken —
+             * no image, no message, no picker.
+             */
+            if (files.length === 0) {
+                this.openPicker('image/jpeg,image/png,image/webp,image/gif');
+
+                return;
             }
 
             this.stage(files);
@@ -390,7 +447,13 @@ document.addEventListener('alpine:init', () => {
          * bytes enter, and the validator remains the thing that decides.
          */
         openPicker(accept = null) {
-            const picker = this.$el.querySelector('[data-composer-picker]');
+            /*
+             * Resolved through `root`, not `this.$el`: the caller may have
+             * resumed after an `await` (see `root`), in which case `this.$el`
+             * is whichever element the expression was bound to.
+             */
+            const host = this.root ?? this.$el;
+            const picker = host === null ? null : host.querySelector('[data-composer-picker]');
 
             if (picker === null) {
                 return;
@@ -401,6 +464,48 @@ document.addEventListener('alpine:init', () => {
             }
 
             picker.click();
+        },
+
+        /*
+         * Let a control outside this component open the same picker.
+         *
+         * The inline editor lives in its own `<form>` inside a commit row, far
+         * from the composer's Alpine scope, and its "add an image" button must
+         * not become a second file field — the one field is what makes the
+         * upload state a single property with a single validating hook. So the
+         * editor asks for the picker rather than owning one, over the window
+         * event bus Livewire and Alpine already share.
+         *
+         * The event carries no destination. `updatedUploads` decides where the
+         * bytes land from whether an editor is open, so a caller cannot aim an
+         * upload at a row it does not own by dispatching with a crafted detail.
+         */
+        listenForAttachRequests() {
+            /*
+             * Bound to `window`, not to the composer's own root.
+             *
+             * The editor is a sibling of the composer, not a descendant, so a
+             * `$dispatch` from its Add button bubbles to `<body>` and never
+             * reaches a listener on the composer's element — the control looked
+             * wired and did nothing. `window` is the one node both share.
+             *
+             * The handler is bound explicitly: `addEventListener` calls it
+             * without a receiver, so a bare method reference would arrive with
+             * `this` = `window`, `this.openPicker` would be `undefined`, and the
+             * click would throw into the console where nobody looks. Alpine only
+             * supplies the component as `this` for a call it evaluates itself.
+             */
+            this.attachRequestHandler = this.attachRequestHandler.bind(this);
+
+            window.addEventListener('composer-attach-requested', this.attachRequestHandler);
+        },
+
+        /*
+         * A stable reference so `destroy()` can unbind the exact listener
+         * `listenForAttachRequests()` added. An inline arrow cannot be removed.
+         */
+        attachRequestHandler() {
+            this.openPicker('image/jpeg,image/png,image/webp,image/gif');
         },
 
         togglePreview() {

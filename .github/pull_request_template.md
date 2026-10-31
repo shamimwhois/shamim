@@ -1,6 +1,8 @@
 <!--
   Fill this in. Delete any heading you cannot answer — an unanswered heading is
-  better than a filled-in box that says nothing. See docs/CODE-REVIEW-STANDARD.md.
+  better than a filled-in box that says nothing. See docs/CODE-REVIEW-STANDARD.md
+  for the process, docs/REVIEW-CHECKLISTS.md for the per-seam procedure, and
+  docs/CODING-STANDARDS.md for the conventions.
 -->
 
 ## What this does
@@ -21,6 +23,7 @@
 - [ ] PHP ↔ write path / Action (§5.1)
 - [ ] Ledger ↔ count (§5.2) — **any new interactive count**
 - [ ] PHP ↔ Livewire wire protocol (§6.1) — **any `wire:submit` / `wire:click` / `wire:target`**
+- [ ] Alpine `this` binding (§6.1a) — **any `await`, `addEventListener`, or `#[Computed]`**
 - [ ] Blade ↔ Alpine / component structure (§6.2–6.4)
 - [ ] CSS ↔ cascade / `--dn-*` tokens (§7.1–7.2)
 - [ ] CSS ↔ geometry contract read by PHP (§7.4) — **run the named test**
@@ -56,6 +59,7 @@
 - [ ] `npm run build` green — required if any `.css` / `.js` / Blade changed
 - [ ] `git ls-files --eol | grep -v 'lf$'` prints nothing
 - [ ] Self-reviewed the diff in the GitHub UI, not the editor
+- [ ] If a `⚡` file changed: `pint --test` run **by explicit path** (discovery skips `⚡`)
 
 <!--
   Livewire only: if this adds or changes a form's primary verb, click it in a real
@@ -64,6 +68,7 @@
 -->
 - [ ] If a `wire:submit` is involved: verified in a browser, not only in a test
 - [ ] If a geometry contract was edited: the named test in §7.4 was run
+- [ ] If a fix is involved: mutation-tested (reintroduced the bug → test failed → restored)
 
 ## Reviewer notes
 

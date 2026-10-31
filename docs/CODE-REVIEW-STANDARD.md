@@ -5,6 +5,13 @@
 and has been reviewed against the checklists in §5–§7.
 **Owner:** the reviewer named on the pull request. See §4 for what that role owns.
 
+> **Companion documents.** `docs/CODING-STANDARDS.md` records *how code is written*
+> (conventions, craft, the four seams); `docs/REVIEW-CHECKLISTS.md` is the
+> *step-by-step review procedure* with per-seam checklists. This document owns the
+> gate model, the process and the severity taxonomy that both of them reference.
+> When a rule needs to be enforced, it belongs in one of those two; this file should
+> not accumulate checklists.
+
 > This document does not restate Laravel or Livewire documentation. It records the
 > rules *this* codebase needs, drawn from bugs that actually shipped here. Every
 > rule below cites the failure it prevents, because a rule without a failure story
@@ -47,38 +54,33 @@ Three layers. **A layer may only cover what the layers below it cannot.**
 
 Run all of them with **`composer test`** (not `composer ci:check` — see §3.1).
 
-**Baseline (2026-10-30):** `1722 passed, 13 skipped (7310 assertions)`. The 13 skips
-are all one cause — `FeedMediaTest` needs the GD extension, which is absent on the
+**Baseline (2026-11-01):** `1774 passed, 16 skipped (7484 assertions)`. The skips are
+all one cause — certain media/image tests need the GD extension, which is absent on the
 development machine. **A skip must carry a reason.** `requiresGd()` is acceptable;
 a deleted test is not.
 
-**PHPStan honesty rule.** PHPStan currently reports **761 errors across 280 files**,
-so it cannot function as a pass/fail gate today. The previous explanation — "a cold
-run reports ~760 errors from the abandoned `Conversation`/`Message` port, a warm one
-is clean" — **is wrong.** Verified 2026-10-30:
+**PHPStan honesty rule.** PHPStan currently reports **525 errors**, and that number is
+the accepted baseline — a change must not raise it. It cannot function as a
+pass/fail gate on the absolute count, because the errors are pre-existing.
 
 | Identifier | Count | Meaning |
 |---|---|---|
-| `method.notFound` | 260 | Calls to methods that do not exist |
-| `class.notFound` | 232 | References to classes that do not exist |
-| `property.notFound` | 115 | Reads of properties that do not exist |
-| `larastan.relationExistence` | 28 | A relation used in a query is not defined |
-| `identical.alwaysFalse` | 25 | A comparison that can never be true |
+| `method.notFound` | — | Calls to methods that do not exist |
+| `class.notFound` | — | References to classes that do not exist |
+| `property.notFound` | — | Reads of properties that do not exist |
+| `larastan.relationExistence` | — | A relation used in a query is not defined |
+| `identical.alwaysFalse` | — | A comparison that can never be true |
 
-By directory: `app/Http/Controllers` 236 errors / 76 files, `app/Actions` 129 / 44,
-`app/Http` (other) 129 / 75, `app/Models` 49 / 21, `app/Services` 53 / 10.
-
-The errors are **real and they are dead code.** For example `PageMetadata` calls
-`$user->nameWithHandle()` and `User::mention()`; neither method exists anywhere in
-`app/`. `PageMetadata` is injected into `AboutController`, `AppController`,
-`BrandController`, `CommitController` and others — and **every one of those
-controllers is referenced by zero routes.** The application routes through Livewire
-single-file components instead. There are 134 files in `app/Http/Controllers` for
-109 `Route::` calls that touch a few of them.
+The errors are mostly **dead code** in the unrouted controller tree. `PageMetadata`,
+for example, calls `$user->nameWithHandle()` and `User::mention()`; neither method
+exists anywhere in `app/`. `PageMetadata` is injected into `AboutController`,
+`AppController`, `BrandController`, `CommitController` and others — and **every one of
+those controllers is referenced by zero routes.** The application routes through
+Livewire single-file components instead.
 
 So these are not live 500s — but they are also not something to ignore, because they
-make PHPStan's total meaningless. Until the unrouted controller tree is deleted or
-repaired, **the only safe use of PHPStan is per-file:**
+make PHPStan's total meaningless as a gate. **The only safe use of PHPStan is
+per-file:**
 
 ```bash
 php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress 2>&1 | grep -i "your/changed/file"
@@ -405,6 +407,27 @@ S4 is at the primary reviewer's discretion. `nit` never blocks.
       A trigger that is also a button must not carry `wire:navigate` — the navigator
       walks and the handler never fires (`aria-expanded` stays `false`, no error).
 
+### 6.1a Alpine `this` binding (S2, always)
+
+`this` is the component only for a call Alpine evaluates **itself**. Two shapes lose it,
+and both fail silently:
+
+- [ ] **A method that resumes after an `await` must not read `this.$el`.** The
+      continuation is handed the raw receiver — for `paste()` that is the paste
+      *button*. `openPicker()` then queried inside the button, found nothing, and
+      returned at its null guard: a wired-looking button that did nothing.
+      **Capture the root in `init()` (`this.root = this.$el`) and read through it.**
+- [ ] **A function passed to `addEventListener` is called with no receiver.**
+      `window.addEventListener('evt', this.handler)` arrives with `this` = `window`, so
+      `this.openPicker` is `undefined`. **`bind(this)` once, store the bound reference,
+      and remove it in `destroy()`** (an inline arrow cannot be removed).
+- [ ] **A cross-scope event is bound where both scopes meet.** The inline editor is a
+      **sibling** of the composer, not a descendant, so a `$dispatch` from its Add
+      button bubbles to `<body>` and never reaches a listener on the composer's
+      element. Bind on **`window`**.
+- [ ] **A `#[Computed]` property is `unset()` wherever its rows change** — otherwise
+      the previous row's data renders under the new row's controls.
+
 ### 6.2 Component structure
 
 - [ ] **One root element per component.** Livewire requires it.
@@ -616,7 +639,8 @@ Copy this into the PR when rejecting.
    guard; a permission check outside the enum/route mechanism.
 2. **S2** — a wire verb naming a magic or non-existent action; a duplicate CSS class;
    a `--dn-*` token resolved outside `.dn`; two absolutely-anchored siblings; a
-   geometry contract edited without its test.
+   geometry contract edited without its test; `this.$el` read after an `await` or in a
+   bare listener; a cross-scope event listened for on the wrong element.
 3. **S3** — positional arguments past ~4 parameters (`LogRow::make()` takes named
    arguments because a 7-arg call once put the report and poll arrays into
    `$lastVisitId`/`$interludeAfter`); a factory randomising the axis under test.
@@ -624,6 +648,9 @@ Copy this into the PR when rejecting.
 5. Red `composer test`, with the output pasted.
 6. A `phpstan.neon` `ignoreErrors` entry added to hide a new error.
 7. A deleted test without approval.
+8. An upload hook clearing its batch on the success path only, or before `validate()`;
+   a per-file error slot written `@error('uploads')`.
+9. A `⚡` file claimed Pint-clean without an explicit-path `pint --test` run.
 
 ---
 
@@ -642,8 +669,8 @@ a change. Each was a decision, and the reasoning is recorded.
 | The abandoned `Conversation`/`Message` port is still in the tree | Untracked, unmigrated; the live page runs on `Remote`/`RemoteMessage`. Do not mix the two |
 | `SilencedActorQuery` is built and barely called | A known open item, not a defect to be discovered in review |
 | `config/portfolio.php` has four `/example/…` GitHub URLs | Live dead links until the owner supplies real repos — known, not a surprise |
-| 13 skipped tests | All one cause: GD is absent on the development machine |
-| PHPStan reports 761 errors | Pre-existing dead code in unrouted controllers (§2). Do not widen `ignoreErrors` to hide a *new* one |
+| 16 skipped tests | All one cause: GD is absent on the development machine |
+| PHPStan reports 525 errors | Pre-existing dead code in unrouted controllers (§2). Do not widen `ignoreErrors` to hide a *new* one |
 | 134 files in `app/Http/Controllers` for a Livewire-routed app | The unrouted tree is the source of most PHPStan errors; deleting it is a known, unstarted cleanup |
 | 28 `⚡` components fail Pint | Discovery skips them entirely (§3.4); reformatting is a pending team decision |
 

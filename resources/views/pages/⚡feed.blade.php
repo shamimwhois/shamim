@@ -433,11 +433,49 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     }
 
     /**
+     * The images already on the row the editor has open.
+     *
+     * A separate reading from {@see stagedMedia()} on purpose. A staged file is
+     * keyed by the composer's temp key and has no post; an edit's file belongs
+     * to a post that already exists, and the two lists are never both live — the
+     * editor and the composer cannot be open at once. Reading them through one
+     * accessor would mean guessing which one the caller meant from whatever
+     * happened to be set.
+     *
+     * Only read while the editor is open, so the query is paid for by the one
+     * row being edited and not by every row on the page.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\FeedAttachment>
+     */
+    #[Computed]
+    public function editingMedia(): \Illuminate\Support\Collection
+    {
+        $reader = $this->reader();
+
+        if ($reader === null || $this->editingId === null) {
+            return \Illuminate\Support\Collection::make();
+        }
+
+        return \App\Models\FeedAttachment::query()
+            ->where('feed_post_id', $this->editingId)
+            ->where('user_id', $reader->id)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * Store what Livewire has just finished transferring.
      *
      * Files are staged before any row exists — that is what the temp key is
      * for — and claimed by the write. A file the disk refuses is reported by
      * the action and never reaches the grid.
+     *
+     * The same property feeds two surfaces, because there is only ever one real
+     * file field on the page: with the editor open a pick lands on the row being
+     * edited, and otherwise it stages for the next commit. Both go through
+     * {@see AttachFeedMedia}, so the bytes are read back from the disk once, in
+     * one place, whichever destination they are heading for.
      */
     public function updatedUploads(): void
     {
@@ -469,6 +507,10 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
          */
         $files = collect($this->uploads ?? [])->filter()->values()->all();
 
+        // Which row is the destination. An open editor takes the pick; with no
+        // editor this is a fresh post and the file stages under the temp key.
+        $post = $this->editingId !== null ? $this->editablePost() : null;
+
         try {
             if ($files === []) {
                 return;
@@ -483,8 +525,15 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
              * staged images plus eight more would sail through as two legal
              * batches and publish sixteen. The modal composer has always
              * checked the total; this path did not.
+             *
+             * The count is whatever the destination already holds: staged rows
+             * for a new post, the row's own attachments for an edit. Reading
+             * only the staged list would let an edit take a post already at the
+             * cap up to the cap *again*.
              */
-            if ($this->stagedMedia->count() + count($files) > $cap) {
+            $existing = $post !== null ? $this->editingMedia->count() : $this->stagedMedia->count();
+
+            if ($existing + count($files) > $cap) {
                 $this->addError('uploads', __('A post can carry at most :count images.', ['count' => $cap]));
 
                 return;
@@ -506,16 +555,48 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 'uploads.*.dimensions' => __('That image is too small or too large to attach.'),
             ]);
 
-            if ($this->tempKey === '') {
-                $this->tempKey = (string) Str::uuid();
-            }
+            if ($post !== null) {
+                app(AttachFeedMedia::class)->handle($post, $reader, $files);
+            } else {
+                if ($this->tempKey === '') {
+                    $this->tempKey = (string) Str::uuid();
+                }
 
-            app(AttachFeedMedia::class)->handle(null, $reader, $files, $this->tempKey);
+                app(AttachFeedMedia::class)->handle(null, $reader, $files, $this->tempKey);
+            }
         } finally {
             $this->uploads = null;
         }
 
-        unset($this->stagedMedia);
+        unset($this->stagedMedia, $this->editingMedia);
+
+        // The row carries the images it renders, and that list was read with the
+        // page. An edit that changes the count has to drop it or the card shows
+        // the images it had before the pick landed.
+        if ($post !== null) {
+            unset($this->commits, $this->rows);
+        }
+    }
+
+    /**
+     * The row the open editor is allowed to write to, or nothing.
+     *
+     * Ownership is re-established here rather than trusted from `editingId`,
+     * for the same reason every other wire action does it: the id arrives from
+     * the browser, so a caller who is not the author must not be able to reach
+     * the row by naming it. `openEdit()` already checks this, but an edit left
+     * open while the page re-renders is not a guarantee about the request that
+     * is arriving now.
+     */
+    private function editablePost(): ?FeedPost
+    {
+        $reader = $this->reader();
+
+        if ($reader === null || $this->editingId === null) {
+            return null;
+        }
+
+        return FeedPost::query()->visible()->where('user_id', $reader->id)->find($this->editingId);
     }
 
     /**
@@ -555,6 +636,42 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         app(DetachFeedMedia::class)->handle($attachment);
 
         unset($this->stagedMedia);
+    }
+
+    /**
+     * Delete one image from the row the editor has open.
+     *
+     * The sibling of {@see removeMedia()}, and deliberately its own method: that
+     * one is scoped to the composer's `temp_key` and cannot reach a file that
+     * belongs to a post, which is the whole point of the split. The scope here
+     * is the *edited post*, re-read through {@see editablePost()} so the id the
+     * browser sent is checked against ownership before anything is deleted —
+     * and an attachment id is not trusted to imply its own parent either, which
+     * is why the query filters on the post rather than looking the row up by id
+     * and checking `feed_post_id` afterwards.
+     *
+     * The file is gone from the disk as well as the row: an image the author
+     * removed must not stay reachable at the URL it used to have.
+     */
+    public function removeEditMedia(int $id): void
+    {
+        $post = $this->editablePost();
+
+        if ($post === null) {
+            return;
+        }
+
+        $attachment = \App\Models\FeedAttachment::query()
+            ->where('feed_post_id', $post->id)
+            ->find($id);
+
+        if ($attachment === null) {
+            return;
+        }
+
+        app(DetachFeedMedia::class)->handle($attachment);
+
+        unset($this->editingMedia, $this->commits, $this->rows);
     }
 
     /**
@@ -743,6 +860,8 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         $this->threadId = null;
         $this->replyTo = null;
         $this->replyDraft = '';
+
+        unset($this->editingMedia);
     }
 
     /** Put the editor away without writing anything. */
@@ -750,6 +869,13 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
     {
         $this->editingId = null;
         $this->editDraft = '';
+
+        // An upload still in flight when the editor closes would otherwise land
+        // on whichever row is edited next, because the destination is read from
+        // `editingId` at the moment the hook runs. Drop it with the editor.
+        $this->uploads = null;
+
+        unset($this->editingMedia);
     }
 
     /**
@@ -796,7 +922,7 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         $this->editingId = null;
         $this->editDraft = '';
 
-        unset($this->commits, $this->rows, $this->stats);
+        unset($this->commits, $this->rows, $this->stats, $this->editingMedia);
 
         $this->toast = 'amend '.CommitBody::shortHash($post->slug).' → HEAD';
     }

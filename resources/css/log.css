@@ -444,7 +444,7 @@
     background: var(--dn-primary);
     color: var(--dn-primary-ink);
     font-family: var(--dn-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 16px;
     text-align: center;
@@ -683,7 +683,7 @@
     border: 1px solid var(--dn-hairline);
     border-radius: 9999px;
     font-family: var(--dn-mono);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--dn-muted);
@@ -731,11 +731,23 @@
 }
 
 /* The header avatar is the phone's account trigger — the rail is off-screen
-   there, so this is the only way into the menu. */
+   there, so this is the only way into the menu. The circle stays 32px; the
+   trigger around it is 44px, because the target a finger has to hit is the
+   anchor, not the glyph. */
 .dn-mobile-avatar {
     display: grid;
     place-items: center;
+    width: 44px;
+    height: 44px;
     border-radius: 9999px;
+}
+
+/* The same floor for the icon buttons beside it. Scoped to the phone bar
+   rather than to `.dn-icon-btn` itself: the desktop rail is a pointer surface
+   where 36px is the right row density. */
+.dn-mobile-actions .dn-icon-btn {
+    width: 44px;
+    height: 44px;
 }
 
 .dn-mobile-bar {
@@ -1904,6 +1916,67 @@
     color: var(--dn-muted);
 }
 
+/* --- The editor's images --------------------------------------------------
+   The same tile as the composer's staged grid, so an image looks like the same
+   object wherever it is being managed, plus one tile that is a control rather
+   than a picture: the way to add another. The add tile sits in the flow at the
+   end of the row, so an empty editor shows it alone and a full one pushes it
+   along without a special case. */
+.dn-edit-media {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.dn-edit-media-item {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    overflow: hidden;
+    border: 1px solid var(--dn-hairline);
+    border-radius: var(--dn-radius-sm);
+    background: var(--dn-wash);
+}
+
+.dn-edit-media-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* The add tile is the same box, drawn as a dashed outline so it reads as an
+   empty slot rather than a picture that failed to load. */
+.dn-edit-media-item.is-add {
+    border-style: dashed;
+    background: transparent;
+}
+
+.dn-edit-media-add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--dn-muted);
+    font-family: var(--dn-mono);
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.dn-edit-media-add:hover {
+    background: var(--dn-wash);
+    color: var(--dn-primary);
+}
+
 /* --- Replies -------------------------------------------------------------- */
 
 .dn-thread {
@@ -2588,7 +2661,7 @@
 }
 
 .dn-chip-count {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--dn-muted);
     font-variant-numeric: tabular-nums;
 }
@@ -3269,6 +3342,45 @@
     border-bottom: 1px solid var(--dn-hairline);
 }
 
+/* The same rule-and-label motif the console's page header uses, so a page in
+   either shell opens the same way. A short rule ahead of the title, not a
+   full-width band: the hairline under the head already draws the boundary,
+   and two rules of equal weight would fight. */
+.dn-page-head::before {
+    content: '';
+    flex: none;
+    align-self: center;
+    width: 14px;
+    height: 1px;
+    background: var(--dn-rail);
+}
+
+/* /feed has no visible page title — its tab strip is the head — so the motif
+   is carried by a label-and-rule line above the tabs. Decorative for the
+   screen reader: the real `h1` is the sr-only one beside it. */
+.dn-head-rule {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 0;
+}
+
+.dn-head-rule-label {
+    flex: none;
+    font-family: var(--dn-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dn-muted);
+}
+
+.dn-head-rule-line {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--dn-hairline);
+}
+
 .dn-page-title {
     font-size: 16px;
     font-weight: 600;
@@ -3452,8 +3564,16 @@
 
 .dn-filter {
     position: relative;
+    display: inline-flex;
+    align-items: center;
     flex: none;
-    padding: 8px 10px 10px;
+    /* 44px is the touch floor the brief sets (§6) and this class is both the
+       log's filter chip and the settings tab strip — the two most-tapped
+       controls on a phone. The box grew; the type did not. `min-height` needs
+       a flex/inline-flex display to apply at all, which is why the display
+       is declared here rather than left inline. */
+    min-height: 44px;
+    padding: 0 10px;
     font-size: 14px;
     font-weight: 500;
     color: var(--dn-muted);
@@ -4107,6 +4227,69 @@
     .dn-thread-back {
         display: grid;
     }
+
+    /* The composer's controls are a touch surface on a phone, so they take the
+       same 44px floor the phone bar already uses — the desktop density of 36px
+       is a pointer decision, and `@media (hover: none)` cannot see it because a
+       small window on a laptop is still a pointer.
+
+       `flex: none` is load-bearing, not tidiness: the tools group is
+       `flex: 1 1 0` and absorbs the row's slack, so a button left at its
+       default `0 1 auto` is what gives the slack back — the measured result
+       was 44px tall and 21px wide. A touch floor has to hold on both axes. */
+    .dn-composer-tools .dn-icon-btn,
+    .dn-composer-tools .dn-composer-more {
+        flex: none;
+    }
+
+    .dn-composer .dn-icon-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Four 44px buttons plus their gaps is ~190px, which fits the row on the
+       narrowest phone the design targets — so the cluster keeps all four
+       rather than hiding one behind the overflow menu. */
+    .dn-composer-tools {
+        gap: 4px;
+    }
+
+    /* The send corner and the two inline verbs. `dn-btn-send` already declares
+       a min-width, so only the height needs raising; the poll's add button and
+       the editor's cancel are text and icon buttons that sat at 27px. */
+    .dn-composer .dn-btn-send,
+    .dn-composer-poll__add,
+    .dn-composer .dn-btn-sm {
+        min-height: 44px;
+    }
+
+    /* The schedule row's field. It is the thing "Go live at" points at, so its
+       own box is the target — 26px of padding and 12px type is a pointer
+       measurement, and a datetime field is exactly the control a thumb has to
+       land on precisely. */
+    .dn-composer-schedule-input {
+        min-height: 44px;
+    }
+
+    /* The editor's own controls. Its remove badge is a 20px corner dot, which
+       is a pointer affordance: on a phone the whole tile becomes the target for
+       removal instead, because a 20px dot in the corner of a 72px tile is a
+       miss waiting to happen. The add tile is already 72px, so it clears the
+       floor on both axes without help. */
+    .dn-edit-media-remove {
+        top: 0;
+        right: 0;
+        width: 44px;
+        height: 44px;
+        border-radius: 0 0 0 var(--dn-radius-sm);
+    }
+
+    .dn-edit .dn-btn-sm {
+        min-height: 44px;
+    }
+
+    /* A label or a paragraph is not a target — `min-height` on the poll's
+       "Choices" heading would open a gap above the first input for nothing. */
 }
 
 .dn-thread-who {
@@ -5555,7 +5738,7 @@
 .dn-nav-group-label {
     padding: 0 16px 2px;
     font-family: var(--dn-mono);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--dn-muted);
@@ -5586,7 +5769,7 @@
 
 .dn-module-stat-label {
     font-family: var(--dn-mono);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--dn-muted);
@@ -6105,7 +6288,7 @@
     top: 8px;
     right: 12px;
     font-family: var(--dn-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
