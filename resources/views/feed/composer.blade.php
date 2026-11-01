@@ -92,9 +92,10 @@
                     wire:model="draft"
                     x-on:input="onInput($event)"
                     x-on:paste="onPaste($event)"
+                    x-on:pointerup="rememberSize()"
                     x-on:keydown.meta.enter.prevent="$el.form.requestSubmit()"
                     x-on:keydown.ctrl.enter.prevent="$el.form.requestSubmit()"
-                    rows="1"
+                    rows="4"
                     maxlength="{{ $max }}"
                     placeholder="{{ __('What did you ship?') }}"
                     autocomplete="off"
@@ -125,7 +126,16 @@
                      `AttachFeedMedia::ACCEPTED_MIMES` is images only, and the
                      component validates `uploads.*` as `image|mimes:jpg,jpeg,
                      png,webp,gif`, so the picker opens pre-filtered to those
-                     and a refusal is the validator's, not a dead control's. --}}
+                     and a refusal is the validator's, not a dead control's.
+
+                     `data-max-bytes` is the other half of that promise and the
+                     one that was missing. `accept` narrows by type but says
+                     nothing about size, so a reader could pick a file the
+                     server's PHP would discard before any validator ran, and
+                     the only feedback was a transfer failure after the wait.
+                     The value comes from `UploadLimits`, which reads the
+                     running PHP, so it is a ceiling the process will honour
+                     rather than the larger number the app would prefer. --}}
                 <div class="dn-composer-tools" data-test="composer-tools">
                     <input
                         type="file"
@@ -134,6 +144,7 @@
                         wire:model="uploads"
                         multiple
                         accept="image/jpeg,image/png,image/webp,image/gif"
+                        data-max-bytes="{{ $maxUploadBytes }}"
                         class="sr-only"
                         tabindex="-1"
                         aria-hidden="true"
@@ -407,14 +418,27 @@
             {{-- Any upload refusal, whichever key it landed on.
                  `uploads` is the slot for a refusal the hook raises itself (the
                  post-wide cap, a transfer that never arrived), but a per-file
-                 rule — `image`, `mimes`, `dimensions` — fails as `uploads.0`,
-                 `uploads.1`, and so on. Only the bare key was rendered, so the
-                 most likely refusal of all, an undersized or wrong-format
-                 image, dropped the file and said nothing. `$errors->first()`
-                 with a wildcard covers both without a second write path. --}}
-            @if ($message = $errors->first('uploads.*') ?: $errors->first('uploads'))
-                <p class="dn-composer-error" data-test="composer-media-error">{{ $message }}</p>
-            @endif
+                 rule — `image`, `mimes`, `max`, `dimensions` — fails as
+                 `uploads.0`, `uploads.1`, and so on. Only the bare key was
+                 rendered, so the most likely refusal of all, an undersized or
+                 wrong-format image, dropped the file and said nothing.
+                 `$errors->first()` with a wildcard covers both without a second
+                 write path.
+
+                 The element is rendered even when there is no error, because
+                 the size check in `stage()` decides in the browser and needs a
+                 place to say so. It is the *same* element either way: one
+                 reporting surface, filled from the server on a refusal the
+                 server made and from the client on one the client caught
+                 before the bytes left. `hidden` is toggled rather than the node
+                 added, so the Alpine component never has to create DOM it does
+                 not own. --}}
+            <p
+                class="dn-composer-error"
+                data-test="composer-media-error"
+                data-composer-media-error
+                @if (! ($message = $errors->first('uploads.*') ?: $errors->first('uploads'))) hidden @endif
+            >{{ $message }}</p>
         </div>
     </div>
 </form>

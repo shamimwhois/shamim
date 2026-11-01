@@ -14,6 +14,7 @@ use App\Models\FeedStar;
 use App\Models\User;
 use App\Support\CommitBody;
 use App\Support\Seo;
+use App\Support\UploadLimits;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
@@ -539,19 +540,51 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
                 return;
             }
 
+            /*
+             * The cap the reader is held to is the smallest one in the stack.
+             *
+             * Three limits bound an upload and, before this, they disagreed by
+             * an order of magnitude: PHP's `upload_max_filesize`, this app's
+             * own advertised cap, and Livewire's framework gate. Only the
+             * middle one is a promise made to a reader, and a promise larger
+             * than the process can keep is a lie the reader pays for with a
+             * failed upload — PHP drops the file before Livewire or this
+             * validator ever sees it, and the refusal arrives as a bare
+             * transfer failure naming a property path.
+             *
+             * So the advertised number is clamped to what this process will
+             * actually accept. `config/feed.php` keeps the intent; the running
+             * PHP setting is the ceiling; the effective limit is whichever is
+             * smaller, and it is the one both the message and the picker use.
+             */
+            $maxKilobytes = min(
+                (int) config('feed.composer.max_upload_kilobytes', 8192),
+                (int) floor(UploadLimits::effectiveBytes() / 1024),
+            );
+
             $this->validate([
                 'uploads' => ['array', 'max:'.$cap],
                 'uploads.*' => [
                     'image',
                     'mimes:jpg,jpeg,png,webp,gif',
-                    'max:'.(int) config('feed.composer.max_upload_kilobytes', 8192),
+                    'max:'.$maxKilobytes,
                     // A 1×1 transparent PNG is a valid image and a useless one,
                     // and a 12000 px panorama will blow the card layout. The
                     // modal has always refused both; this path accepted them.
                     'dimensions:min_width=16,min_height=16,max_width=6000,max_height=6000',
                 ],
             ], [
+                // Every rule declared on `uploads.*` needs a message, because
+                // each one keys its failure to the *field* — `uploads.0` — and
+                // Laravel's generated text puts that path in the sentence. The
+                // panel shows one line, and whichever rule lands first is the
+                // one a reader reads, so an undeclared rule is a live wire
+                // rather than a harmless extra.
                 'uploads.*.image' => __('Only image files can be attached to a post.'),
+                'uploads.*.mimes' => __('Only image files can be attached to a post.'),
+                'uploads.*.max' => __('That image is larger than :size, the most a post can carry.', [
+                    'size' => UploadLimits::human($maxKilobytes),
+                ]),
                 'uploads.*.dimensions' => __('That image is too small or too large to attach.'),
             ]);
 
@@ -1584,6 +1617,10 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
             'initials' => \App\Support\LogIdentity::initials($this->reader()->name),
             'max' => self::MAX_BODY,
             'pollMaxOptions' => $this->pollMaxOptions,
+            // The same ceiling the validator holds a reader to, derived from
+            // the running PHP rather than restated, so the picker cannot
+            // promise more than the process will accept.
+            'maxUploadBytes' => \App\Support\UploadLimits::effectiveBytes(),
         ])
     @endif
 

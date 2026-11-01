@@ -25,7 +25,22 @@ return [
         'max_title_length' => 200,
         'max_tags' => 8,
         'max_attachments' => 8,
+
+        /*
+        | `max_upload_kilobytes` is the largest image the app *wants* to take,
+        | not the largest it can. PHP's own `upload_max_filesize` and
+        | `post_max_size` bound what ever reaches application code, and a file
+        | above them is discarded before any validator runs — so the value a
+        | reader is actually held to is the smallest of the three. That
+        | effective limit is read through {@see App\Support\UploadLimits},
+        | which clamps this one down to what the running process will accept
+        | and is what both the validation message and the file picker quote.
+        |
+        | Raise the PHP settings (and this number with them) to advertise more;
+        | raising only this number changes nothing except the size of the lie.
+        */
         'max_upload_kilobytes' => 8192,
+
         'poll_min_options' => 2,
         'poll_max_options' => 6,
     ],

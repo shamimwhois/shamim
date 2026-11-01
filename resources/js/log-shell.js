@@ -238,6 +238,15 @@ document.addEventListener('alpine:init', () => {
         key: `dn.stash.${options.userId}`,
 
         /*
+         * The reader's own height for the writing box, kept apart from the
+         * draft: a size is a preference the way the rail collapse is, so it
+         * lives for the session and is re-applied on every `wire:navigate`
+         * swap rather than springing back to the default on each link. Keyed
+         * per account, because the box is theirs and not the page's.
+         */
+        sizeKey: `dn.composer-h.${options.userId}`,
+
+        /*
          * The component's root, captured once.
          *
          * `this.$el` is only trustworthy while a method is called *directly*
@@ -265,11 +274,62 @@ document.addEventListener('alpine:init', () => {
                 this.restored = true;
             }
 
+            this.restoreSize();
             this.listenForAttachRequests();
         },
 
         destroy() {
             window.removeEventListener('composer-attach-requested', this.attachRequestHandler);
+        },
+
+        /*
+         * Put back the height the reader dragged to.
+         *
+         * The height is written onto the textarea's *own* `height`, over the
+         * CSS `min-height` floor, which is what a drag leaves behind — so
+         * restoring it after a morph is the same write the drag made. A stored
+         * value outside the live guard rails is discarded rather than clamped:
+         * the rails move with the viewport, and the CSS already knows the right
+         * answer for a viewport it has not seen.
+         */
+        restoreSize() {
+            const stored = Number(window.localStorage.getItem(this.sizeKey));
+
+            if (! Number.isFinite(stored) || stored <= 0) {
+                return;
+            }
+
+            const input = this.$refs.input;
+
+            if (input === undefined) {
+                return;
+            }
+
+            const floor = parseFloat(getComputedStyle(input).minHeight) || 0;
+            const ceiling = window.innerHeight * 0.52;
+
+            if (stored >= floor && stored <= ceiling) {
+                input.style.height = `${stored}px`;
+            }
+        },
+
+        /*
+         * Remember the height a drag settled on.
+         *
+         * Bound to `pointerup` on the textarea itself: the resize gesture is
+         * the browser's, and the only signal it leaves is a changed box, so the
+         * handler reads the settled `offsetHeight` rather than tracking the
+         * drag. Reading the box instead of the pointer means a keyboard resize
+         * (`resize` via the OS) and a pointer drag are stored the same way.
+         */
+        rememberSize() {
+            const input = this.$refs.input;
+
+            if (input === undefined) {
+                return;
+            }
+
+            window.localStorage.setItem(this.sizeKey, String(Math.round(input.offsetHeight)));
         },
 
         measure(value) {
@@ -423,10 +483,32 @@ document.addEventListener('alpine:init', () => {
          * channel the panel already renders (`data-test="composer-media-error"`)
          * and a second way to say "that didn't attach" is a second thing to
          * keep in step.
+         *
+         * The size ceiling is checked here as well, and that is not a second
+         * validation rule competing with the server's — it is the same limit,
+         * read from the field the server rendered (`data-max-bytes`), applied
+         * before the bytes leave. A file PHP will discard must never be
+         * uploaded: the reader would watch a transfer that was doomed at the
+         * start and then be told the transfer failed, which names the symptom
+         * rather than the cause. Refusing locally costs nothing and says the
+         * true thing. The server still validates, so a crafted request that
+         * skips this is refused exactly as before.
          */
         stage(files) {
             if (files.length === 0) {
                 return;
+            }
+
+            const limit = this.maxUploadBytes();
+
+            if (limit !== null) {
+                const oversized = Array.from(files).filter((file) => file.size > limit);
+
+                if (oversized.length > 0) {
+                    this.showUploadError(this.oversizedMessage(limit));
+
+                    return;
+                }
             }
 
             this.$wire.uploadMultiple(
@@ -435,6 +517,66 @@ document.addEventListener('alpine:init', () => {
                 () => this.$wire.call('updatedUploads'),
                 () => this.$wire.call('reportAttachFailure'),
             );
+        },
+
+        /*
+         * The size ceiling the server rendered onto the file field.
+         *
+         * Read from the DOM rather than configured here, so the picker's
+         * promise and the validator's limit cannot drift: both come from
+         * `UploadLimits` in one request. Absent or unparseable means no local
+         * check, which leaves the server's validation as the only gate — the
+         * behaviour before this existed.
+         */
+        maxUploadBytes() {
+            const host = this.root ?? this.$el;
+            const picker = host === null ? null : host.querySelector('[data-composer-picker]');
+
+            if (picker === null) {
+                return null;
+            }
+
+            const raw = picker.getAttribute('data-max-bytes');
+
+            if (raw === null || raw === '') {
+                return null;
+            }
+
+            const bytes = Number.parseInt(raw, 10);
+
+            return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
+        },
+
+        /* A byte count rendered the way the message wants it. */
+        oversizedMessage(limit) {
+            const mb = limit / (1024 * 1024);
+            const size = Number.isInteger(mb) ? `${mb} MB` : `${mb.toFixed(1)} MB`;
+
+            return `That image is larger than ${size}, the most a post can carry.`;
+        },
+
+        /*
+         * Put a refusal in the panel without a round trip.
+         *
+         * The component owns the same slot server-side; this only reaches it
+         * earlier. `addError` on the wire would need a request for a decision
+         * the browser already made, so the message is written straight into
+         * the one element the panel renders for this purpose.
+         */
+        showUploadError(message) {
+            const host = this.root ?? this.$el;
+            const slot = host === null ? null : host.querySelector('[data-composer-media-error]');
+
+            if (slot !== null) {
+                slot.textContent = message;
+                slot.hidden = false;
+
+                return;
+            }
+
+            window.dispatchEvent(new CustomEvent('composer-upload-refused', {
+                detail: { message },
+            }));
         },
 
         /*

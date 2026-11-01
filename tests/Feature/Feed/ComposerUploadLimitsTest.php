@@ -3,6 +3,7 @@
 use App\Actions\Feed\ComposeFeedPost;
 use App\Models\FeedAttachment;
 use App\Models\User;
+use App\Support\UploadLimits;
 use Database\Seeders\FeedPostSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -337,4 +338,209 @@ it('renders the cap refusal in the panel', function (): void {
         ])
         ->assertHasErrors('uploads')
         ->assertSee('composer-media-error', escape: false);
+});
+
+/**
+ * Every refusal names its own reason, in words a reader can act on.
+ *
+ * The panel is the only place an upload problem can be reported, and it shows
+ * exactly one line. What it showed for the two most likely refusals was
+ * Laravel's generated text, which carries the *property path* the framework
+ * keys the error by — `uploads.0` — because no custom message was declared for
+ * those rules. `uploads.*.image` and `uploads.*.dimensions` were declared; the
+ * `mimes` and `max` rules on the same field were not.
+ *
+ * Measured, before the fix, for a single non-image pick:
+ *
+ *     key=uploads.0  msg=Only image files can be attached to a post.
+ *     key=uploads.0  msg=The uploads.0 field must be a file of type: jpg, …
+ *     key=uploads.0  msg=That image is too small or too large to attach.
+ *
+ * Three messages for one file, on one key. The panel renders the first, so the
+ * reader was told the right thing *and* the other two were queued behind it;
+ * anything that reordered them — or reached for a rule whose message was never
+ * declared — put a raw `uploads.0` in front of a reader. And for an oversize
+ * file (the case PHP's own ceiling makes most likely) the first message *was*
+ * the raw one.
+ *
+ * These assert on the rendered line, because the error bag was always
+ * "correct" — keyed `uploads.0`, as Laravel keys every rule on the field. The
+ * gap is in the wording, and only rendered markup shows it.
+ */
+it('never shows a reader the raw uploads.N property path', function (): void {
+    actingAs($this->reader);
+
+    $cases = [
+        'a non-image' => UploadedFile::fake()->create('notes.pdf', 8, 'application/pdf'),
+        'an undersized image' => undersizedImage(),
+    ];
+
+    foreach ($cases as $label => $file) {
+        $html = Livewire::test('pages::feed')
+            ->set('uploads', [$file])
+            ->html();
+
+        expect(str_contains($html, 'uploads.0'))->toBeFalse(
+            "{$label} rendered the property path a reader cannot act on",
+        );
+    }
+});
+
+it('names the effective size limit when a file is too large', function (): void {
+    /* The oversize path had no custom message at all, so Laravel's
+       `validation.max.file` rendered with the property path in it — the one
+       refusal a reader is most likely to meet and the one that said least.
+
+       The number in the message is the *effective* limit, not the advertised
+       one: `UploadLimits` clamps the config value down to what the running PHP
+       will accept, because a file above PHP's ceiling never reaches this
+       validator and a file below it must not be refused by words that quote a
+       figure the process cannot honour. So the test derives the expected text
+       from the same source the message does, rather than restating a constant
+       that would silently stop matching. */
+    actingAs($this->reader);
+
+    // Comfortably above whatever this process accepts, so the rule fires.
+    $bytes = UploadLimits::effectiveBytes() + (1024 * 1024);
+
+    $html = Livewire::test('pages::feed')
+        ->set('uploads', [UploadedFile::fake()->createWithContent('big.png', str_repeat("\x00", $bytes))])
+        ->html();
+
+    $expected = __('That image is larger than :size, the most a post can carry.', [
+        'size' => UploadLimits::human(UploadLimits::effectiveKilobytes()),
+    ]);
+
+    expect(str_contains($html, 'uploads.0'))->toBeFalse('the property path must not reach a reader');
+    expect(str_contains($html, $expected))->toBeTrue('the message must name the effective limit');
+});
+
+it('tells the reader the format, not the framework rule, for a wrong type', function (): void {
+    actingAs($this->reader);
+
+    $html = Livewire::test('pages::feed')
+        ->set('uploads', [UploadedFile::fake()->create('notes.pdf', 8, 'application/pdf')])
+        ->html();
+
+    // Declared once and shown once, however many rules the field trips.
+    expect(substr_count($html, __('Only image files can be attached to a post.')))->toBe(1);
+    expect(str_contains($html, 'must be a file of type'))->toBeFalse();
+});
+
+/**
+ * The composer tells the browser what it will actually take.
+ *
+ * The picker narrowed by MIME (`accept`) but said nothing about size, and the
+ * three limits in the stack disagreed by an order of magnitude: PHP stops at
+ * `upload_max_filesize` (2 MB in this environment), the app advertises
+ * `feed.composer.max_upload_kilobytes` (8 MB), and Livewire's gate allows
+ * 20 MB. A file between 2 MB and 8 MB was offered by the picker, refused by
+ * PHP before Livewire ever saw it, and reported to the reader as a transfer
+ * failure naming the property path.
+ *
+ * A client-side ceiling cannot make a large file uploadable — only PHP's own
+ * setting can, and that belongs in the deployment notes rather than in a
+ * template. What it *can* do is stop the reader before the wait: the field
+ * carries the limit, so the browser refuses what the server would, and the
+ * wait is never wasted.
+ */
+it('carries the effective size limit on the file field', function (): void {
+    /* `data-max-bytes` is what the browser check in `stage()` reads. It is the
+       effective limit, not the advertised one, and this asserts that directly:
+       a config value larger than PHP allows must not move the attribute, or
+       the picker would promise a transfer the process will discard. */
+    config(['feed.composer.max_upload_kilobytes' => 8192]);
+
+    actingAs($this->reader);
+
+    $html = Livewire::test('pages::feed')->html();
+
+    expect($html)->toContain('data-composer-picker');
+    expect($html)->toContain('data-max-bytes="'.UploadLimits::effectiveBytes().'"');
+});
+
+it('clamps the advertised cap down to what PHP will accept', function (): void {
+    /* The config value is an intent; the process is the ceiling. A cap set
+       above PHP's limit must not be quoted to a reader, because the file would
+       be dropped before any validator ran. */
+    config(['feed.composer.max_upload_kilobytes' => 999999]);
+
+    actingAs($this->reader);
+
+    $html = Livewire::test('pages::feed')
+        ->set('uploads', [undersizedImage()])
+        ->html();
+
+    $expected = __('That image is larger than :size, the most a post can carry.', [
+        'size' => UploadLimits::human(UploadLimits::effectiveKilobytes()),
+    ]);
+
+    // The oversize message names the clamped limit, never the config figure.
+    expect(UploadLimits::effectiveKilobytes())->toBeLessThan(999999);
+
+    $oversize = Livewire::test('pages::feed')
+        ->set('uploads', [
+            UploadedFile::fake()->createWithContent(
+                'big.png',
+                str_repeat("\x00", UploadLimits::effectiveBytes() + 1),
+            ),
+        ])
+        ->html();
+
+    expect(str_contains($oversize, $expected))->toBeTrue();
+    expect(str_contains($html, '999999'))->toBeFalse('the raw config figure must not reach a reader');
+});
+
+it('reads a PHP shorthand size as bytes, not as a cast', function (): void {
+    /* `ini_get` returns `php.ini` text — `2M`, not `2097152` — and `(int) '2M'`
+       is `2`. A limit check written with a bare cast is therefore a two-byte
+       limit, which is the kind of bug that looks like a working guard until
+       someone attaches a real photograph.
+
+       The parse is tested directly rather than through the live settings,
+       because `upload_max_filesize` and `post_max_size` are `PHP_INI_PERDIR`:
+       `ini_set` returns `false` for both (measured), so a test cannot move them
+       to exercise the arithmetic. Reaching for the private method instead would
+       leave the one place a two-byte limit comes from uncovered — which is why
+       the parse is public. */
+    expect(UploadLimits::parse('3M'))->toBe(3 * 1024 * 1024);
+    expect(UploadLimits::parse('2M'))->toBe(2097152);
+    expect(UploadLimits::parse('512K'))->toBe(512 * 1024);
+    expect(UploadLimits::parse('1G'))->toBe(1024 * 1024 * 1024);
+
+    // A bare number is bytes, matching PHP's own reading of the value.
+    expect(UploadLimits::parse('4096'))->toBe(4096);
+
+    // `-1` and an empty string mean unlimited, and must not become a `min()`
+    // of negative one or zero.
+    expect(UploadLimits::parse('-1'))->toBe(PHP_INT_MAX);
+    expect(UploadLimits::parse(''))->toBe(PHP_INT_MAX);
+
+    // Case and surrounding space are the `php.ini` author's, not ours.
+    expect(UploadLimits::parse(' 8m '))->toBe(8 * 1024 * 1024);
+});
+
+it('derives the effective limit from the live PHP settings', function (): void {
+    /* The value the app quotes has to come from the process, not from a
+       constant. This pins the two relationships the rest of the fix relies on:
+       byte magnitude is sane, and the kilobyte figure is the floored division
+       the validator's `max:` rule is built from. */
+    $bytes = UploadLimits::effectiveBytes();
+
+    expect($bytes)->toBeGreaterThan(0);
+    expect($bytes)->not->toBe(PHP_INT_MAX, 'this environment has a real ceiling');
+    expect(UploadLimits::effectiveKilobytes())->toBe(intdiv($bytes, 1024));
+    expect(UploadLimits::effectiveBytes())->toBeLessThanOrEqual(UploadLimits::parse((string) ini_get('upload_max_filesize')));
+    expect(UploadLimits::effectiveBytes())->toBeLessThanOrEqual(UploadLimits::parse((string) ini_get('post_max_size')));
+});
+
+it('renders a human size for every shape of ceiling', function (): void {
+    /* Whole megabytes read as megabytes, a fractional ceiling keeps its
+       fraction (1.5 MB is a real stock-PHP value and rounding it to 1 MB would
+       misstate what a reader may attach), and a sub-megabyte ceiling stays in
+       kilobytes. */
+    expect(UploadLimits::human(2048))->toBe('2 MB');
+    expect(UploadLimits::human(1024))->toBe('1 MB');
+    expect(UploadLimits::human(1536))->toBe('1.5 MB');
+    expect(UploadLimits::human(512))->toBe('512 KB');
 });
