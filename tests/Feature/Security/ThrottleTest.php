@@ -212,8 +212,13 @@ test('the two factor challenge limiter stops the sixth attempt in a minute', fun
         ])->getStatusCode();
     }
 
+    /* One needle only. `toContain` is variadic — every argument is a needle,
+       not a message — so a trailing description makes the *negative* form
+       vacuous: the assertion passes when the array contains neither the value
+       nor the description, which is always. The intent is asserted on the
+       value, and the test's own name carries the explanation. */
     expect($statuses[5])->toBe(429)
-        ->and(array_slice($statuses, 0, 5))->not->toContain(429, 'the challenge accepted a wrong code');
+        ->and(array_slice($statuses, 0, 5))->not->toContain(429);
 
     $this->assertGuest();
 });

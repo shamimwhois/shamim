@@ -49,7 +49,17 @@ class HydrateFeedPostContent
 
         $attributes['type'] = $this->type($attributes['type'] ?? null);
         $attributes['topic'] = $this->topic($attributes['topic'] ?? null);
-        $attributes['title'] = $this->title($attributes['title'] ?? null, $body);
+
+        /*
+         * Storage keeps the author's text whole and writes the headline beside
+         * it. The card is what lifts the opening line out of the body — see
+         * `feed/commit.blade.php` — so the body in the database stays the text
+         * the author typed, which is the thing the inline editor has to open
+         * holding. Lifting here instead would leave a one-line post with an
+         * empty body and an editor that opens blank.
+         */
+        $attributes['title'] = $this->subject($attributes['title'] ?? null, $body);
+
         $attributes['tags'] = $this->tags($attributes['tags'] ?? [], $attributes['topic']);
         $attributes['read_minutes'] = $this->readMinutes($body);
 
@@ -88,14 +98,35 @@ class HydrateFeedPostContent
     }
 
     /**
-     * Take the author's headline, or write one from the opening line.
+     * The headline this body alone would produce, with no authored title applied.
+     *
+     * Public because the rule has a second caller that must not restate it: the
+     * card asks "was this post's headline derived from its opening line?" before
+     * deciding to lift that line out of the body, and the only trustworthy way
+     * to answer is to derive it again and compare. A caller that re-implemented
+     * the strip-and-limit rule here would drift from this one the first time
+     * either changed.
+     */
+    public function headlineFor(string $body): string
+    {
+        return $this->subject(null, $body);
+    }
+
+    /**
+     * Write the headline the card will print above the body.
      *
      * A composer with no title field still owes the card a headline, and the
      * first line is the sentence the author already chose to lead with. Markup
      * that would look broken cut in half — a heading sigil, a list dash, a
      * quote bar — is stripped before the cut, not after.
+     *
+     * The body is **not** touched here. Storage keeps the author's text whole;
+     * {@see FeedPost::bodyUnderHeadline()} is what takes the derived line back
+     * out at render time. Splitting the two matters because the inline editor
+     * has to open holding what the author typed, and a body that had already
+     * lost its first line would open blank for every one-line post.
      */
-    protected function title(mixed $title, string $body): string
+    protected function subject(mixed $title, string $body): string
     {
         $title = trim((string) $title);
 
@@ -107,9 +138,17 @@ class HydrateFeedPostContent
             ->map(fn (string $line): string => trim($line))
             ->first(fn (string $line): bool => $line !== '');
 
-        $firstLine = (string) preg_replace('/^[#>\-*+]\s*/u', '', (string) $firstLine);
+        if ($firstLine === null || $firstLine === '') {
+            return '';
+        }
 
-        return Str::limit(trim($firstLine), self::TITLE_LIMIT, '…');
+        // The sigil run is greedy (`+`): markdown writes a level-two heading as
+        // `##`, and stripping a single marker would leave the card advertising
+        // `# Getting the N+1 out` as its subject. Only a *run* at the very start
+        // is cut, so `- - spaced` and `3 - 2` keep their punctuation.
+        $lead = (string) preg_replace('/^[#>\-*+]+\s*/u', '', (string) $firstLine);
+
+        return Str::limit(trim($lead), self::TITLE_LIMIT, '…');
     }
 
     /**

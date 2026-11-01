@@ -218,22 +218,28 @@
             <p class="dn-commit-subject">{{ $commit['title'] }}</p>
         @endif
 
-        <div class="dn-body-wrap" x-data="{ open: false }">
-            <div class="dn-body {{ $commit['long'] ? 'is-folded' : '' }}" x-bind:class="{ 'is-open': open }" @if ($commit['editing']) hidden @endif>{!! $commit['body'] !!}</div>
+        {{-- The body, when there is one. A one-line post is entirely subject:
+             the headline was derived from the opening line and that line taken
+             out of the body, so nothing is left. Rendering the wrapper anyway
+             would print an empty paragraph-sized gap under every short post. --}}
+        @if (filled($commit['plain']) || $commit['editing'])
+            <div class="dn-body-wrap" x-data="{ open: false }">
+                <div class="dn-body {{ $commit['long'] ? 'is-folded' : '' }}" x-bind:class="{ 'is-open': open }" @if ($commit['editing']) hidden @endif>{!! $commit['body'] !!}</div>
 
-            @if ($commit['long'] && ! $commit['editing'])
-                <button
-                    type="button"
-                    class="dn-fold"
-                    x-on:click="open = ! open"
-                    x-bind:aria-expanded="open"
-                    data-test="commit-fold"
-                >
-                    <span x-show="! open">{{ __('Show more') }}</span>
-                    <span x-show="open" x-cloak>{{ __('Show less') }}</span>
-                </button>
-            @endif
-        </div>
+                @if ($commit['long'] && ! $commit['editing'])
+                    <button
+                        type="button"
+                        class="dn-fold"
+                        x-on:click="open = ! open"
+                        x-bind:aria-expanded="open"
+                        data-test="commit-fold"
+                    >
+                        <span x-show="! open">{{ __('Show more') }}</span>
+                        <span x-show="open" x-cloak>{{ __('Show less') }}</span>
+                    </button>
+                @endif
+            </div>
+        @endif
 
         {{-- The inline editor. It replaces the body rather than sitting beside
              it, because two copies of the same paragraph on one row is a row

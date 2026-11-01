@@ -886,6 +886,9 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
         }
 
         $this->editingId = $post->id;
+        // The editor edits the body — its label says so — and storage keeps the
+        // author's text whole, so the draft is the body as written. The headline
+        // is a field of its own and is not part of the form.
         $this->editDraft = (string) $post->body;
 
         // Editing and replying to the same row at once would put two forms in
@@ -941,7 +944,13 @@ new #[Title('The Log')] #[Layout('layouts::feed')] class extends Component
 
         app(\App\Actions\Feed\UpdateFeedPost::class)->handle($reader, [
             'body' => trim($this->editDraft),
-            'title' => $post->title,
+            // The headline is carried through untouched. The editor edits the
+            // body, so re-deriving here would let a body-only edit silently
+            // rewrite the subject — and for a post whose headline *was* its
+            // opening line, re-deriving from the new body would replace the
+            // reader's headline with whatever they typed while leaving the
+            // card's subject and its body describing different posts.
+            'title' => $post->title ?: null,
             'type' => $post->type,
             'topic' => $post->topic,
             'tags' => array_values($post->tags ?? []),

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Feed\HydrateFeedPostContent;
 use App\Concerns\HasSlug;
 use App\Enums\FeedPostAudience;
 use App\Enums\FeedPostStatus;
@@ -357,6 +358,67 @@ class FeedPost extends Model
     {
         return $this->status === FeedPostStatus::Published
             && ($this->scheduled_at === null || $this->scheduled_at->isPast());
+    }
+
+    /**
+     * The body as the card prints it: the stored text with the derived headline
+     * taken back out of the top.
+     *
+     * A card shows a subject above the body, the way `git log` does, and `git
+     * log` prints a body with its subject line removed. A composer post keeps
+     * its headline *inside* `body` (storage stays faithful, so the inline editor
+     * has the author's text to open with), so the removal has to happen here —
+     * otherwise the opening sentence is printed twice: once bold as the subject
+     * and again at the top of the body.
+     *
+     * **An authored headline is never lifted.** The rule is not "does the body
+     * contain the title" — a corpus post's headline is a separate field that the
+     * body never repeats, and stripping a line on that basis would eat a
+     * paragraph. The lift happens only when the stored title is exactly what
+     * deriving from this body would have produced, which is a question the
+     * derivation itself can answer.
+     *
+     * Returns an empty string for a one-line post, and empty is the right
+     * answer: the subject is the whole post, and printing it again as the body
+     * would be the duplication with nothing added. A sigil-only opening line
+     * (`---`, `#`) derives no headline at all, so nothing is lifted and the
+     * line stays where the author put it.
+     */
+    public function bodyUnderHeadline(): string
+    {
+        $body = trim((string) $this->body);
+        $title = trim((string) $this->title);
+
+        if ($body === '' || $title === '') {
+            return $body;
+        }
+
+        // Re-derive from the body alone: when that produces the stored title,
+        // the title *was* this body's opening line and printing both repeats it.
+        $derived = app(HydrateFeedPostContent::class)->headlineFor($body);
+
+        if ($derived === '' || $derived !== $title) {
+            return $body;
+        }
+
+        $lines = explode("\n", $body);
+        $index = null;
+
+        foreach ($lines as $offset => $line) {
+            if (trim($line) !== '') {
+                $index = $offset;
+
+                break;
+            }
+        }
+
+        if ($index === null) {
+            return $body;
+        }
+
+        unset($lines[$index]);
+
+        return trim(implode("\n", $lines));
     }
 
     /**

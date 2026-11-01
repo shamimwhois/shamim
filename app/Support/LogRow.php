@@ -33,40 +33,23 @@ final class LogRow
     public const FOLD_AFTER = 700;
 
     /**
-     * Which handles own an account, memoised for the request.
-     *
-     * A page draws twenty rows and most of them share an author, so resolving
-     * "does this handle have a profile" per row would be twenty `exists()`
-     * calls answering three questions. One `pluck` of every handle, keyed by
-     * the lower-cased value the comparison uses, settles all of them.
-     *
-     * @var array<string, bool>|null
-     */
-    private static ?array $knownHandles = null;
-
-    /**
      * The URL of the author behind a commit handle, or null when nobody owns it.
      *
      * Muscle memory says a commit always has a profile to open, and for a
      * seeded corpus that is true. It stops being true the moment a corpus
      * author is retired or a row outlives the account it was written against —
      * and then the row must not offer a door to a 404.
+     *
+     * The set of known handles comes from {@see LogHandleIndex}, a scoped
+     * binding rather than a static. A static outlives the accounts it describes
+     * under a long-running worker, and it leaked between tests: the map filled
+     * in one test was still answering for the next one's rolled-back accounts.
      */
     private static function profileUrlFor(string $handle): ?string
     {
         $normalised = mb_strtolower(LogIdentity::handle($handle));
 
-        if ($normalised === '') {
-            return null;
-        }
-
-        self::$knownHandles ??= User::query()
-            ->whereNotNull('handle')
-            ->pluck('handle')
-            ->mapWithKeys(fn (string $candidate): array => [mb_strtolower($candidate) => true])
-            ->all();
-
-        if (! isset(self::$knownHandles[$normalised])) {
+        if (! app(LogHandleIndex::class)->owns($normalised)) {
             return null;
         }
 
@@ -203,7 +186,14 @@ final class LogRow
     ): array {
         $createdAt = $post->posted_at ?? $post->created_at;
         $isOpen = $threadId === $post->id;
-        $body = CommitBody::toHtml($post->body);
+        /*
+         * The body as the card prints it: with the line that became the headline
+         * taken out of the top. Storage keeps the author's text whole so the
+         * inline editor has something to open with, and `git log` does not print
+         * a subject inside the body either — so the removal belongs to the row
+         * that pairs the two, not to the write that stored them.
+         */
+        $body = CommitBody::toHtml($post->bodyUnderHeadline());
         $plain = trim(strip_tags($body));
 
         return [
