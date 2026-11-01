@@ -412,13 +412,21 @@ final class LogRow
     }
 
     /**
-     * A commit's images, at most four.
+     * A commit's attachments, at most four.
      *
      * The relation is read only when it has already been loaded: a row is
-     * drawn on three surfaces, and a row that quietly fetched its images would
+     * drawn on three surfaces, and a row that quietly fetched its files would
      * turn a page of commits into a page of queries.
      *
-     * @return array<int, array{url: string, alt: string, width: int|null, height: int|null}>
+     * The payload carries everything the card needs to choose how to draw the
+     * file, not just how to draw an image. `image` is the decision itself —
+     * taken here, from the mime, rather than re-derived in Blade from several
+     * fields — so the card has one flag to branch on and cannot reach a
+     * different answer than the controller that serves the bytes. `name` and
+     * `size` are what a download chip shows; both are null-free strings so the
+     * markup never has to guard a missing value.
+     *
+     * @return array<int, array{url: string, alt: string, image: bool, name: string, kind: string, size: string, width: int|null, height: int|null}>
      */
     public static function attachments(FeedPost $post): array
     {
@@ -432,6 +440,10 @@ final class LogRow
             ->map(fn (FeedAttachment $attachment): array => [
                 'url' => $attachment->url(),
                 'alt' => $attachment->alt(),
+                'image' => $attachment->isImage(),
+                'name' => $attachment->displayName(),
+                'kind' => $attachment->kindLabel(),
+                'size' => $attachment->humanSize(),
                 'width' => $attachment->width,
                 'height' => $attachment->height,
             ])

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Stream one composer image out of the private feed media disk.
+ * Stream one composer attachment out of the private feed media disk.
  *
  * The file's bytes are never reachable by path — `feed_media` is configured with
  * `'serve' => false`, so no stock storage route exists for it — which makes this
@@ -31,10 +31,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * alone, which is the only claim that exists on it before the row is written.
  * The class string is passed to Gate so the policy still resolves when that post
  * is null; without it there would be no model to infer `FeedPostPolicy` from and
- * the preview the composer promises would 404 on every draft image.
+ * the preview the composer promises would 404 on every draft file.
  *
  * Failure answers 404 rather than 403 wherever the post is the reason: a private
  * post that exists must be indistinguishable from a post that does not.
+ *
+ * **Two kinds, two dispositions.** An image is painted in the page; anything
+ * else is handed to the reader as a download. That split matters more than
+ * presentation: a PDF rendering in the app's own origin is a document that gets
+ * to run inside it, and this route is the one place the private bytes surface.
+ * Served as `attachment`, the browser saves the file and no renderer ever gets
+ * the app's origin to run scripts in.
  */
 class FeedAttachmentController extends Controller
 {
@@ -54,7 +61,7 @@ class FeedAttachmentController extends Controller
 
         return $disk->response(
             $attachment->path,
-            basename($attachment->path),
+            $attachment->isImage() ? basename($attachment->path) : $attachment->displayName(),
             $this->headers($attachment),
         );
     }
@@ -68,17 +75,29 @@ class FeedAttachmentController extends Controller
      * origin as the app can otherwise read the app's cookies, so the response is
      * fenced into being an inert document that no script may run inside.
      *
-     * Content-Disposition is left to the filesystem adapter, which builds it from
-     * the name passed above; the stored path is a UUID, so there is no uploaded
-     * filename in the response for a quoting bug to live in.
+     * `Content-Disposition` is stated here rather than left to the adapter
+     * because the default is not one rule but a guess: the adapter decides
+     * between inline and attachment from the mime, and a type it does not
+     * recognise lands on whichever way its heuristic falls. For an image the
+     * inline disposition is what makes the `<img>` on the card work, so it is
+     * kept explicitly. For everything else the decision is made here — a
+     * document is always a download, so an unrecognised type fails toward
+     * saving the file rather than toward rendering it in the app's origin.
+     *
+     * The filename in that header is built from the row, never from the upload;
+     * the stored path is a UUID precisely so an attacker-chosen name has no
+     * route into a response header.
      *
      * @return array<string, string>
      */
     private function headers(FeedAttachment $attachment): array
     {
+        $disposition = $attachment->isImage() ? 'inline' : 'attachment';
+
         return [
             'Content-Type' => $attachment->mime,
             'Content-Length' => (string) $attachment->size,
+            'Content-Disposition' => $disposition.'; filename="'.$attachment->displayName().'"',
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; sandbox",
             'Cache-Control' => 'private, no-store, max-age=0',
