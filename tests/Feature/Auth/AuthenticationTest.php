@@ -6,9 +6,9 @@ use Laravel\Fortify\Features;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse;
 
 test('login screen can be rendered', function () {
-    $response = $this->get(route('login'));
-
-    $response->assertOk();
+    // Login is modal-first: the URL bounces to the flagged home, where the
+    // dialog opens server-side. No standalone login page exists.
+    $this->get(route('login'))->assertRedirect(route('home', ['signin' => 'required']));
 });
 
 test('users can authenticate using the login screen', function () {
@@ -19,17 +19,43 @@ test('users can authenticate using the login screen', function () {
         'password' => 'password',
     ]);
 
-    // Login lands on the user's current team dashboard, which is the starter
-    // kit's RedirectsToCurrentTeam behaviour and is independent of DevFolio's
-    // single-author authoring dashboard at /dashboard.
+    // Login lands on the dashboard the account's role owns. A plain user gets
+    // the author workspace at /dashboard; the destination is resolved from
+    // AccountRole::dashboardRoute(), never from a fixed path.
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
+        ->assertRedirect(route('dashboard.index'));
 
     $this->assertAuthenticated();
 });
 
-test('passkey login response redirects to the current team dashboard', function () {
+test('a seller lands on the seller dashboard after logging in', function () {
+    $user = User::factory()->seller()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('seller.dashboard'));
+
+    $this->assertAuthenticated();
+});
+
+test('an admin lands on the admin dashboard after logging in', function () {
+    $user = User::factory()->admin()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('admin.dashboard'));
+
+    $this->assertAuthenticated();
+});
+
+test('passkey login response redirects to the role dashboard', function () {
     $user = User::factory()->create();
 
     $request = Request::create(route('login', absolute: false), 'GET', server: [
@@ -40,7 +66,7 @@ test('passkey login response redirects to the current team dashboard', function 
 
     $jsonResponse = app(PasskeyLoginResponse::class)->toResponse($request);
 
-    expect($jsonResponse->getData()->redirect)->toBe(route('team.dashboard', ['current_team' => $user->personalTeam()->slug]));
+    expect($jsonResponse->getData()->redirect)->toBe(route('dashboard.index'));
 });
 
 test('users can not authenticate with invalid password', function () {

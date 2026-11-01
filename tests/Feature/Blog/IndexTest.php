@@ -100,3 +100,18 @@ test('the index paginates rather than loading every post', function () {
     expect($response->getContent())
         ->toContain('page=2');
 });
+
+test('the index wears the log frame, not the marketing header', function () {
+    Post::factory()->published()->create();
+
+    // The blog is a module of the log, like the community directory, the AI
+    // hub, Ideas and the Dev Lab, so it renders the application shell. It used
+    // to fall back to the public layout as well, which put the site header on
+    // top of the log's own nav rail: two navigations on one page.
+    $this->get(route('blog.index'))
+        ->assertOk()
+        ->assertSee('dn-shell', false)
+        ->assertSee('dn-nav', false)
+        ->assertDontSee('Toggle navigation', false)
+        ->assertDontSee('All rights reserved', false);
+});

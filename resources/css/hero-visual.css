@@ -1,0 +1,253 @@
+/* ------------------------------------------------------------------ */
+/* About hero :: full-bleed low-poly portrait                           */
+/*                                                                     */
+/* Scope note: this file used to carry the landing page's `.brain-hero` */
+/* block as well. That hero was replaced by `hero-deck.css` (the Signal */
+/* Deck), so this is now the About page's hero only — portrait, name     */
+/* draw, and the CTA push.                                              */
+/*                                                                     */
+/* The portrait is not a card. It fills its column edge to edge and runs */
+/* off the top, bottom and right of the hero. In light mode the white     */
+/* studio field is removed by the `#hero-portrait-knockout` SVG filter    */
+/* declared in the page — luminance to alpha, so white resolves to        */
+/* nothing while the subject and the shatter stay opaque, leaving the    */
+/* figure sitting directly on the page. Dark mode shows something         */
+/* different on purpose (see the override below).                          */
+/* ------------------------------------------------------------------ */
+
+.hero-portrait {
+    position: relative;
+    /* Fills the grid cell; the negative margins on the element itself do
+       the bleeding, so nothing here should cap its size. */
+    min-height: 22rem;
+}
+
+/* Soft emitted light behind the figure. Sits under the image so it reads
+   as glow rather than shadow, and it is what gives the knockout some
+   depth against the flat page. */
+.hero-portrait__glow {
+    position: absolute;
+    inset: -4% -6%;
+    z-index: 0;
+    background: radial-gradient(
+        58% 54% at 52% 44%,
+        color-mix(in srgb, var(--color-signal-500) 16%, transparent),
+        color-mix(in srgb, var(--color-signal-500) 5%, transparent) 55%,
+        transparent 78%
+    );
+    filter: blur(30px);
+    pointer-events: none;
+}
+
+.dark .hero-portrait__glow {
+    background: radial-gradient(
+        56% 52% at 52% 44%,
+        color-mix(in srgb, var(--color-signal-400) 22%, transparent),
+        color-mix(in srgb, var(--color-signal-300) 9%, transparent) 52%,
+        transparent 76%
+    );
+}
+
+.hero-portrait__stack {
+    /* Positioned, full-bleed layer rather than a plain flow div: it keeps
+       the images' percentage sizing and the glow/orbit stacking order
+       exactly what they were before this wrapper existed. */
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+/* No color grade in either theme, by design. (An emerald duotone was
+   tried once and reverted: it read as colorless.) The two themes differ
+   only in HOW the white studio field disappears:
+
+   - Light keeps the SVG knockout: it lifts the field off the page, and
+     any subject pixel it half-ghosts is invisible against the near-white
+     page anyway.
+   - Dark cannot use that filter — measured on this asset, its ramp made
+     ~58k bright subject pixels semi-transparent and the dark grid bled
+     through as blotches on the face. So the dark asset ships with the
+     background already gone (baked alpha, see the override below). */
+
+.hero-portrait__img {
+    position: relative;
+    z-index: 1;
+    display: block;
+    /* Full width and height of the column — the composition supplies its
+       own framing, so the element must not letterbox or cap it. */
+    width: 100%;
+    height: 100%;
+    /* The source is landscape (1536x1024) and the column is portrait, so
+       `cover` necessarily crops the sides — the visible window is only
+       ~46% of the frame. The figure's mass spans roughly 9-56% of the
+       source width (peaking at 23-52%), so anchoring the window's left
+       edge at ~10% keeps the head and body fully inside with the left
+       cut falling on near-empty field, and lets the thinning shards run
+       off the right edge rather than being sliced mid-flight. */
+    object-fit: cover;
+    object-position: 18% 12%;
+    /* The knockout, light mode only. Harmless where the field is already
+       close to the page — and the dark override below switches it off. */
+    filter: url('#hero-portrait-knockout');
+    transition: transform 700ms var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.hero-portrait:hover .hero-portrait__img {
+    transform: scale(1.02);
+}
+
+/* Both portraits ship in the markup; exactly one is shown per theme.
+   The light render is the default, and `.dark` swaps in the dark render. */
+.hero-portrait__img--dark { display: none; }
+.dark .hero-portrait__img--light { display: none; }
+.dark .hero-portrait__img--dark { display: block; }
+
+/* Dark mode :: the background-removed render *in the asset itself*
+   (`darkmode.webp` — large connected white regions removed in the file,
+   small bright subject details left opaque). No runtime
+   filter, so nothing can ghost the subject: the bright pixels —
+   face highlights, glasses, white art strokes — that the old SVG alpha
+   ramp was rendering semi-transparent stay at full opacity. Full width
+   and height of the column come from the base cover crop, same as the
+   light render. */
+.dark .hero-portrait__img--dark {
+    filter: none;
+}
+
+/* Faint orbital rings behind the figure, echoing the line-art in the art
+   itself. Deliberately low contrast — they are texture, not decoration. */
+.hero-portrait__orbit {
+    position: absolute;
+    z-index: 0;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--color-signal-500) 18%, transparent);
+    pointer-events: none;
+}
+
+.dark .hero-portrait__orbit {
+    border-color: color-mix(in srgb, var(--color-signal-400) 24%, transparent);
+}
+
+.hero-portrait__orbit--a {
+    top: 4%;
+    left: -6%;
+    width: 46%;
+    aspect-ratio: 1;
+    animation: hero-portrait-orbit 18s linear infinite;
+}
+
+.hero-portrait__orbit--b {
+    bottom: 8%;
+    right: -4%;
+    width: 28%;
+    aspect-ratio: 1;
+    border-color: color-mix(in srgb, var(--color-signal-600) 22%, transparent);
+    animation: hero-portrait-orbit 24s linear infinite reverse;
+}
+
+@keyframes hero-portrait-orbit {
+    from { transform: rotate(0deg) translateX(6px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(6px) rotate(-360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-portrait__img { transition: none; }
+    .hero-portrait__orbit--a,
+    .hero-portrait__orbit--b { animation: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* About hero :: drawn calligraphy name                                 */
+/*                                                                     */
+/* The reference renders its name as a hand-traced SVG signature that    */
+/* strokes itself in on load. Same idea here: Dancing Script stroked    */
+/* with a dash pattern and the dash offset walked to zero, then the     */
+/* fill cross-fades in behind the finished stroke. The color follows    */
+/* the wrapper's text color, so both themes come for free.               */
+/* ------------------------------------------------------------------ */
+
+.hero-name-draw {
+    height: clamp(3rem, 7.5vw, 5.6rem);
+    width: auto;
+    overflow: visible;
+}
+
+.hero-name-draw__text {
+    font-family: var(--font-calligraphy);
+    font-size: 122px;
+    fill: currentColor;
+    fill-opacity: 0;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
+    animation:
+        hero-name-draw-stroke 2.6s ease-in-out forwards,
+        hero-name-draw-fill 1.1s ease-out 1.9s forwards;
+}
+
+@keyframes hero-name-draw-stroke {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes hero-name-draw-fill {
+    to { fill-opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ */
+/* About hero :: push buttons and pulse rings                           */
+/*                                                                     */
+/* .btn-push is the reference's press feel: the pill sinks 1px while     */
+/* held. The rings live inside the primary pill and expand from its      */
+/* border, fading as they grow; two run the same animation half a        */
+/* period apart, so a ring always looks mid-flight.                      */
+/* ------------------------------------------------------------------ */
+
+.btn-push:active {
+    transform: translateY(1px);
+}
+
+.hero-cta-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 2px solid color-mix(in srgb, currentColor 80%, transparent);
+    transform: scale(1);
+    opacity: 0.6;
+    animation: hero-cta-ring-expand 2.6s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+}
+
+.hero-cta-ring--alt {
+    animation-delay: -1.3s;
+}
+
+@keyframes hero-cta-ring-expand {
+    0% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: scale(1.6);
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-name-draw__text {
+        animation: none;
+        stroke-dashoffset: 0;
+        fill-opacity: 1;
+    }
+
+    .hero-cta-ring {
+        animation: none;
+        opacity: 0;
+    }
+
+    .btn-push:active {
+        transform: none;
+    }
+}
+

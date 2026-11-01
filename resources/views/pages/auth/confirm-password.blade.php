@@ -1,13 +1,15 @@
-<x-layouts::auth :title="__('Confirm password')">
+<x-layouts::auth :eyebrow="__('Security')"
+            :title="__('Confirm your password')">
     <div class="flex flex-col gap-6">
-        <x-auth-header
-            :title="__('Confirm password')"
+        <x-app.ui.auth.header
+            :eyebrow="__('Security')"
+            :title="__('Confirm your password')"
             :description="__('This is a secure area of the application. Please confirm your password before continuing.')"
         />
 
-        <x-auth-session-status class="text-center" :status="session('status')" />
+        <x-app.ui.auth.session-status class="text-center" :status="session('status')" />
 
-        <x-passkey-verify
+        <x-app.ui.auth.passkey-verify
             options-route="passkey.confirm-options"
             submit-route="passkey.confirm"
             :label="__('Confirm with passkey')"

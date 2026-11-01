@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\PostTagFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
@@ -15,6 +17,17 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  */
 class PostTag extends Pivot
 {
+    /** @use HasFactory<PostTagFactory> */
+    use HasFactory;
+
+    /**
+     * `post_tag` carries no timestamp columns and the relationships never ask
+     * for them (`belongsToMany()->using()`, without `withTimestamps()`), so an
+     * inherited `true` here would only surface the first time a row is written
+     * outside a sync — which is exactly what a factory does.
+     */
+    public $timestamps = false;
+
     /**
      * The table associated with the pivot.
      *

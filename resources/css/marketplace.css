@@ -1,0 +1,400 @@
+@layer components {
+    /* ==========================================================================
+       Marketplace — the Vibe96 skin
+       --------------------------------------------------------------------------
+       A visual reskin of the public marketplace surfaces (catalogue, listing
+       page, product cards) onto the Vibe96 design system, scoped to a `.v96`
+       root class so nothing here can leak into the rest of the site.
+
+       Tokens are transcribed from vibe96.com's own stylesheet: Manrope for
+       reading type, IBM Plex Mono for labels and code, one purple (#7624F4)
+       carrying every accent, warm-grey lines on white, and a night surface
+       (#1C1728) for inverted bands. Dark mode re-uses that night token as the
+       surface level, so the reskin reads as the same product with the lights
+       off rather than a colour inversion.
+       ========================================================================== */
+
+    .v96 {
+        /* --- Palette -------------------------------------------------------- */
+        --v96-purple: #7624F4;
+        --v96-purple-d: #5B14CF;
+        /* Accent text and hover accents need a lighter step in dark mode for
+           contrast on the night surfaces; templates must use these instead of
+           re-pairing the light hex with a `dark:` literal every time. */
+        --v96-purple-soft: #7624F4;
+        --v96-purple-lift: #7624F4;
+        --v96-eyebrow: #7842C9;
+        --v96-ink: #211A31;
+        --v96-body: #5F566E;
+        --v96-faint: #8E839B;
+        --v96-line: #ECE7F2;
+        --v96-border: #DDD6E7;
+        --v96-tint: #F8F7FB;
+        --v96-soft: #F4EEFE;
+        --v96-band: #FAF8FE;
+        --v96-night: #1C1728;
+
+        /* --- Type ----------------------------------------------------------- */
+        --v96-font: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --v96-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+        font-family: var(--v96-font);
+        color: var(--v96-body);
+    }
+
+    .dark .v96 {
+        --v96-purple-soft: #C9A8FC;
+        --v96-purple-lift: #B48CF8;
+        --v96-eyebrow: #B48CF8;
+        --v96-ink: #F0EBF7;
+        --v96-body: #BCB2CB;
+        --v96-faint: #8E839B;
+        --v96-line: #322A44;
+        --v96-border: #3A3152;
+        --v96-tint: #191424;
+        --v96-soft: #2A2140;
+        --v96-band: #171220;
+    }
+
+    /* --- Eyebrow: the mono label above headings ----------------------------- */
+
+    .v96-eyebrow {
+        font-family: var(--v96-mono);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        line-height: 1;
+        color: var(--v96-eyebrow);
+    }
+
+    .v96-mono {
+        font-family: var(--v96-mono);
+    }
+
+    /* --- Hero band ---------------------------------------------------------- */
+
+    .v96-hero {
+        position: relative;
+        overflow: hidden;
+        background:
+            radial-gradient(58rem 30rem at 82% -12%, rgba(118, 36, 244, 0.07), transparent 60%),
+            var(--v96-band);
+        border-bottom: 1px solid var(--v96-line);
+    }
+
+    .dark .v96-hero {
+        background:
+            radial-gradient(58rem 30rem at 82% -12%, rgba(118, 36, 244, 0.22), transparent 60%),
+            var(--v96-night);
+    }
+
+    /* --- Chips (category filter pills) -------------------------------------- */
+
+    .v96-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: 2.5rem;
+        padding: 0 0.9rem;
+        border: 1px solid var(--v96-border);
+        border-radius: 999px;
+        background: #fff;
+        font-size: 13.5px;
+        font-weight: 500;
+        color: #5E536E;
+        transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .v96-chip:hover {
+        border-color: var(--v96-purple);
+        color: var(--v96-purple);
+    }
+
+    .v96-chip[aria-pressed='true'] {
+        border-color: var(--v96-purple);
+        background: var(--v96-purple);
+        color: #fff;
+    }
+
+    .v96-chip[aria-pressed='true']:hover {
+        border-color: var(--v96-purple-d);
+        background: var(--v96-purple-d);
+        color: #fff;
+    }
+
+    .dark .v96-chip {
+        background: #221B33;
+        color: #C6BCD6;
+    }
+
+    .dark .v96-chip:hover {
+        color: #C9A8FC;
+    }
+
+    .dark .v96-chip[aria-pressed='true'] {
+        color: #fff;
+    }
+
+    /* Small chip, Vibe96's 26px quick-link treatment. */
+    .v96-chip-sm {
+        min-height: 1.75rem;
+        padding: 0 0.7rem;
+        font-size: 13px;
+    }
+
+    /* --- Cards --------------------------------------------------------------- */
+
+    .v96-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+        border: 1px solid var(--v96-line);
+        border-radius: 10px;
+        background: #fff;
+        transition: transform 0.3s cubic-bezier(0.22, 0.7, 0.3, 1), box-shadow 0.3s cubic-bezier(0.22, 0.7, 0.3, 1), border-color 0.3s ease;
+    }
+
+    .v96-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--v96-border);
+        box-shadow: 0 24px 40px -30px rgba(40, 20, 80, 0.35);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .v96-card,
+        .v96-card:hover {
+            transition: none;
+            transform: none;
+        }
+    }
+
+    .dark .v96-card {
+        background: #201A2E;
+        border-color: var(--v96-line);
+    }
+
+    .dark .v96-card:hover {
+        border-color: var(--v96-border);
+        box-shadow: 0 24px 40px -30px rgba(0, 0, 0, 0.55);
+    }
+
+    .v96-card-title {
+        font-size: 17.3px;
+        font-weight: 700;
+        line-height: 22px;
+        letter-spacing: -0.01em;
+        color: var(--v96-ink);
+        transition: color 0.15s ease;
+    }
+
+    .v96-card:hover .v96-card-title,
+    .v96-card-title:hover {
+        color: var(--v96-purple);
+    }
+
+    .v96-card-line {
+        font-size: 14.5px;
+        line-height: 21px;
+        color: var(--v96-body);
+    }
+
+    .v96-price {
+        font-size: 23px;
+        line-height: 26px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--v96-ink);
+    }
+
+    .dark .v96-price {
+        color: var(--v96-ink);
+    }
+
+    /* --- Buttons -------------------------------------------------------------- */
+
+    .v96-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        min-height: 2.5rem;
+        padding: 0 1.15rem;
+        border: 1px solid var(--v96-purple);
+        border-radius: 8px;
+        background: var(--v96-purple);
+        font-size: 14.5px;
+        font-weight: 600;
+        color: #fff;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .v96-btn:hover {
+        border-color: var(--v96-purple-d);
+        background: var(--v96-purple-d);
+    }
+
+    .v96-btn--ghost {
+        border-color: var(--v96-border);
+        background: #fff;
+        color: #4C4260;
+    }
+
+    .v96-btn--ghost:hover {
+        border-color: var(--v96-purple);
+        background: #fff;
+        color: var(--v96-purple);
+    }
+
+    .dark .v96-btn--ghost {
+        background: #221B33;
+        color: #C6BCD6;
+    }
+
+    .dark .v96-btn--ghost:hover {
+        color: #C9A8FC;
+    }
+
+    /* --- Inputs --------------------------------------------------------------- */
+
+    .v96-input,
+    .v96-select {
+        width: 100%;
+        min-height: 2.75rem;
+        padding: 0.5rem 0.9rem;
+        border: 1px solid var(--v96-border);
+        border-radius: 8px;
+        background: #fff;
+        font-family: inherit;
+        font-size: 14.5px;
+        color: var(--v96-ink);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .v96-input::placeholder {
+        color: var(--v96-faint);
+    }
+
+    .v96-input:focus,
+    .v96-select:focus {
+        outline: none;
+        border-color: var(--v96-purple);
+        box-shadow: 0 0 0 3px rgba(118, 36, 244, 0.18);
+    }
+
+    .dark .v96-input,
+    .dark .v96-select {
+        background: #221B33;
+    }
+
+    /* --- Bands ----------------------------------------------------------------- */
+
+    .v96-band {
+        background: var(--v96-band);
+        border-color: var(--v96-line);
+    }
+
+    .dark .v96-band {
+        background: var(--v96-tint);
+    }
+
+    .v96-night {
+        background: var(--v96-night);
+        color: #EDE9F4;
+    }
+
+    /* --- Scoped overrides for shared components ---------------------------------
+       The marketplace composes shared primitives (tag pills, card surfaces,
+       labels). Inside the .v96 scope they adopt the skin, so the rating, install
+       command and review card components match without forking their markup. */
+
+    .v96 .tag-pill {
+        border-color: var(--v96-border);
+        background: #fff;
+        color: #5E536E;
+        border-radius: 999px;
+    }
+
+    .dark .v96 .tag-pill {
+        background: #221B33;
+        color: #C6BCD6;
+    }
+
+    .v96 .tag-pill[class*='bg-signal'],
+    .v96 .tag-pill[class*='text-signal'] {
+        border-color: rgba(118, 36, 244, 0.35);
+        background: var(--v96-soft);
+        color: var(--v96-purple);
+    }
+
+    .dark .v96 .tag-pill[class*='bg-signal'],
+    .dark .v96 .tag-pill[class*='text-signal'] {
+        background: var(--v96-soft);
+        color: #C9A8FC;
+    }
+
+    .v96 .sui-label {
+        font-family: var(--v96-mono);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+    }
+
+    .v96 .card-surface {
+        border: 1px solid var(--v96-line);
+        border-radius: 14px;
+        background: #fff;
+    }
+
+    .dark .v96 .card-surface {
+        background: #201A2E;
+    }
+
+    /* Focus visibility: the skin's own ring, in purple. */
+    .v96 :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+        outline: 2px solid var(--v96-purple);
+        outline-offset: 2px;
+    }
+
+}
+
+/* ==========================================================================
+   Invoice — the printed document
+   --------------------------------------------------------------------------
+   Outside the component layer on purpose: `@page` is an at-rule, and an
+   at-rule nested inside `@layer` is not what the paper needs.
+
+   A receipt is read on paper more often than on a screen, so the print sheet
+   is a rule of its own rather than a stack of `print:` variants: the page is
+   A4 with a margin a hole punch does not eat, the dark canvas is forced back
+   to ink on white, and a table row never breaks across two sheets. Everything
+   that only drives the document on screen — the back link, the print button —
+   is hidden with Tailwind's `print:hidden` at the point of use.
+   ========================================================================== */
+
+@page {
+    size: A4;
+    margin: 18mm;
+}
+
+@media print {
+    html,
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .invoice-sheet,
+    .invoice-sheet * {
+        color: #000 !important;
+        background: transparent !important;
+        border-color: #000 !important;
+        box-shadow: none !important;
+    }
+
+    .invoice-sheet tr,
+    .invoice-sheet address {
+        break-inside: avoid;
+    }
+}

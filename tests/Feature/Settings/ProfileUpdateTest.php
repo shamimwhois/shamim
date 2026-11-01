@@ -73,3 +73,48 @@ test('correct password must be provided to delete account', function () {
 
     expect($user->fresh())->not->toBeNull();
 });
+
+test('the page previews the signature the log will print', function () {
+    $user = User::factory()->create(['name' => 'Amara Diallo', 'handle' => 'amara']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')
+        ->assertSee('data-test="byline-preview"', false)
+        ->assertSee('Amara Diallo')
+        ->assertSee('@amara')
+        // The role a commit's byline carries is the account's, not an editable field.
+        ->assertSee($user->accountRole()->label());
+});
+
+test('a changed name changes the preview before it is saved', function () {
+    $user = User::factory()->create(['handle' => 'amara']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')
+        ->set('name', 'Renamed Person')
+        ->assertSee('Renamed Person', false);
+});
+
+test('a handle can be checked before it is claimed', function () {
+    User::factory()->create(['handle' => 'taken-name']);
+    $user = User::factory()->create(['handle' => 'mine']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')
+        ->set('handle', 'taken-name')
+        ->call('checkHandle')
+        ->assertSet('handleStatus', 'taken')
+        ->set('handle', 'free-name')
+        ->call('checkHandle')
+        ->assertSet('handleStatus', 'free')
+        // The account's own handle is nothing to announce.
+        ->set('handle', 'mine')
+        ->call('checkHandle')
+        ->assertSet('handleStatus', null)
+        ->set('handle', 'bad handle with spaces')
+        ->call('checkHandle')
+        ->assertSet('handleStatus', 'invalid');
+});

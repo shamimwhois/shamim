@@ -1,0 +1,268 @@
+name: deploy
+
+# Deploy to Hostinger shared hosting on every push to `production`, but only
+# after the CI gate in tests.yml has passed. `workflow_run` is used rather than
+# a plain `push` trigger so a red test suite can never reach the live site.
+#
+# The chain is therefore:
+#   push to production -> tests.yml -> (on success) -> this workflow
+#
+# A manual run is also available from the Actions tab (workflow_dispatch) for
+# redeploys and for recovering from a failed deployment without a new commit.
+on:
+  workflow_run:
+    workflows: ["tests"]
+    types: [completed]
+    branches: [production]
+  workflow_dispatch:
+
+# Least privilege: this workflow pushes no code back to the repository.
+permissions:
+  contents: read
+
+# Never let two deploys overlap. `cancel-in-progress: false` means a deploy in
+# flight finishes rather than being killed half-way through a migration, which
+# would leave the site in an undefined state. A newer push waits its turn.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release artifact
+    runs-on: ubuntu-latest
+    # Skip when the CI suite failed; allow every manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Deploy the exact commit CI validated, not whatever the branch tip is
+          # by the time this job starts.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      # Production PHP dependencies. --no-dev drops PHPUnit, Pint and PHPStan;
+      # --optimize-autoloader builds the classmap an opcode cache can use.
+      # Platform requirements are checked against the PHP we target on the host.
+      - name: Install production PHP dependencies
+        run: |
+          composer install \
+            --no-dev \
+            --prefer-dist \
+            --optimize-autoloader \
+            --no-interaction \
+            --no-progress
+
+      # Vite 8 + Tailwind 4. The build is produced HERE, not on the server,
+      # because /public/build is gitignored and Hostinger's shared plans either
+      # lack Node entirely or cap the memory a Vite build needs. `vp build` is
+      # this project's smoke-test alias for `vite build`.
+      - name: Build front-end assets
+        run: |
+          npm ci
+          npm run build
+
+      # Keep the artifact as small as possible: no node_modules, no dev files,
+      # no local .env. The server receives vendor/ (already built for production)
+      # and public/build/ (the compiled assets).
+      #
+      # `git archive` is used instead of tarring the working tree. It exports the
+      # tracked files at the commit being deployed, so the artifact is exactly
+      # what the repository says — no stray untracked files, no .git history, and
+      # none of the exclusion guesswork that a hand-written --exclude list needs.
+      # The two gitignored things the host DOES need (vendor, public/build) are
+      # copied in afterwards.
+      - name: Assemble deploy artifact
+        run: |
+          set -euo pipefail
+          rm -rf release
+          mkdir -p release
+
+          # Tracked files at HEAD. .gitattributes export-ignore rules apply here,
+          # so anything marked export-ignore is already absent.
+          git archive --format=tar HEAD | tar -xf - -C release
+
+          # vendor/ is gitignored, so it is absent from the archive above.
+          # Copy the production install the earlier step just built.
+          cp -a vendor release/vendor
+
+          # public/build is gitignored too — ship the compiled assets.
+          mkdir -p release/public/build
+          cp -a public/build/. release/public/build/
+
+          # The .env is generated on the server from secrets, never shipped.
+          # Defensive: the local .env is gitignored, so it cannot be in the
+          # archive, but a mistake in .gitignore would make this the last guard.
+          rm -f release/.env
+
+          # Fail loudly here rather than on the host, so a broken artifact never
+          # reaches the deploy job.
+          for required in artisan composer.json vendor/autoload.php public/index.php; do
+            if [ ! -e "release/$required" ]; then
+              echo "::error::artifact is missing $required"
+              exit 1
+            fi
+          done
+
+          if [ ! -d release/public/build ] || [ -z "$(ls -A release/public/build)" ]; then
+            echo "::error::compiled assets are missing from public/build"
+            exit 1
+          fi
+
+          # Prove the two things that must never ship are absent.
+          for forbidden in .git .env tests; do
+            if [ -e "release/$forbidden" ]; then
+              echo "::error::artifact unexpectedly contains $forbidden"
+              exit 1
+            fi
+          done
+
+          echo "Artifact contents (top level):"
+          find release -maxdepth 1 -mindepth 1 | sort
+          echo "Artifact size:"
+          du -sh release
+
+
+          find release -maxdepth 1 -mindepth 1 | sort
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: laravel-release
+          path: release
+          # A fresh artifact per run; the workflow only ever reads the newest.
+          retention-days: 5
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy over SSH
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Download artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: laravel-release
+          path: release
+
+      # The SSH key is written to a file rather than passed as an env var so
+      # ssh-agent never sees it in a process listing.
+      - name: Install SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pin the host key so a MITM cannot silently accept the connection.
+          # Populate this with `ssh-keyscan -p "$PORT" "$HOST"` (see docs).
+          printf '%s\n' "${{ secrets.HOSTINGER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release to server
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$SSH_HOST"
+
+          # Atomically replace the release directory: upload to a staging path,
+          # then swap. A half-uploaded directory is never the live one.
+          STAGING="${DEPLOY_PATH}.incoming"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            "rm -rf '$STAGING' && mkdir -p '$STAGING'"
+
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            release/ "$SSH_USER@$SSH_HOST:$STAGING/"
+
+          echo "Upload complete; running the post-deploy script on the host."
+
+      # The heavy lifting runs on the server, inside the new release, before the
+      # swap, so migrations and caches are built against the code being
+      # activated. See deploy/hostinger-deploy.sh for what each step guards.
+      - name: Run remote deploy steps
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+          APP_ENV_FILE: ${{ secrets.HOSTINGER_APP_ENV }}
+        run: |
+          set -euo pipefail
+          STAGING="${DEPLOY_PATH}.incoming"
+
+          # The .env is written from a secret on every deploy, so rotating a
+          # credential is a secret change plus a redeploy — never a manual edit
+          # on the server that drifts from the repository.
+          printf '%s\n' "$APP_ENV_FILE" > /tmp/laravel.env
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            /tmp/laravel.env "$SSH_USER@$SSH_HOST:$STAGING/.env"
+          rm -f /tmp/laravel.env
+
+          # Copy the deploy script from the artifact and run it. `bash -s`
+          # streams the script so no extra file needs to exist beforehand.
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            "set -euo pipefail && cd '$STAGING' && bash deploy/hostinger-deploy.sh '$STAGING' '$DEPLOY_PATH'"
+
+      - name: Swap release into place
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          STAGING="${DEPLOY_PATH}.incoming"
+
+          # One previous release is kept for a one-command rollback. The swap
+          # itself is two renames, which are atomic on the same filesystem.
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            "set -euo pipefail && \
+             [ -d '$DEPLOY_PATH' ] && rm -rf '${DEPLOY_PATH}.previous' && mv '$DEPLOY_PATH' '${DEPLOY_PATH}.previous' || true && \
+             mv '$STAGING' '$DEPLOY_PATH' && \
+             echo 'Swapped into place.'"
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "### Deployed to Hostinger :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.event.workflow_run.head_sha || github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`production\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Rollback: see \`docs/DEPLOYMENT.md\`" >> "$GITHUB_STEP_SUMMARY"

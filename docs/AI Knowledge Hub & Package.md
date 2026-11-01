@@ -1,5 +1,63 @@
 # shamim V2 — AI Knowledge Hub & Package Marketplace
 
+> **Status: UPSTREAM PRODUCT SPEC — PARTIALLY IMPLEMENTED.**
+>
+> This document is an **input** that has since been partly built. It specifies two
+> modules, and they landed differently.
+>
+> **The AI Knowledge Hub is built.** `AiArticle`, `AiTopic`, `AiResource`,
+> `AiLearningPath` and `AiArticleLink` exist with their own migrations, nineteen
+> actions in `app/Actions/AiHub`, `AiPublicationStatus` as an enum-owned workflow, ten
+> public screens under `/ai-hub` (index, articles, topics, paths and resources, each
+> with its detail page), and a console at `/admin/ai-hub` gated on `ai-hub:manage`.
+> Its public half carries no permission at all: reading the hub is not entering a
+> workspace. Two screens remain placeholders — `/ai-hub/ideas` and `/ai-hub/dev-lab`,
+> the shelves that were meant to curate rows from those modules — because a shelf needs
+> a hub-side curation object, which is a different thing from either module's own
+> content.
+>
+> **The Package Marketplace is half-built**, and the split is the same one recorded in
+> [Developer Marketplace & Digital Product Ecosystem](./Developer%20Marketplace%20%26%20Dig.md):
+> the catalogue exists (products, categories, versions, reviews, the public storefront,
+> the moderation console), the commerce does not (no purchase, no `Sale`, no protected
+> download, no provider, and no seller-facing authoring screen).
+>
+> Read §1 onward as: *what the modules were specified to become.* Where the two
+> disagree, this document defers — the shipped system is described in
+> [ROUTES](./ROUTES.md), [SCHEMA](./SCHEMA.md), [COMPONENTS](./COMPONENTS.md) and
+> [API §6.6](./API.md).
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md) · [Idea](./Idea.md) ·
+> [lab](./lab.md)
+>
+> **One premise in this spec still does not hold.** It assumes the knowledge base is
+> single-author. The current system has three account roles and the hub is
+> platform-curated rather than per-account: `AiArticlePolicy` authorises by permission
+> alone, because curation is the job. A knowledge base with *enrolled readers* would
+> need its own permission additions to `AccountPermission` rather than reusing the
+> publishing set, and nothing in this build added one.
+>
+> **The other premise no longer holds.** It says to *preserve the existing Ideas,
+> Plans and Tasks modules*, and there now is something to preserve: Ideas shipped as a
+> four-table workspace with its own URL space, enums, actions and policies. See the
+> status banner in [Idea.md](./Idea.md). Anything this spec wants the hub to import from
+> Ideas would read `ideas` rows through `Idea::isVisibleTo()`, not through a new table.
+>
+> **Already built and reusable:** the modal system, the dashboard shell with
+> permission-driven navigation, and the `RolePlan` entitlements
+> (`productListingLimit()`, `commissionPercent()`, `canSell()`) that a package
+> marketplace would price against. See
+> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission).
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. Project Context
 
 Extend the existing shamimsystem inside `https://shamim.it`.

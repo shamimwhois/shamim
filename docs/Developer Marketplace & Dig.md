@@ -1,5 +1,60 @@
 # shamimV3 — Developer Marketplace & Digital Product Ecosystem
 
+> **Status: UPSTREAM PRODUCT SPEC — PARTIALLY IMPLEMENTED.**
+>
+> This document is an **input** that has since been partly built. It specifies a
+> commercial marketplace with purchasing, protected downloads, licensing, and
+> version management, and predates the current architecture. The **catalogue**
+> half of it exists in the codebase: four tables
+> (`marketplace_categories`, `marketplace_products`,
+> `marketplace_product_versions`, `marketplace_reviews`), four models, the
+> `ProductStatus` / `ProductLicense` / `ReviewStatus` enums, a public storefront at
+> `/marketplace` with category browsing, search, sorting, ratings and a copyable
+> install command, and a moderation console at `/admin/marketplace` that approves,
+> rejects, features and moderates reviews. The **commerce** half does not: there is
+> no purchase, no `Sale`, no protected download, no refund, and no payment provider.
+> The product page says so in its own copy — "checkout is not enabled" — and the
+> price and licence are printed as facts about a listing, not as a working order flow.
+>
+> Read §1 onward as: *what the module was specified to become.* Where the two
+> disagree, this document defers — the shipped system is described in
+> [ROUTES](./ROUTES.md), [SCHEMA](./SCHEMA.md), [COMPONENTS](./COMPONENTS.md) and
+> [API §6.6](./API.md), and those are the files kept in step with the code.
+>
+> **Where the rest of the system is documented instead:**
+> [README](../README.md) · [ARCHITECTURE](./ARCHITECTURE.md) ·
+> [PRD](./PRD.md) · [TRD](./TRD.md) · [SCHEMA](./SCHEMA.md) · [ERD](./ERD.md) ·
+> [ROUTES](./ROUTES.md) · [COMPONENTS](./COMPONENTS.md) ·
+> [PERMISSIONS](./PERMISSIONS.md) · [APP-FLOW](./APP-FLOW.md) ·
+> [UI-UX-BRIEF](./UI-UX-BRIEF.md) · [API](./API.md) · [Idea](./Idea.md) ·
+> [lab](./lab.md)
+>
+> **Built on the assumptions this spec made.** The `seller` role and its selling
+> permissions (`product:create`, `product:update-own`, `product:delete-own`,
+> `product:submit`, `sale:view-own`, `support:manage-own`) are defined; the admin
+> review set (`product:review`, `product:manage-any`, `sale:view-any`,
+> `refund:process`, `payment:configure`) is defined; `product:review` now guards a
+> real console. `RolePlan` carries `productListingLimit()` (Free 0, Seller 25,
+> Platform unlimited) alongside `commissionPercent()`, read as data through the
+> account rather than inlined as a conditional. Those were declared before the
+> module existed, which is why the catalogue needed no permission migration.
+>
+> **What is genuinely missing before the commerce half can ship.** Sellers cannot
+> author a listing — `/seller/dashboard` is the only route behind `product:create`,
+> and it states that listings are not available yet — so the pipeline from draft to
+> review begins from a seeded row, not from a seller. There is no
+> `MarketplaceProductPolicy`, no order or licence schema, no file storage with access
+> control, and no provider integrated, which is why `payment:configure`,
+> `sale:view-own`, `sale:view-any`, `refund:process` and `support:manage-own` are
+> granted and never checked. See
+> [TRD §7.2](./TRD.md#72-deferred-by-decision-not-by-omission),
+> [API §6.6](./API.md) and
+> [audit §10](./audit/PHASE-0-AUDIT.md) for the recorded gaps.
+>
+> **Naming note.** This spec addresses `https://shamim.it`. In-repository
+> documentation calls the application **DevFolio**; they refer to the same
+> product.
+
 ## 1. Product Vision
 
 Build a professional developer-focused digital marketplace inside my existing portfolio website:
