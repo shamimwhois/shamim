@@ -31,7 +31,7 @@ Hostinger shared hosting is a constrained environment. This setup assumes:
 | Requirement | Why | Where to check |
 | --- | --- | --- |
 | **PHP 8.3+** | `composer.json` requires `^8.3` | hPanel → Advanced → PHP Configuration |
-| **PHP extensions**: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`, `curl` | Laravel + MySQL | hPanel → PHP Configuration → Extensions |
+| **PHP extensions**: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `dom`, `ctype`, `json`, `fileinfo`, `curl`, `zip` | Laravel + MySQL + Composer archive handling | hPanel → PHP Configuration → Extensions |
 | **MySQL database** | Replaces the local SQLite file | hPanel → Databases → MySQL Databases |
 | **SSH access** | The deploy uploads over SSH/rsync | hPanel → Advanced → SSH Access |
 | **Cron** (optional) | Draining the database queue | hPanel → Advanced → Cron Jobs |
@@ -290,6 +290,7 @@ The failed release is kept as `<deploy_path>.failed` for inspection.
 | `No application encryption key` | `APP_KEY` empty in the secret | regenerate with `php artisan key:generate --show`, redeploy |
 | Assets 404 (`/build/...`) | `public/build` not served | confirm §3 Option A or B; the build ships inside the release |
 | `php: command not found` during deploy | versioned binary on host | set `PHP_BIN=/usr/bin/php8.3` (check `ls /usr/bin/php*`) |
+| `Process class relies on proc_open` | hPanel's Git feature is deploying too, and runs `composer install` on a PHP without `proc_open` | remove that deployment — see §14 |
 | Deploy hangs on SSH | host key mismatch | refresh `HOSTINGER_KNOWN_HOSTS` with `ssh-keyscan` |
 | Login doesn't stick | `SESSION_*` misconfigured | ensure `SESSION_DRIVER=database`, `SESSION_SECURE_COOKIE=true` on https |
 | Redirect loop / wrong scheme | trusted proxies | ensure `TRUSTED_PROXIES=*` is set |
@@ -311,3 +312,57 @@ tail -n 50 ~/domains/example.com/devfolio/storage/logs/laravel.log
 The deploy assembles them in CI and uploads them inside the release, which is
 why the artifact is built from the working tree rather than from a bare
 `git archive`.
+
+---
+
+## 14. Do NOT also enable hPanel's Git deployment
+
+Hostinger's hPanel has a **Git** feature (hPanel → **Advanced → Git**) that can
+clone a repository into a directory and rebuild it on every push. **Leaving it
+enabled alongside this pipeline breaks both.**
+
+### What the conflict looks like
+
+A hPanel Git deployment runs `composer install` **on the server**. Hostinger's
+PHP ships with `proc_open` in `disable_functions` (shared hosting disables it to
+sandbox child processes), and Composer's `Symfony\Process` constructor refuses to
+build a process without it:
+
+```
+ERROR: Installing failed
+ERROR: install: In Process.php line 147:
+The Process class relies on proc_open, which is not available on your PHP installation.
+```
+
+That message is a PHP *capability* failure, not a dependency-resolution failure.
+`--prefer-dist`, `--no-scripts` or clearing the Composer cache do **not** fix it;
+only enabling `proc_open` does, and even then the Vite build would still fail
+because shared plans have no Node. This is exactly why the pipeline builds in CI
+(§1, §6) and ships `vendor/` and `public/build/` inside the artifact.
+
+### The fix
+
+1. **hPanel → Advanced → Git → remove the deployment** for this repository and
+   path, or switch it to manual. Auto-deploy must be off: two deployers writing
+   to one directory means neither one's result is predictable.
+2. **Confirm `HOSTINGER_DEPLOY_PATH` matches this pipeline** (§3) and that no
+   `.git` directory exists at that path or at `<path>.incoming`.
+3. **Delete a stray checkout** so the next release starts clean — as part of
+   step 3 in §3, or directly:
+
+   ```bash
+   ssh -i ~/.ssh/devfolio_deploy -p 65002 u123456789@<host> \
+     'rm -rf ~/domains/example.com/devfolio.incoming'
+   ```
+
+`deploy/hostinger-deploy.sh` now **refuses to run** when it finds a `.git`
+directory in the release, and `deploy.yml` reports the same condition before the
+remote steps — so this misconfiguration fails with a one-line explanation
+instead of being re-discovered as an opaque Composer trace.
+
+> **Why not just enable `proc_open`?** If hPanel lets you remove it from
+> `disable_functions`, Composer will run — but you still have no Node for
+> `npm run build`, no atomic swap, and no rollback. The Actions pipeline is the
+> supported path; do not make the host build what CI already builds.
+
+---

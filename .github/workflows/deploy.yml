@@ -206,6 +206,23 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -p $SSH_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
             release/ "$SSH_USER@$SSH_HOST:$STAGING/"
 
+          # A release left by hPanel's Git deployment feature carries a .git
+          # directory, which is what its own `composer install` acts on. Two
+          # deployers writing to one directory means neither result is
+          # predictable, and that host-side install always fails because
+          # Hostinger's PHP disables proc_open. Fail here, with the fix in the
+          # message, rather than letting the remote script produce a trace.
+          #
+          # The `if` runs on the host and exits non-zero, which propagates
+          # through `set -e` and stops the deploy before it touches anything.
+          if ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
+               -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+               "$SSH_USER@$SSH_HOST" \
+               "test -e '$STAGING/.git'"; then
+            echo "::error::The deploy path looks like a Git checkout managed by hPanel's Git feature. Remove that deployment (hPanel -> Advanced -> Git) before using this pipeline; see docs/DEPLOYMENT.md section 13."
+            exit 1
+          fi
+
           echo "Upload complete; running the post-deploy script on the host."
 
       # The heavy lifting runs on the server, inside the new release, before the
@@ -231,12 +248,14 @@ jobs:
             /tmp/laravel.env "$SSH_USER@$SSH_HOST:$STAGING/.env"
           rm -f /tmp/laravel.env
 
-          # Copy the deploy script from the artifact and run it. `bash -s`
-          # streams the script so no extra file needs to exist beforehand.
+          # Run the deploy script that shipped inside the release. It was placed
+          # there by `git archive`, so the version executed is the one belonging
+          # to the code being activated, not whatever script happens to exist on
+          # the host from a previous deploy.
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
             -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             "$SSH_USER@$SSH_HOST" \
-            "set -euo pipefail && cd '$STAGING' && bash deploy/hostinger-deploy.sh '$STAGING' '$DEPLOY_PATH'"
+            "set -euo pipefail && test -f '$STAGING/deploy/hostinger-deploy.sh' && cd '$STAGING' && bash deploy/hostinger-deploy.sh '$STAGING' '$DEPLOY_PATH'"
 
       - name: Swap release into place
         env:
@@ -248,15 +267,38 @@ jobs:
           set -euo pipefail
           STAGING="${DEPLOY_PATH}.incoming"
 
-          # One previous release is kept for a one-command rollback. The swap
-          # itself is two renames, which are atomic on the same filesystem.
+          # Two renames of sibling paths, which are atomic on one filesystem, so
+          # there is no window where the document root does not resolve. The
+          # outgoing release is parked as `.previous` for a one-command rollback
+          # rather than deleted.
+          #
+          # Written as a heredoc script executed remotely rather than an inline
+          # &&/|| chain: shell operator precedence makes a long chain easy to get
+          # wrong, and a swallowed failure here would leave the site pointing at
+          # a directory that was never swapped.
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
             -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "$SSH_USER@$SSH_HOST" \
-            "set -euo pipefail && \
-             [ -d '$DEPLOY_PATH' ] && rm -rf '${DEPLOY_PATH}.previous' && mv '$DEPLOY_PATH' '${DEPLOY_PATH}.previous' || true && \
-             mv '$STAGING' '$DEPLOY_PATH' && \
-             echo 'Swapped into place.'"
+            "$SSH_USER@$SSH_HOST" bash -s -- "$STAGING" "$DEPLOY_PATH" <<'REMOTE'
+          set -euo pipefail
+          STAGING="$1"
+          LIVE="$2"
+
+          if [ ! -d "$STAGING" ]; then
+            echo "ERROR: staging directory $STAGING does not exist; nothing to swap." >&2
+            exit 1
+          fi
+
+          # Keep one previous release. `rm -rf` of the older `.previous` is the
+          # only destructive act here, and it targets a path we created.
+          if [ -d "$LIVE" ]; then
+            rm -rf "${LIVE}.previous"
+            mv "$LIVE" "${LIVE}.previous"
+            echo "Moved the outgoing release to ${LIVE}.previous"
+          fi
+
+          mv "$STAGING" "$LIVE"
+          echo "Swapped $STAGING into $LIVE"
+          REMOTE
 
       - name: Deployment summary
         if: success()

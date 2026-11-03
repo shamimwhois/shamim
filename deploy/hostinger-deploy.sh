@@ -31,6 +31,49 @@ echo "==> Deploying $(basename "$STAGING_PATH") to $LIVE_PATH"
 echo "==> PHP: $("$PHP_BIN" -v | head -n1)"
 
 # ---------------------------------------------------------------------------
+# 0. This release must not be a git working tree.
+# ---------------------------------------------------------------------------
+# The artifact is assembled in CI with `git archive`, so it carries no .git.
+# If one is present, somebody has configured hPanel's Git feature to deploy
+# onto this path, and two deployers are now fighting over one directory: that
+# feature runs its own `composer install` on the host, where Hostinger's PHP
+# has `proc_open` in disable_functions, so it fails every time and can also
+# re-clone the repository over a release we already activated.
+#
+# Failing here is deliberate. A silent `git pull` over the release directory
+# would replace the CI-built vendor/ with an unbootable tree, so refuse rather
+# than proceed. See docs/DEPLOYMENT.md §13.
+if [ -e .git ]; then
+  echo "ERROR: $STAGING_PATH contains a .git directory." >&2
+  echo "       This path is being managed by hPanel's Git deployment feature," >&2
+  echo "       which conflicts with the GitHub Actions pipeline in deploy.yml." >&2
+  echo "       Remove that deployment (hPanel -> Advanced -> Git) and re-run." >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 0b. Assert the host can actually boot this release.
+# ---------------------------------------------------------------------------
+# The release ships vendor/ pre-built, so Composer is NOT run here. These two
+# checks exist because the failure they replace is expensive to read: without
+# them, a host that cannot run the app produces an opaque 500 whose cause is
+# buried in a log the deployer may not think to open.
+if [ ! -f vendor/autoload.php ]; then
+  echo "ERROR: vendor/autoload.php is missing; the release was not built with" >&2
+  echo "       its Composer dependencies bundled. Build it in CI instead." >&2
+  exit 1
+fi
+
+# `proc_open` is what Hostinger disables, and it is the single most common
+# reason a server-side `composer install` dies with an unreadable
+# "Process.php line 147" trace. Report it as a warning: the app itself does
+# not need it, only a host-side Composer does.
+if ! "$PHP_BIN" -r 'exit(function_exists("proc_open") ? 0 : 1);'; then
+  echo "WARN: proc_open is disabled in this PHP. Composer cannot run on this" >&2
+  echo "      host, which is expected: the release ships vendor/ pre-built." >&2
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Sanity: the artifact must actually be a Laravel app.
 # ---------------------------------------------------------------------------
 if [ ! -f artisan ]; then
@@ -40,6 +83,30 @@ fi
 
 if [ ! -f .env ]; then
   echo "ERROR: .env missing. The workflow writes it before this script runs." >&2
+  exit 1
+fi
+
+# Extensions the framework and the production drivers require.
+# `composer check-platform-reqs` would be the thorough test, but it is a Composer
+# command and Composer is precisely what may be unavailable here, so probe the
+# extensions directly with PHP.
+#
+# Derived from the `ext-*` entries in composer.lock plus the drivers the
+# production .env selects (mysql, and the database session/cache/queue stores).
+# A missing one of these is the difference between a working site and a bare
+# "could not find driver" page, so fail loudly with the fix rather than letting
+# the first HTTP request discover it.
+missing_ext=""
+for ext in pdo_mysql mbstring openssl tokenizer xml dom fileinfo curl ctype json zip; do
+  if ! "$PHP_BIN" -r "exit(extension_loaded('$ext') ? 0 : 1);"; then
+    missing_ext="$missing_ext $ext"
+  fi
+done
+
+if [ -n "$missing_ext" ]; then
+  echo "ERROR: the host PHP is missing required extension(s):$missing_ext" >&2
+  echo "       Enable them in hPanel -> Advanced -> PHP Configuration -> Extensions" >&2
+  echo "       and re-run the deploy. See docs/DEPLOYMENT.md §1." >&2
   exit 1
 fi
 
