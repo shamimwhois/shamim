@@ -17,7 +17,7 @@
             <li>
                 <span
                     aria-disabled="true"
-                    class="grid size-8 cursor-not-allowed place-items-center rounded-sm text-ink-300 dark:text-ink-700"
+                    class="grid size-8 cursor-not-allowed place-items-center rounded-md text-ink-400"
                 >
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -31,7 +31,7 @@
                     href="{{ $paginator->previousPageUrl() }}"
                     rel="prev"
                     wire:navigate
-                    class="grid size-8 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-900 dark:hover:text-ink-50"
+                    class="grid size-8 place-items-center rounded-md text-ink-600 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink"
                 >
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -45,7 +45,7 @@
         @foreach ($elements as $element)
             @if (is_string($element))
                 <li>
-                    <span class="grid size-8 place-items-center font-mono text-xs text-ink-400 dark:text-ink-600" aria-hidden="true">
+                    <span class="grid size-8 place-items-center text-xs text-ink-400" aria-hidden="true">
                         {{ $element }}
                     </span>
                 </li>
@@ -57,7 +57,7 @@
                         <li>
                             <span
                                 aria-current="page"
-                                class="grid size-8 place-items-center rounded-sm border border-ink-900 bg-ink-900 font-mono text-xs font-semibold tabular-nums text-white dark:border-ink-50 dark:bg-ink-50 dark:text-ink-950"
+                                class="grid size-8 place-items-center rounded-md bg-sui-accent text-xs font-semibold tabular-nums text-white shadow-soft-1"
                             >
                                 {{ $page }}
                                 <span class="sr-only">(current page)</span>
@@ -69,7 +69,7 @@
                                 href="{{ $url }}"
                                 wire:navigate
                                 aria-label="Go to page {{ $page }}"
-                                class="grid size-8 place-items-center rounded-sm font-mono text-xs tabular-nums text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-900 dark:hover:text-ink-50"
+                                class="grid size-8 place-items-center rounded-md text-xs font-medium tabular-nums text-ink-600 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink"
                             >
                                 {{ $page }}
                             </a>
@@ -86,7 +86,7 @@
                     href="{{ $paginator->nextPageUrl() }}"
                     rel="next"
                     wire:navigate
-                    class="grid size-8 place-items-center rounded-sm text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-900 dark:hover:text-ink-50"
+                    class="grid size-8 place-items-center rounded-md text-ink-600 transition duration-150 ease-soft hover:bg-sui-hover hover:text-sui-ink"
                 >
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -98,7 +98,7 @@
             <li>
                 <span
                     aria-disabled="true"
-                    class="grid size-8 cursor-not-allowed place-items-center rounded-sm text-ink-300 dark:text-ink-700"
+                    class="grid size-8 cursor-not-allowed place-items-center rounded-md text-ink-400"
                 >
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />

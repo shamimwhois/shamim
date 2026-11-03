@@ -1,0 +1,1992 @@
+/* ==========================================================================
+   CI/CD & Laravel — section 02 of the landing page
+   --------------------------------------------------------------------------
+   One plate, one column, four bands, one clock.
+
+   Top to bottom: the chain of eight stage cards (the interactive rail, laid
+   horizontally), the mind map under it (a bus, a spoke per stage, the core,
+   the rollback edge), the readout for the selected stage, and the console —
+   progress, tabbed logs, workflow details. Same argument as before, drawn
+   the way an operator actually reads a run.
+
+   Two attributes carry all the state, and this file is the only place they
+   mean anything:
+
+   - `data-cursor` on `.cicd-plate` is the run. It paints every status pill,
+     checklist row and log line: `[data-cursor='4']` three cells complete,
+     the fourth running, the rest pending.
+   - `data-stage` is the reader's selection, and it shows exactly one
+     readout panel — nothing else, so the demo can advance while a stage
+     stays open.
+
+   Both are server-rendered at 1, so the plate is correct before Alpine
+   boots and stays readable with JavaScript disabled. `data-status` on a
+   cell/row is the resolved status of that one item: Alpine writes it, the
+   stylesheet paints it, and the server writes the same value first.
+
+   LAYOUT CONTRACT
+   The plate is ONE column at every width. An earlier revision split it in
+   two at >=1024px, which quietly broke the section: the run column was
+   ~590px wide while the eight-card track needs 980px, so the chain scrolled
+   sideways on a desktop, and the console's three panels were crushed into
+   that same narrow column. The console now carries its own internal grid
+   instead, so the chain gets the whole plate and the log pane gets the
+   width a log pane needs.
+
+   GEOMETRY CONTRACT
+   `.cicd-track { min-width }` and `.cicd-cell { margin-right }` are read by
+   the blade to derive the mind map's spoke positions, so a spoke always
+   lands on the card it belongs to. Change one, change the other.
+
+   Colours come from the `--color-cd-*` role set in app.css, never from a
+   raw hex here, so the band follows the theme *and* the accent picker. The
+   terminal is the one exception: it uses the `--color-code-*` roles on
+   purpose, because a shell pane stays dark in both themes — the reader is
+   looking at a console, not at the page.
+   ========================================================================== */
+
+/* --- The plate ------------------------------------------------------------ */
+
+.cicd-plate {
+    position: relative;
+    isolation: isolate;
+    /* Prevent the plate from stretching indefinitely on very large screens */
+    max-width: min(100%, 1240px);
+    margin-inline: auto;
+    overflow: hidden;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-xl);
+    background: var(--color-cd-card);
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 28px 56px -36px rgb(0 0 0 / 0.32);
+}
+
+/* A hairline of accent along the top edge: the plate reads as one machined
+   object rather than a stack of divs. */
+.cicd-plate::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    z-index: 3;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklab, var(--color-cd-accent) 55%, transparent) 22%,
+        color-mix(in oklab, var(--color-cd-accent) 55%, transparent) 78%,
+        transparent
+    );
+    pointer-events: none;
+}
+
+/* --- Header controls ------------------------------------------------------ */
+
+.cicd-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.62rem 1.15rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background-color 160ms var(--ease-soft, ease),
+        border-color 160ms var(--ease-soft, ease),
+        color 160ms var(--ease-soft, ease),
+        box-shadow 160ms var(--ease-soft, ease),
+        transform 160ms var(--ease-soft, ease);
+}
+
+.cicd-btn:focus-visible {
+    outline: 2px solid var(--color-cd-accent);
+    outline-offset: 2px;
+}
+
+.cicd-btn--primary {
+    background: var(--color-cd-accent);
+    color: var(--color-cd-on-accent);
+    box-shadow: 0 10px 22px -14px color-mix(in oklab, var(--color-cd-accent) 80%, transparent);
+}
+
+.cicd-btn--primary:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.cicd-btn--ghost {
+    border-color: var(--color-cd-line);
+    background: var(--color-cd-card);
+    color: var(--color-cd-ink-muted);
+}
+
+.cicd-btn--ghost:hover {
+    border-color: var(--color-cd-line-strong);
+    background: var(--color-cd-raised);
+    color: var(--color-cd-ink);
+}
+
+.cicd-btn__icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex: none;
+}
+
+/* The play/pause pair swaps on the button's own `data-playing` attribute —
+   the same contract as data-stage and data-cursor: the server renders the
+   initial value, the stylesheet owns what it looks like. */
+.cicd-btn__icon--pause {
+    display: none;
+}
+
+.cicd-btn[data-playing='true'] .cicd-btn__icon--play {
+    display: none;
+}
+
+.cicd-btn[data-playing='true'] .cicd-btn__icon--pause {
+    display: block;
+}
+
+/* --- The live badge ------------------------------------------------------- */
+
+/* The plate's own clock, surfaced next to the controls where an operator
+   would look for it. State rides on `data-state` — queued, running, paused
+   or success — and the word next to the lamp always says the same thing. */
+.cicd-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-card);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    color: var(--color-cd-ink-muted);
+    white-space: nowrap;
+}
+
+.cicd-live__dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-cd-line-strong);
+    transition: background-color 200ms var(--ease-soft, ease);
+}
+
+.cicd-live__word {
+    text-transform: uppercase;
+    color: var(--color-cd-ink);
+}
+
+.cicd-live__time {
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--color-cd-line);
+    color: var(--color-cd-ink-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.cicd-live[data-state='running'] .cicd-live__dot {
+    background: var(--color-cd-accent);
+    animation: cicd-blink 1.2s ease-in-out infinite;
+}
+
+.cicd-live[data-state='paused'] .cicd-live__dot {
+    background: color-mix(in oklab, var(--color-cd-accent) 55%, transparent);
+}
+
+.cicd-live[data-state='success'] .cicd-live__dot {
+    background: var(--color-cd-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-cd-accent) 18%, transparent);
+}
+
+/* --- The stat strip ------------------------------------------------------- */
+
+.cicd-stats {
+    display: flex;
+    gap: 1.4rem;
+}
+
+.cicd-stats__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.cicd-stats__item + .cicd-stats__item {
+    padding-left: 1.4rem;
+    border-left: 1px solid var(--color-cd-line);
+}
+
+.cicd-stats dt {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-stats dd {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-cd-ink);
+}
+
+/* --- Stack chips ---------------------------------------------------------- */
+
+.cicd-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-start;
+}
+
+@media (min-width: 1024px) {
+    .cicd-chips {
+        justify-content: flex-end;
+    }
+}
+
+.cicd-chip {
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-card);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    color: var(--color-cd-ink-muted);
+    text-transform: none;
+    transition:
+        border-color 160ms var(--ease-soft, ease),
+        color 160ms var(--ease-soft, ease);
+}
+
+.cicd-chip:hover {
+    border-color: var(--color-cd-line-strong);
+    color: var(--color-cd-ink);
+}
+
+/* --- Repo card ------------------------------------------------------------ */
+
+/* Part of the demo, so it says so: the DEMO chip rides the border, and the
+   workflow cell is bound to the same clock as the chain below. */
+.cicd-repo {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-lg);
+    background: var(--color-cd-card);
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 18px 34px -30px rgb(0 0 0 / 0.4);
+}
+
+.cicd-repo__tag {
+    position: absolute;
+    top: 0;
+    right: 0.9rem;
+    transform: translateY(-50%);
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-card);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-repo__id {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.cicd-repo__mark {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-md);
+    background: var(--color-cd-raised);
+    color: var(--color-cd-ink);
+}
+
+.cicd-repo__mark svg {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.cicd-repo__name p {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-cd-ink);
+    white-space: nowrap;
+}
+
+.cicd-repo__badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+    vertical-align: 1px;
+}
+
+.cicd-repo__meta {
+    margin-top: 0.15rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-cd-ink-faint);
+    white-space: nowrap;
+    text-transform: none;
+}
+
+.cicd-repo__cells {
+    display: flex;
+    gap: 0.9rem;
+    padding-left: 0.95rem;
+    border-left: 1px solid var(--color-cd-line);
+}
+
+.cicd-repo__cells dt {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-repo__cells dd {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-cd-ink);
+    white-space: nowrap;
+}
+
+.cicd-repo__state {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* One dot vocabulary, three homes: the cards (status on the cell), the repo
+   card and the details row (status on the dot itself). Solid means cleared,
+   a ring means running, hollow means waiting — and every one of them is
+   accompanied by a word, so colour is never carrying the state alone. */
+.cicd-state-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    flex: none;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    background: var(--color-cd-line-strong);
+}
+
+.cicd-state-dot[data-status='queued'],
+.cicd-state-dot[data-status='pending'],
+.cicd-state-dot[data-status='paused'],
+.cicd-cell[data-status='pending'] .cicd-state-dot {
+    background: transparent;
+    border-color: var(--color-cd-line-strong);
+}
+
+.cicd-state-dot[data-status='running'],
+.cicd-cell[data-status='running'] .cicd-state-dot {
+    background: transparent;
+    border-color: color-mix(in oklab, var(--color-cd-accent) 32%, transparent);
+    border-top-color: var(--color-cd-accent);
+    animation: cicd-spin 0.9s linear infinite;
+}
+
+.cicd-state-dot[data-status='done'],
+.cicd-state-dot[data-status='success'],
+.cicd-cell[data-status='done'] .cicd-state-dot {
+    background: var(--color-cd-accent);
+    border-color: transparent;
+}
+
+/* --- Band 1: the field ---------------------------------------------------- */
+
+.cicd-run {
+    position: relative;
+    background: var(--color-cd-canvas);
+}
+
+.cicd-field {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* The dot grid the whole instrument sits on — the image's particle field,
+   rendered as one repeating gradient instead of four hundred elements. */
+.cicd-field__grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+        circle at 1px 1px,
+        color-mix(in oklab, var(--color-cd-ink-faint) 42%, transparent) 1px,
+        transparent 0
+    );
+    background-size: 18px 18px;
+    opacity: 0.55;
+    /* The grid fades out toward the bottom so the cards read as sitting on
+       a surface rather than on a photograph. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+
+/* Two soft washes of accent — the aurora. Modern, but quiet: it is depth,
+   not decoration, and it never competes with the cards in front of it. */
+.cicd-field__aurora {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(58% 62% at 16% 4%, color-mix(in oklab, var(--color-cd-accent) 13%, transparent), transparent 68%),
+        radial-gradient(46% 54% at 84% 18%, color-mix(in oklab, var(--color-cd-accent) 9%, transparent), transparent 70%);
+}
+
+.cicd-field__glow {
+    position: absolute;
+    left: 50%;
+    bottom: -45%;
+    width: 34rem;
+    height: 28rem;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, var(--color-cd-glow), transparent);
+}
+
+.cicd-cortex {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* The brain is texture, not illustration — the hero owns the literal brain
+   on this page. It is drawn quietly on purpose: the bus, the spokes and the
+   packet are the argument, and a loud silhouette would compete with them. */
+.cicd-cortex-top {
+    stop-color: var(--color-cd-accent);
+    stop-opacity: 0.07;
+}
+
+.cicd-cortex-bottom {
+    stop-color: var(--color-cd-accent);
+    stop-opacity: 0.015;
+}
+
+.cicd-cortex-outline {
+    fill: none;
+    stroke: var(--color-cd-accent);
+    stroke-width: 1.25;
+    stroke-opacity: 0.13;
+}
+
+.cicd-cortex-fissure {
+    fill: none;
+    stroke: var(--color-cd-accent);
+    stroke-width: 1.5;
+    stroke-opacity: 0.16;
+    stroke-dasharray: 1 6;
+    stroke-linecap: round;
+}
+
+.cicd-cortex-sulcus {
+    fill: none;
+    stroke: var(--color-cd-accent);
+    stroke-width: 1.1;
+    stroke-opacity: 0.13;
+    stroke-linecap: round;
+}
+
+/* `currentColor` inside a <pattern> resolves against the pattern, not the
+   element that references it, so the dot carries its own role. */
+.cicd-lattice-dot {
+    fill: var(--color-cd-accent);
+    fill-opacity: 0.26;
+}
+
+/* The digital part: a soft band of light crossing the cortex forever, so
+   the field reads as scanned rather than drawn. */
+.cicd-scan {
+    animation: cicd-scan 7.5s linear infinite;
+}
+
+.cicd-scan-edge {
+    stop-color: var(--color-cd-accent);
+    stop-opacity: 0;
+}
+
+.cicd-scan-core {
+    stop-color: var(--color-cd-accent);
+    stop-opacity: 0.16;
+}
+
+.cicd-synapse {
+    fill: var(--color-cd-accent);
+    opacity: 0.5;
+    animation: cicd-twinkle 5.4s ease-in-out infinite;
+}
+
+/* --- Band 1: the chain ---------------------------------------------------- */
+
+.cicd-scroll {
+    position: relative;
+    z-index: 1;
+    overflow-x: auto;
+    padding: 1.75rem 1.5rem 0.4rem;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Eight cards plus seven connectors have to stay one row — a stacked
+   pipeline is not a pipeline — so below this width the track scrolls
+   sideways. The map's viewBox is derived from this number, so a spoke
+   never drifts from its card. 982 is not an aesthetic choice: the cells
+   refuse to shrink below 100px each (`min-width` below), and 8 × 100 plus
+   the seven 26px connectors is 982 — a track any narrower carries a 2px
+   phantom scroll, and the stretched wire SVG turns those 2px into visibly
+   drifting spokes. Change this number and `$trackMinWidth` together. */
+.cicd-track {
+    min-width: 982px;
+}
+
+.cicd-cards {
+    display: flex;
+    align-items: stretch;
+    list-style: none;
+}
+
+.cicd-cell {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 100px;
+}
+
+.cicd-cell:not(:last-child) {
+    margin-right: 26px;
+}
+
+/* The connector into the next stage: a hairline that runs out of this card
+   and ends in an arrowhead pointing at the next one. It is drawn with
+   borders rather than a glyph, so a screen reader never announces it as a
+   stray character. State comes from the cell, so the connector lights up as
+   the run passes through it. */
+.cicd-cell:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    width: 20px;
+    height: 1px;
+    transform: translateY(-50%);
+    background: var(--color-cd-line-strong);
+    transition: background-color 200ms var(--ease-soft, ease);
+}
+
+.cicd-cell:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: calc(100% + 20px);
+    top: 50%;
+    width: 0;
+    height: 0;
+    transform: translateY(-50%);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--color-cd-line-strong);
+    transition: border-left-color 200ms var(--ease-soft, ease);
+}
+
+.cicd-cell[data-status='done']:not(:last-child)::before,
+.cicd-cell[data-status='running']:not(:last-child)::before {
+    background: color-mix(in oklab, var(--color-cd-accent) 55%, var(--color-cd-line));
+}
+
+.cicd-cell[data-status='done']:not(:last-child)::after,
+.cicd-cell[data-status='running']:not(:last-child)::after {
+    border-left-color: var(--color-cd-accent);
+}
+
+.cicd-cell[data-status='running']:not(:last-child)::after {
+    animation: cicd-blink 1.1s ease-in-out infinite;
+}
+
+.cicd-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    height: 100%;
+    padding: 0.85rem 0.7rem 0.7rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-lg);
+    background: var(--color-cd-card);
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 14px 28px -24px rgb(0 0 0 / 0.45);
+    text-align: center;
+    cursor: pointer;
+    transition:
+        border-color 180ms var(--ease-soft, ease),
+        box-shadow 180ms var(--ease-soft, ease),
+        background-color 180ms var(--ease-soft, ease),
+        transform 180ms var(--ease-soft, ease);
+}
+
+.cicd-card:hover {
+    border-color: var(--color-cd-line-strong);
+    box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.04),
+        0 18px 30px -24px rgb(0 0 0 / 0.5);
+    transform: translateY(-2px);
+}
+
+.cicd-card:focus-visible {
+    outline: 2px solid var(--color-cd-accent);
+    outline-offset: 2px;
+}
+
+/* Selection and run state are independent: a selected pending card keeps
+   its ring, a running unselected card keeps its border. Different
+   properties, so neither rule has to outrank the other.
+
+   This rule comes AFTER `:hover` on purpose — same specificity, so source
+   order decides, and a selected card stays lifted whether or not the
+   pointer is on it. */
+.cicd-card[aria-pressed='true'] {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 50%, var(--color-cd-line));
+    background: color-mix(in oklab, var(--color-cd-accent) 6%, var(--color-cd-card));
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklab, var(--color-cd-accent) 40%, transparent),
+        0 20px 34px -26px color-mix(in oklab, var(--color-cd-accent) 65%, transparent);
+    transform: translateY(-2px);
+}
+
+.cicd-cell[data-status='running'] .cicd-card {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 45%, var(--color-cd-line));
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-cd-accent) 18%, transparent),
+        0 20px 32px -24px color-mix(in oklab, var(--color-cd-accent) 55%, transparent);
+}
+
+.cicd-card__top {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    justify-content: space-between;
+    gap: 0.3rem;
+    min-height: 1.1rem;
+}
+
+.cicd-row__ord {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    color: var(--color-cd-ink-faint);
+    transition: color 180ms var(--ease-soft, ease);
+}
+
+.cicd-card[aria-pressed='true'] .cicd-row__ord {
+    color: var(--color-cd-accent-soft);
+}
+
+/* The stamp. A gate is allowed to raise its voice — gates are the argument
+   of the section, and this is where that shows. The final check wears the
+   same shape in a quieter tone: it is the last word on the release, but it
+   is not one of the three gates that fan out and block it. */
+.cicd-card__stamp {
+    padding: 0.05rem 0.35rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-raised);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-card__stamp.is-gate {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 30%, transparent);
+    background: color-mix(in oklab, var(--color-cd-accent) 10%, transparent);
+    color: var(--color-cd-accent-soft);
+}
+
+.cicd-card__icon {
+    display: grid;
+    place-items: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    flex: none;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-md);
+    background: var(--color-cd-panel);
+    color: var(--color-cd-ink-muted);
+    transition:
+        color 180ms var(--ease-soft, ease),
+        border-color 180ms var(--ease-soft, ease),
+        background-color 180ms var(--ease-soft, ease);
+}
+
+.cicd-card__icon svg {
+    width: 1.2rem;
+    height: 1.2rem;
+}
+
+.cicd-cell[data-status='done'] .cicd-card__icon,
+.cicd-cell[data-status='running'] .cicd-card__icon {
+    color: var(--color-cd-accent-soft);
+    border-color: color-mix(in oklab, var(--color-cd-accent) 32%, var(--color-cd-line));
+}
+
+.cicd-cell[data-status='running'] .cicd-card__icon {
+    background: color-mix(in oklab, var(--color-cd-accent) 9%, var(--color-cd-card));
+}
+
+.cicd-row__name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    color: var(--color-cd-ink);
+}
+
+.cicd-card__desc {
+    font-size: 0.62rem;
+    line-height: 1.4;
+    color: var(--color-cd-ink-muted);
+}
+
+/* The status rides in a pill, tinted by the cell's own state: the card
+   states its place in the run in one line, the way an operator scans a
+   board — word first, colour only confirming it. */
+.cicd-card__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-raised);
+    transition:
+        background-color 180ms var(--ease-soft, ease),
+        border-color 180ms var(--ease-soft, ease);
+}
+
+.cicd-cell[data-status='done'] .cicd-card__state,
+.cicd-cell[data-status='running'] .cicd-card__state {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 32%, var(--color-cd-line));
+    background: color-mix(in oklab, var(--color-cd-accent) 10%, var(--color-cd-card));
+}
+
+.cicd-card__status {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--color-cd-ink-faint);
+    transition: color 180ms var(--ease-soft, ease);
+}
+
+.cicd-cell[data-status='done'] .cicd-card__status,
+.cicd-cell[data-status='running'] .cicd-card__status {
+    color: var(--color-cd-accent-soft);
+}
+
+/* The kind the rail used to print, and the one piece of evidence that
+   stage carries. Only a gate is allowed to raise its voice — gates are the
+   argument of the section. */
+.cicd-card__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    align-content: flex-end;
+    justify-content: space-between;
+    gap: 0.1rem 0.25rem;
+    width: 100%;
+    min-height: 2.1rem;
+    margin-top: auto;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--color-cd-line);
+}
+
+.cicd-row__kind {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-row__kind.is-gate {
+    color: var(--color-cd-accent-soft);
+}
+
+.cicd-card__meta {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.01em;
+    color: var(--color-cd-ink-faint);
+    overflow-wrap: anywhere;
+}
+
+/* --- Band 1: the mind map ------------------------------------------------- */
+
+.cicd-map {
+    position: relative;
+    height: 148px;
+}
+
+.cicd-wires {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Every stroke is scaled non-uniformly by the viewBox, so every stroke
+   declares `non-scaling-stroke`: without it the dashes read as a rendering
+   bug the moment the viewport changes width. */
+.cicd-spoke {
+    fill: none;
+    stroke: var(--color-cd-accent);
+    stroke-width: 1;
+    stroke-opacity: 0.52;
+    stroke-dasharray: 1 5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+/* The bus is the spine of the drawing, so it is drawn in ink rather than in
+   a hairline grey — it has to survive on top of the cortex texture in both
+   themes. */
+.cicd-bus {
+    fill: none;
+    stroke: color-mix(in oklab, var(--color-cd-ink-muted) 65%, transparent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+/* The packet is the whole animation budget of the band: one segment of a
+   100-unit dash travelling the bus, which is the ring the old radial graph
+   drew — the chain above it is the order, the bus is the same order
+   under the surface. */
+.cicd-packet {
+    fill: none;
+    stroke: var(--color-cd-accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 5 95;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 5px var(--color-cd-accent));
+    animation: cicd-packet 5.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* The one edge that runs against the flow: verification failing re-points
+   the symlink. Dashed, red, slow — and the only red on the plate. */
+.cicd-rollback {
+    fill: none;
+    stroke: var(--color-cd-danger);
+    stroke-width: 1.25;
+    stroke-opacity: 0.65;
+    stroke-dasharray: 4 7;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    animation: cicd-flow 6s linear infinite reverse;
+}
+
+.cicd-rollback-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 0.1rem 0.4rem;
+    border: 1px solid color-mix(in oklab, var(--color-cd-danger) 35%, transparent);
+    border-radius: 999px;
+    background: var(--color-cd-canvas);
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.18em;
+    color: var(--color-cd-danger);
+    opacity: 0.9;
+}
+
+/* The application itself. Every spoke on the bus is a stage acting on this
+   one core, which is what keeps the drawing a mind map rather than a
+   flowchart. */
+.cicd-core {
+    position: absolute;
+    left: 50%;
+    top: 44.6%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--color-cd-accent) 45%, transparent);
+    border-radius: 999px;
+    background: var(--color-cd-card);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--color-cd-accent-soft);
+    box-shadow: 0 10px 22px -18px rgb(0 0 0 / 0.5);
+    z-index: 2;
+}
+
+.cicd-core__dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: var(--color-cd-accent);
+}
+
+.cicd-core__pulse {
+    position: absolute;
+    inset: -3px;
+    border: 1px solid var(--color-cd-accent);
+    border-radius: 999px;
+    opacity: 0;
+    animation: cicd-pulse 3.4s var(--ease-soft, ease-out) infinite;
+}
+
+/* --- Band 2: the readout -------------------------------------------------- */
+
+.cicd-readout {
+    position: relative;
+    z-index: 1;
+    padding: 1.5rem 1.6rem 1.65rem;
+    border-top: 1px solid var(--color-cd-line);
+    background: var(--color-cd-card);
+}
+
+.cicd-readout__panel {
+    display: none;
+}
+
+.cicd-plate[data-stage='1'] [data-panel='1'],
+.cicd-plate[data-stage='2'] [data-panel='2'],
+.cicd-plate[data-stage='3'] [data-panel='3'],
+.cicd-plate[data-stage='4'] [data-panel='4'],
+.cicd-plate[data-stage='5'] [data-panel='5'],
+.cicd-plate[data-stage='6'] [data-panel='6'],
+.cicd-plate[data-stage='7'] [data-panel='7'],
+.cicd-plate[data-stage='8'] [data-panel='8'] {
+    display: block;
+    animation: cicd-panel-in 260ms var(--ease-out-quint, ease) both;
+}
+
+@keyframes cicd-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* The header of the panel: what this stage is on the left, what it costs
+   on the right. */
+.cicd-readout__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.cicd-readout__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-readout__ord {
+    color: var(--color-cd-accent-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+.cicd-readout__dot {
+    color: var(--color-cd-line-strong);
+}
+
+.cicd-readout__kind {
+    color: var(--color-cd-ink-muted);
+}
+
+.cicd-readout__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.cicd-badge {
+    padding: 0.12rem 0.5rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-raised);
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+    white-space: nowrap;
+}
+
+.cicd-badge--gate {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 32%, transparent);
+    background: color-mix(in oklab, var(--color-cd-accent) 10%, transparent);
+    color: var(--color-cd-accent-soft);
+}
+
+.cicd-badge--check {
+    border-color: var(--color-cd-line-strong);
+    background: var(--color-cd-raised);
+    color: var(--color-cd-ink-muted);
+}
+
+.cicd-readout__title {
+    margin-top: 0.65rem;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--color-cd-ink);
+}
+
+.cicd-readout__note {
+    margin-top: 0.45rem;
+    max-width: 62ch;
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--color-cd-ink-muted);
+}
+
+/* The command line is the one place on the plate that is allowed to look
+   like a shell: a recessed well, mono, with a prompt in the accent. */
+.cicd-readout__command {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    max-width: 46rem;
+    padding: 0.6rem 0.8rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-md);
+    background: var(--color-cd-well);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: 1.5;
+    white-space: nowrap;
+    color: var(--color-cd-ink);
+}
+
+.cicd-readout__prompt {
+    color: var(--color-cd-accent-soft);
+    user-select: none;
+}
+
+/* The caret. A command line without one looks like a caption; with one it
+   looks like the run is still going. */
+.cicd-readout__caret {
+    flex: 0 0 0.5ch;
+    align-self: center;
+    height: 0.9em;
+    background: var(--color-cd-accent-soft);
+    animation: cicd-caret 1.05s steps(1) infinite;
+}
+
+@keyframes cicd-caret {
+    0%,
+    50% {
+        opacity: 1;
+    }
+    51%,
+    100% {
+        opacity: 0;
+    }
+}
+
+/* --- Band 3: the console -------------------------------------------------- */
+
+/* The console is a full-width band that carries its own grid: progress on
+   the left, the log in the middle, the run's details on the right. */
+.cicd-console {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    border-top: 1px solid var(--color-cd-line);
+    background: var(--color-cd-card);
+}
+
+.cicd-panel {
+    min-width: 0;
+    padding: 1.25rem 1.4rem 1.4rem;
+}
+
+.cicd-panel + .cicd-panel {
+    border-top: 1px solid var(--color-cd-line);
+}
+
+.cicd-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+}
+
+.cicd-panel__head h3 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-cd-ink);
+}
+
+.cicd-panel__figure {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-cd-accent-soft);
+}
+
+.cicd-panel__figure--muted {
+    padding: 0.12rem 0.5rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-panel__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    border: 1px solid color-mix(in oklab, var(--color-cd-accent) 32%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-cd-accent) 9%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.5938rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-cd-accent-soft);
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+        background-color 160ms var(--ease-soft, ease),
+        border-color 160ms var(--ease-soft, ease);
+}
+
+.cicd-panel__link:hover {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 52%, transparent);
+    background: color-mix(in oklab, var(--color-cd-accent) 15%, transparent);
+}
+
+/* --- Console: pipeline progress ------------------------------------------- */
+
+.cicd-bar {
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-cd-raised);
+}
+
+.cicd-bar__fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--color-cd-accent) 72%, transparent),
+        var(--color-cd-accent)
+    );
+    transition: width 500ms var(--ease-out-quint, ease);
+}
+
+.cicd-checks {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.7rem;
+    list-style: none;
+}
+
+.cicd-check {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--color-cd-line);
+    font-size: 0.75rem;
+}
+
+.cicd-check:first-child {
+    border-top: 0;
+}
+
+.cicd-check__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: none;
+    border: 1.25px solid var(--color-cd-line-strong);
+    border-radius: 50%;
+    background: transparent;
+}
+
+.cicd-check[data-status='done'] .cicd-check__mark {
+    border-color: var(--color-cd-accent);
+    background: var(--color-cd-accent);
+}
+
+.cicd-check[data-status='done'] .cicd-check__mark::after {
+    content: '✓';
+    font-size: 0.5625rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-cd-on-accent);
+}
+
+.cicd-check[data-status='running'] .cicd-check__mark {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 32%, transparent);
+    border-top-color: var(--color-cd-accent);
+    animation: cicd-spin 0.9s linear infinite;
+}
+
+.cicd-check__label {
+    color: var(--color-cd-ink-faint);
+    transition: color 180ms var(--ease-soft, ease);
+}
+
+.cicd-check[data-status='done'] .cicd-check__label,
+.cicd-check[data-status='running'] .cicd-check__label {
+    color: var(--color-cd-ink);
+}
+
+.cicd-check__time {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-check[data-status='running'] .cicd-check__time,
+.cicd-check[data-status='done'] .cicd-check__time {
+    color: var(--color-cd-accent-soft);
+}
+
+/* --- Console: tabs and terminal ------------------------------------------- */
+
+/* The tabs hang off a hairline and the active one is marked by
+   aria-selected alone — one attribute, as everywhere else on the plate. */
+.cicd-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0 0 0.75rem;
+}
+
+.cicd-tabs button {
+    appearance: none;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: 999px;
+    background: var(--color-cd-card);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+    cursor: pointer;
+    transition:
+        color 160ms var(--ease-soft, ease),
+        border-color 160ms var(--ease-soft, ease),
+        background-color 160ms var(--ease-soft, ease);
+}
+
+.cicd-tabs button:hover {
+    color: var(--color-cd-ink-muted);
+}
+
+.cicd-tabs button:focus-visible {
+    outline: 2px solid var(--color-cd-accent);
+    outline-offset: -2px;
+}
+
+.cicd-tabs button[aria-selected='true'] {
+    border-color: color-mix(in oklab, var(--color-cd-accent) 38%, transparent);
+    background: color-mix(in oklab, var(--color-cd-accent) 11%, var(--color-cd-card));
+    color: var(--color-cd-accent-soft);
+}
+
+/* The shell pane: dark in BOTH themes, because the reader is looking at a
+   console, not at the page. Roles come from the shared `--color-code-*`
+   set for exactly that reason. */
+.cicd-term {
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--color-code-ink) 12%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--color-code-canvas);
+    box-shadow: 0 18px 34px -28px rgb(0 0 0 / 0.7);
+}
+
+.cicd-term__chrome {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-code-ink) 8%, transparent);
+}
+
+.cicd-term__dots {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.cicd-term__dots i {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--color-code-muted) 45%, transparent);
+}
+
+.cicd-term__dots i:first-child {
+    background: color-mix(in oklab, var(--color-danger) 75%, transparent);
+}
+
+.cicd-term__dots i:nth-child(2) {
+    background: color-mix(in oklab, var(--color-warning) 75%, transparent);
+}
+
+.cicd-term__dots i:nth-child(3) {
+    background: color-mix(in oklab, var(--color-signal-500) 75%, transparent);
+}
+
+.cicd-term__file {
+    font-family: var(--font-mono);
+    font-size: 0.5938rem;
+    letter-spacing: 0.06em;
+    color: var(--color-code-muted);
+}
+
+/* The lamp in the chrome bar: the console's own state, so the pane says
+   whether the run behind it is moving. */
+.cicd-term__live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-code-muted);
+}
+
+.cicd-term__lamp {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--color-code-muted) 55%, transparent);
+}
+
+.cicd-term__live[data-state='running'] .cicd-term__lamp {
+    background: var(--color-signal-400);
+    animation: cicd-blink 1.2s ease-in-out infinite;
+}
+
+.cicd-term__live[data-state='success'] .cicd-term__lamp {
+    background: var(--color-signal-400);
+}
+
+.cicd-term__live[data-state='paused'] .cicd-term__lamp {
+    background: var(--color-warning);
+}
+
+/* A floor on the pane so switching tabs does not resize the panel under
+   the reader's pointer. Panes are hidden by default and the matching one
+   is raised by the tablist's `data-tab` — one attribute, server-rendered at
+   the default, rewritten by Alpine; the stylesheet is the only place it
+   means anything, exactly like data-stage on the readout. */
+.cicd-term__pane {
+    display: none;
+    min-height: 15rem;
+    max-height: 24rem;
+    overflow-y: auto;
+    padding: 0.85rem 0.9rem 1rem;
+    scrollbar-width: thin;
+}
+
+.cicd-tabs[data-tab='logs'] ~ .cicd-term .cicd-term__pane[data-pane='logs'],
+.cicd-tabs[data-tab='tests'] ~ .cicd-term .cicd-term__pane[data-pane='tests'],
+.cicd-tabs[data-tab='deploy'] ~ .cicd-term .cicd-term__pane[data-pane='deploy'],
+.cicd-tabs[data-tab='environments'] ~ .cicd-term .cicd-term__pane[data-pane='environments'] {
+    display: block;
+}
+
+.cicd-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.65;
+}
+
+.cicd-line {
+    display: grid;
+    grid-template-columns: 1.4rem minmax(0, 1fr) 0.9rem 3.4rem;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.cicd-line__no {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-code-muted);
+}
+
+.cicd-line__text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--color-code-ink);
+}
+
+.cicd-line__chevron {
+    margin-right: 0.4rem;
+    color: var(--color-signal-400);
+}
+
+.cicd-line__time {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-code-muted);
+}
+
+/* One glyph per state in the mark column: a tick cleared, a dot running,
+   a middot waiting. The glyph carries the meaning; colour only confirms it. */
+.cicd-line__mark {
+    text-align: center;
+}
+
+.cicd-line[data-status='done'] .cicd-line__mark::after {
+    content: '✓';
+    color: var(--color-signal-400);
+}
+
+.cicd-line[data-status='running'] .cicd-line__mark::after {
+    content: '●';
+    color: var(--color-signal-400);
+    animation: cicd-blink 1.1s ease-in-out infinite;
+}
+
+.cicd-line[data-status='pending'] .cicd-line__mark::after {
+    content: '·';
+    color: var(--color-code-muted);
+}
+
+.cicd-line[data-status='done'] .cicd-line__time {
+    color: var(--color-signal-400);
+}
+
+.cicd-line[data-status='running'] .cicd-line__time {
+    color: var(--color-signal-300);
+}
+
+/* Static panes (tests, deploy) reuse the same grid with two cells, so the
+   columns line up with the live build log. */
+.cicd-line--prompt .cicd-line__no,
+.cicd-line--ok .cicd-line__no {
+    color: var(--color-signal-400);
+}
+
+.cicd-line--muted .cicd-line__no,
+.cicd-line--muted .cicd-line__text {
+    color: var(--color-code-muted);
+}
+
+.cicd-envs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    list-style: none;
+}
+
+.cicd-env {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid color-mix(in oklab, var(--color-code-ink) 10%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklab, var(--color-code-ink) 3%, transparent);
+}
+
+.cicd-env__name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-code-ink);
+}
+
+.cicd-env__detail {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--color-code-muted);
+    overflow-wrap: anywhere;
+}
+
+.cicd-env__state {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid color-mix(in oklab, var(--color-code-ink) 16%, transparent);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-code-muted);
+}
+
+.cicd-env__state.is-live {
+    border-color: color-mix(in oklab, var(--color-signal-400) 45%, transparent);
+    background: color-mix(in oklab, var(--color-signal-400) 12%, transparent);
+    color: var(--color-signal-400);
+}
+
+/* --- Console: workflow details -------------------------------------------- */
+
+.cicd-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.cicd-details > div {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--color-cd-line);
+    font-size: 0.75rem;
+}
+
+.cicd-details > div:first-child {
+    border-top: 0;
+}
+
+.cicd-details dt {
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-details dd {
+    font-weight: 500;
+    color: var(--color-cd-ink);
+    overflow-wrap: anywhere;
+}
+
+.cicd-details__mono {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.cicd-details__value {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.cicd-env-pill {
+    display: inline-flex;
+    padding: 0.12rem 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--color-cd-accent) 32%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-cd-accent) 11%, transparent);
+    font-size: 0.6563rem;
+    font-weight: 600;
+    color: var(--color-cd-accent-soft);
+}
+
+/* --- The three claims ----------------------------------------------------- */
+
+/* These are the sentences the diagram is evidence for, so they get the same
+   treatment as a spec sheet: an inset card per claim, with a rule of accent
+   along the top edge. */
+.cicd-claims {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-cd-line);
+}
+
+.cicd-claim {
+    position: relative;
+    padding: 1.15rem 1.2rem 1.25rem;
+    border: 1px solid var(--color-cd-line);
+    border-radius: var(--radius-lg);
+    background: var(--color-cd-panel);
+    transition:
+        border-color 200ms var(--ease-soft, ease),
+        transform 200ms var(--ease-soft, ease),
+        box-shadow 200ms var(--ease-soft, ease);
+}
+
+.cicd-claim::before {
+    content: '';
+    position: absolute;
+    inset: -1px auto auto -1px;
+    width: 2.25rem;
+    height: 2px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-cd-accent) 60%, transparent);
+}
+
+.cicd-claim:hover {
+    border-color: var(--color-cd-line-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 18px 34px -30px rgb(0 0 0 / 0.45);
+}
+
+.cicd-claim__label {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-cd-ink-faint);
+}
+
+.cicd-claim__title {
+    margin-top: 0.55rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-cd-ink);
+}
+
+.cicd-claim__body {
+    margin-top: 0.45rem;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--color-cd-ink-muted);
+}
+
+/* --- Keyframes ------------------------------------------------------------ */
+
+@keyframes cicd-flow {
+    to {
+        stroke-dashoffset: -100;
+    }
+}
+
+@keyframes cicd-packet {
+    0% {
+        stroke-dashoffset: 6;
+        opacity: 0;
+    }
+    6% {
+        opacity: 1;
+    }
+    94% {
+        opacity: 1;
+    }
+    100% {
+        stroke-dashoffset: -100;
+        opacity: 0;
+    }
+}
+
+@keyframes cicd-pulse {
+    0% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+    70%,
+    100% {
+        opacity: 0;
+        transform: scale(1.6);
+    }
+}
+
+@keyframes cicd-twinkle {
+    0%,
+    100% {
+        opacity: 0.18;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes cicd-scan {
+    from {
+        transform: translateY(-80px);
+    }
+    to {
+        transform: translateY(540px);
+    }
+}
+
+@keyframes cicd-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes cicd-blink {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
+/* --- Responsive ------------------------------------------------------------ */
+
+/* Tablet: the console splits into progress + logs, and the run's details
+   become a wide strip underneath them, where they read as a summary table
+   rather than as a third column. */
+@media (min-width: 768px) {
+    .cicd-console {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr);
+    }
+
+    .cicd-panel--progress {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .cicd-panel--logs {
+        grid-column: 2;
+        grid-row: 1;
+        border-top: 0;
+        border-left: 1px solid var(--color-cd-line);
+    }
+
+    .cicd-panel--details {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        border-left: 0;
+    }
+
+    /* The details strip is wide here, so the fields sit side by side. */
+    .cicd-details {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        column-gap: 1.5rem;
+    }
+
+    .cicd-details > div {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+        gap: 0.15rem;
+        padding: 0.6rem 0;
+    }
+
+    .cicd-details > div:first-child {
+        border-top: 1px solid var(--color-cd-line);
+    }
+}
+
+/* Desktop: the console gets its three columns back — progress, the log, and
+   the run's details — now that it owns the whole width of the plate. */
+@media (min-width: 1024px) {
+    .cicd-console {
+        grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.9fr) minmax(0, 1.1fr);
+    }
+
+    .cicd-panel--progress {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .cicd-panel--logs {
+        grid-column: 2;
+        grid-row: 1;
+        border-left: 1px solid var(--color-cd-line);
+    }
+
+    .cicd-panel--details {
+        grid-column: 3;
+        grid-row: 1;
+        border-top: 0;
+        border-left: 1px solid var(--color-cd-line);
+    }
+
+    /* The details column is narrow again, so the fields stack. */
+    .cicd-details {
+        display: flex;
+    }
+
+    .cicd-details > div {
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        align-items: baseline;
+        gap: 0.6rem;
+        padding: 0.5rem 0;
+    }
+
+    .cicd-details > div:first-child {
+        border-top: 0;
+    }
+}
+
+/* --- Narrow screens ------------------------------------------------------- */
+
+/* The console stacks, the readout tightens, and the map shortens — its
+   viewBox scales with it, so the rollback label stays on the curve. */
+@media (max-width: 40rem) {
+    .cicd-scroll {
+        padding: 1.25rem 1rem 0.35rem;
+    }
+
+    .cicd-map {
+        height: 124px;
+    }
+
+    .cicd-readout {
+        padding: 1.2rem 1.15rem 1.3rem;
+    }
+
+    .cicd-panel {
+        padding: 1.1rem 1.05rem 1.25rem;
+    }
+
+    .cicd-term__pane {
+        min-height: 0;
+        max-height: 20rem;
+    }
+
+    .cicd-line {
+        grid-template-columns: 1.2rem minmax(0, 1fr) 0.8rem 3rem;
+        gap: 0.4rem;
+        font-size: 0.6563rem;
+    }
+
+    .cicd-env {
+        grid-template-columns: 5rem minmax(0, 1fr) auto;
+    }
+
+    .cicd-details > div {
+        grid-template-columns: 5.5rem minmax(0, 1fr);
+    }
+
+    .cicd-repo__cells {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .cicd-stats {
+        gap: 1rem;
+    }
+
+    .cicd-stats__item + .cicd-stats__item {
+        padding-left: 1rem;
+    }
+}
+
+/* --- Reduced motion ------------------------------------------------------- */
+
+/* Nothing here conveys state by motion alone, so stopping everything leaves
+   a complete plate: the dashes still read as a path, the packet is gone,
+   the running dot is a static ring, and the selected stage is still
+   selected. The demo's Run Demo button still works — it just does not
+   start on its own. */
+@media (prefers-reduced-motion: reduce) {
+    .cicd-scan,
+    .cicd-synapse,
+    .cicd-packet,
+    .cicd-rollback,
+    .cicd-core__pulse,
+    .cicd-readout__caret,
+    .cicd-state-dot[data-status='running'],
+    .cicd-cell[data-status='running'] .cicd-state-dot,
+    .cicd-check[data-status='running'] .cicd-check__mark,
+    .cicd-cell[data-status='running']:not(:last-child)::after,
+    .cicd-line[data-status='running'] .cicd-line__mark::after,
+    .cicd-live[data-state='running'] .cicd-live__dot,
+    .cicd-term__live[data-state='running'] .cicd-term__lamp {
+        animation: none;
+    }
+
+    .cicd-packet {
+        display: none;
+    }
+
+    .cicd-readout__caret {
+        opacity: 0.4;
+    }
+
+    .cicd-plate [data-panel] {
+        animation: none;
+    }
+
+    .cicd-card,
+    .cicd-card:hover,
+    .cicd-card[aria-pressed='true'],
+    .cicd-bar__fill,
+    .cicd-row__ord,
+    .cicd-card__icon,
+    .cicd-card__status,
+    .cicd-check__label,
+    .cicd-claim,
+    .cicd-claim:hover,
+    .cicd-btn {
+        transition: none;
+    }
+
+    .cicd-card:hover,
+    .cicd-card[aria-pressed='true'],
+    .cicd-claim:hover {
+        transform: none;
+    }
+}

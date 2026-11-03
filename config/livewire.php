@@ -33,16 +33,30 @@ return [
     ],
 
     /*
-    |--------------------------------------------------------------------------
-    | Page Layout
-    |--------------------------------------------------------------------------
-    |
-    | The layout a single-file component is wrapped in when rendered as a full
-    | page via Route::livewire(). Public pages use the marketing shell.
-    |
-    */
+|--------------------------------------------------------------------------
+| Page Layout
+|--------------------------------------------------------------------------
+|
+| The layout a single-file component is wrapped in when rendered as a full
+| page via Route::livewire(). Public pages use the guest shell — the public
+| header, the page, the public footer.
+|
+| There are five audiences in `resources/views/layouts`, and this is the one
+| that answers pages that have not said otherwise:
+|
+|   guest.home   — unauthenticated visitors; this default
+|   auth         — an unauthenticated visitor proving who they are
+|   app          — the general authenticated dashboard
+|   seller       — the selling workspace
+|   admin        — platform administration
+|
+| Page components that need a workspace shell opt in explicitly with
+| `#[Layout('layouts::seller.dashboard')]` and so on. See the docblock at the
+| foot of each layout for what it owns and what it delegates.
+|
+*/
 
-    'component_layout' => 'layouts::public',
+    'component_layout' => 'layouts::guest.home',
 
     /*
     |--------------------------------------------------------------------------
@@ -102,11 +116,20 @@ return [
     |--------------------------------------------------------------------------
     | Temporary File Uploads
     |--------------------------------------------------------------------------
+    |
+    | `rules` is the gate every staged upload passes through before a component
+    | ever sees it, so it has to be at least as generous as the widest per-field
+    | cap in the application — currently a listing deliverable, which
+    | `config/marketplace.php` allows 20 MB of. Leave it at Livewire's 12 MB
+    | default and a seller with a big package gets a framework message about a
+    | limit no screen mentions, and the component's own `max:` rule becomes
+    | unreachable. Narrower caps (screenshots, feed images) still bind at the
+    | field, which is where each one is documented.
     */
 
     'temporary_file_upload' => [
         'disk' => null,
-        'rules' => null,
+        'rules' => 'required|file|max:20480',
         'directory' => null,
         'middleware' => null,
         'preview_mimes' => [

@@ -41,6 +41,19 @@ class Seo
     /** @var array<int, string> */
     public array $tags = [];
 
+    /**
+     * Structured data for the document head, as `@type` shaped arrays.
+     *
+     * A list rather than one object because a page legitimately has several things to
+     * say about itself: the article it is, and the trail of pages that lead to it.
+     * `partials/head` encodes the whole list into one `application/ld+json` script with
+     * the hex flags that make an unescaped print of a database string safe, and emits
+     * nothing at all for a page it has been told not to index.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $jsonLd = [];
+
     public bool $noindex = false;
 
     /**

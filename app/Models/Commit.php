@@ -1,0 +1,321 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Enums\CommitStatus;
+use App\Queries\CommitBuilder;
+use App\Services\CommitBodies;
+use Carbon\CarbonInterface;
+use Database\Factories\CommitFactory;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Casts\AsVector;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+/**
+ * @property-read string $id
+ * @property-read string|null $user_id
+ * @property-read string|null $parent_id
+ * @property-read string|null $root_id
+ * @property-read float $hot_score
+ * @property-read string $body
+ * @property-read array<string, string>|null $mentions
+ * @property-read CommitStatus $status
+ * @property-read string|null $link_preview_id
+ * @property-read string|null $quoted_commit_id
+ * @property-read CommitStatus|null $ai_decision
+ * @property-read list<string>|null $ai_categories
+ * @property-read list<float>|null $embedding
+ * @property-read CarbonInterface $created_at
+ * @property-read CarbonInterface $updated_at
+ * @property-read CarbonInterface|null $deleted_at
+ * @property-read int $stars_count
+ * @property-read int $pasteis_count
+ * @property-read bool $starred
+ * @property-read User|null $user
+ * @property-read Collection<int, User> $stars
+ * @property-read Collection<int, Tag> $tags
+ * @property-read Commit|null $parent
+ * @property-read Collection<int, Commit> $replies
+ * @property-read int $replies_count
+ * @property-read int|null $repliers_count
+ * @property-read string|null $continuation_id
+ * @property-read LinkPreview|null $linkPreview
+ * @property-read Poll|null $poll
+ * @property-read Commit|null $quotedCommit
+ * @property-read Collection<int, Commit> $quotes
+ * @property-read Collection<int, CommitImage> $images
+ */
+#[Hidden([
+    'ai_decision',
+    'ai_categories',
+    'embedding',
+])]
+#[UseEloquentBuilder(CommitBuilder::class)]
+final class Commit extends Model
+{
+    /** @use HasFactory<CommitFactory> */
+    use HasFactory;
+
+    use HasUuids;
+    use SoftDeletes;
+
+    public const int RESTORABLE_SECONDS = 30;
+
+    /**
+     * Moderation retries a failed check twice, the last time ten minutes later, so a pending commit older than this has
+     * been through every attempt.
+     */
+    public const int CHECKING_MINUTES = 15;
+
+    public const int MIN_BODY_LENGTH = 1;
+
+    public const int MAX_BODY_LENGTH = 4000;
+
+    /**
+     * Lists show a longer body folded to its first characters and lines, the rest one click away.
+     */
+    public const int PREVIEW_LENGTH = 280;
+
+    public const int PREVIEW_LINES = 8;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'pasteis_count' => 0,
+    ];
+
+    /**
+     * @var array{body_segments: list<array<string, string|null>>, preview_segments: list<array<string, string|null>>|null}|null
+     */
+    private ?array $segments = null;
+
+    /**
+     * @return array<string, string>
+     */
+    public function casts(): array
+    {
+        return [
+            'id' => 'string',
+            'user_id' => 'string',
+            'parent_id' => 'string',
+            'root_id' => 'string',
+            'hot_score' => 'float',
+            'pasteis_count' => 'integer',
+            'body' => 'string',
+            'mentions' => 'array',
+            'status' => CommitStatus::class,
+            'link_preview_id' => 'string',
+            'quoted_commit_id' => 'string',
+            'ai_decision' => CommitStatus::class,
+            'ai_categories' => 'array',
+            'embedding' => AsVector::class,
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * A deleted commit only ever leaves a tombstone behind: never its author or body. Otherwise, the body also comes split
+     * into segments, for rendering, and whether it is still being checked, so its author knows how long it might stay
+     * pending.
+     *
+     * @return array<mixed>
+     */
+    public function toArray(): array
+    {
+        if ($this->trashed()) {
+            $keys = ['id', 'parent_id', 'deleted_at', 'replies_count'];
+
+            return array_intersect_key($this->attributesToArray(), array_flip($keys));
+        }
+
+        if ($this->segments === null || $this->isDirty('body')) {
+            $this->segments = resolve(CommitBodies::class)->segments($this->body);
+        }
+
+        return [
+            ...parent::toArray(),
+            ...$this->segments,
+            'is_checking' => $this->isBeingChecked(),
+            // Only when the caller asked for them, so a list of commits doesn't run a query per row to find out.
+            ...($this->relationLoaded('tags') ? ['tags' => $this->tags] : []),
+        ];
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function stars(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'stars')->withTimestamps();
+    }
+
+    /**
+     * @return BelongsToMany<Tag, $this>
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+
+    public function isAddressedTo(User $user): bool
+    {
+        return in_array($user->id, $this->mentions ?? [], true) || $this->parent?->user_id === $user->id;
+    }
+
+    /**
+     * Approved commits are visible to everyone but people across a block. Authors can also see their own.
+     */
+    public function isVisibleTo(?User $user): bool
+    {
+        if ($user instanceof User && $this->user_id === $user->id) {
+            return true;
+        }
+
+        return $this->status === CommitStatus::Approved
+            && (! $user instanceof User || ! $this->user instanceof User || ! $user->hasBlockWith($this->user));
+    }
+
+    /**
+     * A pending commit is being checked until its moderation job leaves an AI decision behind. After that, or once every
+     * attempt has had its chance, it simply waits for a moderator.
+     */
+    public function isBeingChecked(): bool
+    {
+        return $this->status === CommitStatus::Pending
+            && $this->ai_decision === null
+            && $this->created_at->greaterThan(now()->subMinutes(self::CHECKING_MINUTES));
+    }
+
+    public function isRestorable(): bool
+    {
+        return $this->user_id !== null && $this->deleted_at !== null && now()->lessThan($this->deleted_at->copy()->addSeconds(self::RESTORABLE_SECONDS));
+    }
+
+    /**
+     * @return BelongsTo<Commit, $this>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /**
+     * The top-level commit that started the thread the commit belongs to, which is the commit itself when it is top-level.
+     */
+    public function threadRootId(): string
+    {
+        return $this->root_id ?? $this->id;
+    }
+
+    /**
+     * @return HasMany<Commit, $this>
+     */
+    public function replies(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    /**
+     * @return BelongsTo<LinkPreview, $this>
+     */
+    public function linkPreview(): BelongsTo
+    {
+        return $this->belongsTo(LinkPreview::class);
+    }
+
+    /**
+     * @return HasOne<Poll, $this>
+     */
+    public function poll(): HasOne
+    {
+        return $this->hasOne(Poll::class);
+    }
+
+    /**
+     * @return BelongsTo<Commit, $this>
+     */
+    public function quotedCommit(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'quoted_commit_id');
+    }
+
+    /**
+     * @return HasMany<Commit, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(self::class, 'quoted_commit_id');
+    }
+
+    /**
+     * @return HasMany<CommitImage, $this>
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(CommitImage::class)->orderBy('position');
+    }
+
+    /**
+     * Images follow the commit's visibility, and moderators see them to review the commit.
+     */
+    public function imagesAreVisibleTo(?User $user): bool
+    {
+        if ($this->trashed()) {
+            return false;
+        }
+
+        if ($this->status === CommitStatus::Approved) {
+            return true;
+        }
+
+        return $user instanceof User && ($this->user_id === $user->id || $user->isAdmin());
+    }
+
+    /**
+     * Loads what anyone may see around the commit: its author, its approved replies, and its parent only when approved.
+     */
+    public function loadPublicPreview(): self
+    {
+        $this->forceFill([
+            'replies_count' => self::query()->withTrashed()->withVisibleReplyCount(null)
+                ->whereKey($this->getAttributeFromArray($this->getKeyName()))->first()->replies_count ?? 0,
+        ])->syncOriginalAttribute('replies_count');
+
+        return $this->load(['user', 'parent' => fn (BelongsTo $query): BelongsTo => $query->where('status', CommitStatus::Approved)->with('user')]);
+    }
+
+    /**
+     * Changes whenever anything drawn on the commit's link preview image may have changed.
+     */
+    public function openGraphImageVersion(): string
+    {
+        return hash('xxh3', (string) json_encode([
+            $this->body,
+            $this->replies_count,
+            $this->user?->openGraphIdentity(),
+            $this->parent?->user?->handle,
+        ]));
+    }
+}

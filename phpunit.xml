@@ -17,7 +17,22 @@
             <directory>app</directory>
         </include>
     </source>
+    <!--
+        Coverage is reported on demand (`composer test:coverage`) and never
+        enforced; a threshold turns an arbitrary number into something the suite
+        has to be made to pass. It is not configured here because a coverage block
+        in this file stops the run when no driver is installed.
+    -->
     <php>
+        <!--
+            The suite renders the whole application across every feature test,
+            and the memory it holds at any moment is cumulative. PHP's 128M
+            default is enough for any single page but not for fourteen hundred
+            of them in one process, so the ceiling is raised here — where every
+            runner (pest, phpunit, `artisan test`) inherits it — rather than on
+            the command line, where a spawned test process would not.
+        -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

@@ -9,7 +9,6 @@ use App\Http\Responses\PasskeyLoginResponse;
 use App\Http\Responses\RegisterResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
-use App\Models\TeamInvitation;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -57,20 +56,27 @@ class FortifyServiceProvider extends ServiceProvider
 
     /**
      * Configure Fortify views.
+     *
+     * The guest-facing screens — login, registration, and the forgot-password
+     * request — are modal-first now: the dialogs live on the public surfaces
+     * (`x-auth.modals`), and these three GET routes bounce the visitor to the
+     * flagged home page whose server-side `show` binding opens the matching
+     * dialog. That keeps every route name alive for no-JS fallbacks and email
+     * links while removing the standalone pages.
+     *
+     * The four mid-flow screens (verify email, two-factor challenge, confirm
+     * password, and the token-bearing reset form) stay as real pages: they are
+     * reached from emails or an in-progress session, not from a guest journey.
      */
     private function configureViews(): void
     {
-        Fortify::loginView(fn (Request $request) => view('pages::auth.login', [
-            'teamInvitation' => $this->teamInvitation($request),
-        ]));
+        Fortify::loginView(fn () => redirect()->route('home', ['signin' => 'required']));
         Fortify::verifyEmailView(fn () => view('pages::auth.verify-email'));
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
-        Fortify::registerView(fn (Request $request) => view('pages::auth.register', [
-            'teamInvitation' => $this->teamInvitation($request),
-        ]));
+        Fortify::registerView(fn () => redirect()->route('home', ['signup' => 'required']));
         Fortify::resetPasswordView(fn () => view('pages::auth.reset-password'));
-        Fortify::requestPasswordResetLinkView(fn () => view('pages::auth.forgot-password'));
+        Fortify::requestPasswordResetLinkView(fn () => redirect()->route('home', ['forgot' => 'required']));
     }
 
     /**
@@ -95,37 +101,5 @@ class FortifyServiceProvider extends ServiceProvider
                 ($credentialId ?: $request->session()->getId()).'|'.$request->ip(),
             );
         });
-    }
-
-    /**
-     * Get the pending team invitation context for auth pages.
-     *
-     * @return array{code: string, teamName: string}|null
-     */
-    private function teamInvitation(Request $request): ?array
-    {
-        $invitationCode = $request->query('invitation');
-
-        if (! is_string($invitationCode)) {
-            return null;
-        }
-
-        $invitation = TeamInvitation::query()
-            ->with('team')
-            ->where('code', $invitationCode)
-            ->whereNull('accepted_at')
-            ->where(fn ($query) => $query
-                ->whereNull('expires_at')
-                ->orWhere('expires_at', '>=', now()))
-            ->first();
-
-        if (! $invitation) {
-            return null;
-        }
-
-        return [
-            'code' => $invitation->code,
-            'teamName' => $invitation->team->name,
-        ];
     }
 }

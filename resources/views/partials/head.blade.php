@@ -12,6 +12,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+{{--
+    CSRF token for fetch-based requests.
+
+    Livewire injects its own token into its script tag, but the editor's AI
+    calls are plain `fetch()` POSTs, which do not go through Livewire and so
+    need a token they can read. Without this they are rejected with a 419.
+--}}
+<meta name="csrf-token" content="{{ csrf_token() }}" />
+
+
 {{-- ------------------------------------------------------------------ --
  | Title / description
  --}}
@@ -20,6 +30,14 @@
 <meta name="description" content="{{ $seo->resolvedDescription() }}" />
 <meta name="author" content="{{ $seo->authorName ?? config('portfolio.author.name') }}" />
 <meta name="color-scheme" content="light dark" />
+
+{{--
+    Browser chrome (mobile address bar, task switcher) follows the applied
+    theme. Dark is the product default, so the static value is the dark
+    canvas; `partials/theme-boot` and the theme toggle keep it in sync with
+    the applied theme afterwards.
+--}}
+<meta name="theme-color" content="#0d0d0c" />
 
 {{-- ------------------------------------------------------------------ --
  | Canonical + robots
@@ -73,6 +91,25 @@
 @endif
 
 {{-- ------------------------------------------------------------------ --
+ | Structured data
+ |
+ | The one unescaped print of dynamic content in the head, and the flags are
+ | what make it safe rather than bold: JSON_HEX_TAG turns `<` and `>` into
+ | `\u003C` and `\u003E`, so a title containing `</script>` cannot close the
+ | element it is being written inside, and the other three do the same for the
+ | quote and ampersand forms a database string is full of. The value arrives as
+ | a PHP array built by the page component and is encoded here — nothing in this
+ | line is interpolated from markup.
+ |
+ | A `noindex` page emits none. Structured data is a claim to a search engine
+ | about a document it is being told not to list, and the workspace screens are
+ | exactly that.
+ --}}
+@if ($seo->jsonLd !== [] && ! $seo->noindex)
+    <script type="application/ld+json">{!! json_encode($seo->jsonLd, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) !!}</script>
+@endif
+
+{{-- ------------------------------------------------------------------ --
  | Feeds + icons
  --}}
 @unless ($seo->noindex)
@@ -87,3 +124,4 @@
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+@include('partials.theme-boot')

@@ -6,10 +6,13 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/coverage
+/storage/coverage.txt
 /vendor
 .env
 .env.backup
 .env.production
+.env.dusk.local
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -32,8 +35,22 @@ yarn-error.log
 /.kiro
 /.pi
 /.mcp.json
+/.workbuddy-ai
 /AGENTS.md
 /CLAUDE.md
 /boost.json
 /opencode.json
 /opencode.jsonc
+
+# AI tooling / diagnostics (not committed)
+/.freebuff/
+/_diag/
+/ext/
+/.kilo/
+/.qoder/settings.local.json
+
+# Browser tooling cache (not committed)
+/.playwright-cli/
+
+# Local archives (not committed)
+/shamim.zip

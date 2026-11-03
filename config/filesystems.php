@@ -38,6 +38,31 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Feed composer images. `'serve' => false` is the whole point of this
+         * disk: no route exists that will stream a file from it by path, so the
+         * only way a browser can read a byte is the signed `feed.attachments.show`
+         * route, which re-checks the post's audience before it opens the stream.
+         * `local` keeps `serve => true` because Livewire's temporary upload
+         * staging reads and deletes through that served path.
+         */
+
+        'feed_media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/feed-media'),
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
+
+        'marketplace_media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/marketplace'),
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

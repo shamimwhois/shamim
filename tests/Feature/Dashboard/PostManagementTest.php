@@ -2,55 +2,81 @@
 
 use App\Actions\Posts\CreatePost;
 use App\Actions\Posts\UpdatePost;
+use App\Enums\AccountRole;
 use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\User;
 use App\Rules\PostSlug;
+use Livewire\Livewire;
 
 test('the posts index requires authentication', function () {
-    $this->get(route('dashboard.posts.index'))->assertRedirect(route('login'));
+    $this->get(route('admin.posts.index'))->assertRedirect(route('home', ['signin' => 'required']));
+});
+
+test('the post screens are admin screens', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('admin.posts.index'))
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->seller()->create())
+        ->get(route('admin.posts.create'))
+        ->assertForbidden();
+});
+
+test('the editor rechecks admin access on Livewire updates', function () {
+    // The route group never runs for an update — they POST to `/livewire/update`
+    // — so the component's own guard is the only thing standing between a
+    // demoted account and a write.
+    $admin = User::factory()->admin()->create();
+    $post = Post::factory()->for($admin)->create();
+
+    $component = Livewire::actingAs($admin)->test('pages::admin.posts.edit', ['post' => $post]);
+
+    $admin->forceFill(['role' => AccountRole::User])->save();
+
+    $component->call('save')->assertForbidden();
 });
 
 test('the posts index lists the authors own posts only', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $other = User::factory()->create();
 
     Post::factory()->for($author)->create(['title' => 'My own draft']);
     Post::factory()->for($other)->create(['title' => 'Someone elses draft']);
 
     $this->actingAs($author)
-        ->get(route('dashboard.posts.index'))
+        ->get(route('admin.posts.index'))
         ->assertOk()
         ->assertSee('My own draft')
         ->assertDontSee('Someone elses draft');
 });
 
 test('the edit screen is reachable by its author', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $post = Post::factory()->for($author)->create();
 
     $this->actingAs($author)
-        ->get(route('dashboard.posts.edit', $post))
+        ->get(route('admin.posts.edit', $post))
         ->assertOk();
 });
 
 test('the edit screen is a 404 for another author', function () {
     $post = Post::factory()->create();
 
-    $this->actingAs(User::factory()->create())
-        ->get(route('dashboard.posts.edit', $post))
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.posts.edit', $post))
         ->assertNotFound();
 });
 
 test('the edit route binds by primary key so a retitled slug cannot break it', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->admin()->create();
     $post = Post::factory()->for($author)->create(['slug' => 'original-slug']);
 
     // Simulate the author changing the slug mid-session.
     $post->forceFill(['slug' => 'a-completely-new-slug'])->save();
 
-    $response = $this->actingAs($author)->get(route('dashboard.posts.edit', $post));
+    $response = $this->actingAs($author)->get(route('admin.posts.edit', $post));
 
     $response->assertOk();
 
@@ -58,7 +84,7 @@ test('the edit route binds by primary key so a retitled slug cannot break it', f
     // Livewire snapshot rather than a value="" attribute.
     expect($response->getContent())
         ->toContain('&quot;slug&quot;:&quot;a-completely-new-slug&quot;')
-        ->and(route('dashboard.posts.edit', $post))->toContain('/'.$post->id.'/edit');
+        ->and(route('admin.posts.edit', $post))->toContain('/'.$post->id.'/edit');
 });
 
 test('a new post is created as a draft even when publication is requested', function () {
@@ -98,6 +124,14 @@ test('an explicit slug is preserved when it is still unique', function () {
     ]);
 
     expect($post->slug)->toBe('my-chosen-slug');
+
+    // The returned model proves the action ran; the row proves it persisted,
+    // guarding against a handler that builds a model without saving it.
+    $this->assertDatabaseHas('posts', [
+        'id' => $post->id,
+        'slug' => 'my-chosen-slug',
+        'user_id' => $author->id,
+    ]);
 });
 
 test('a colliding slug is suffixed rather than silently reusing the URL', function () {
@@ -141,7 +175,17 @@ test('updating a post re-derives its reading metrics', function () {
         'body' => str_repeat('word ', 500),
     ]);
 
-    expect($post->refresh()->word_count)->toBeGreaterThan(100);
+    $post->refresh();
+
+    expect($post->word_count)->toBeGreaterThan(100);
+
+    // The derived metric must survive a reload, not just live on the in-memory
+    // model — a handler that sets the attribute but skips save() would pass the
+    // first assertion and fail this one.
+    $this->assertDatabaseHas('posts', [
+        'id' => $post->id,
+        'word_count' => $post->word_count,
+    ]);
 });
 
 test('updating a post cannot silently steal another posts slug', function () {
@@ -222,4 +266,79 @@ test('a published post keeps its published_at when edited without a status chang
     app(UpdatePost::class)->handle($post, ['title' => 'A revised title']);
 
     expect($post->refresh()->published_at->equalTo($original))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| The rich text editor
+|--------------------------------------------------------------------------
+*/
+
+test('the edit screen mounts the rich text editor over the body field', function () {
+    $author = User::factory()->admin()->create();
+    $post = Post::factory()->for($author)->create(['body' => '# Existing draft']);
+
+    $this->actingAs($author)
+        ->get(route('admin.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('richTextEditor', escape: false)
+        ->assertSee('data-editor', escape: false);
+});
+
+test('the rich text editor is mounted on the create screen too', function () {
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.posts.create'))
+        ->assertOk()
+        ->assertSee('richTextEditor', escape: false);
+});
+
+test('the editor receives the persisted body as its initial value', function () {
+    $author = User::factory()->admin()->create();
+    $post = Post::factory()->for($author)->create([
+        'body' => 'Body text that must survive into the editor',
+    ]);
+
+    $this->actingAs($author)
+        ->get(route('admin.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('Body text that must survive into the editor');
+});
+
+test('the editor toolbar no longer drives a Livewire mode property', function () {
+    $author = User::factory()->admin()->create();
+    $post = Post::factory()->for($author)->create();
+
+    $response = $this->actingAs($author)->get(route('admin.posts.edit', $post));
+
+    $response->assertOk();
+
+    // The mode switch is Alpine-owned now. A Livewire round trip per toggle
+    // would replace the textarea and drop the caret, which is the exact thing
+    // the editor was built to avoid.
+    expect($response->getContent())
+        ->not->toContain('setMode(&#039;')
+        ->not->toContain('setMode(\'');
+});
+
+test('the edit screen still renders the publishing sidebar', function () {
+    $author = User::factory()->admin()->create();
+    $post = Post::factory()->for($author)->create();
+
+    $this->actingAs($author)
+        ->get(route('admin.posts.edit', $post))
+        ->assertOk()
+        ->assertSee('Status')
+        ->assertSee('Featured');
+});
+
+test('saving a post from the editor persists the body', function () {
+    $author = User::factory()->admin()->create();
+    $post = Post::factory()->for($author)->create(['body' => 'Original body']);
+
+    Livewire::actingAs($author)
+        ->test('pages::admin.posts.edit', ['post' => $post])
+        ->set('body', 'A completely rewritten body')
+        ->call('save');
+
+    expect($post->refresh()->body)->toBe('A completely rewritten body');
 });

@@ -121,10 +121,84 @@ Semantic naming, not literal. Templates reference intent.
 | Shell | Used by | Structure |
 | --- | --- | --- |
 | **Public** | Home, blog index, blog detail, about | Skip-link → sticky header (logo, nav, theme toggle, auth action) → `main` → footer → back-to-top |
-| **Auth** | Login, register, reset, verify, 2FA | Existing starter-kit auth shells — **reuse, do not rebuild** |
-| **App** | Dashboard, post editor, settings | Existing starter-kit sidebar shell — **extend the nav, do not replace the shell** |
+| **Auth** | Login, register, reset, verify, 2FA | Split panel (editorial left, form right) collapsing to a centred card below `lg`; skip-link → `main#auth-form` |
+| **App** | Dashboard, post editor, settings | Sidebar shell with permission-filtered navigation and a pinned account footer (identity, utility links) |
 
-**Rationale for reusing the existing shells.** The starter kit already ships accessible `auth` and `app` shells with working theme handling. Rebuilding them would be churn with a real risk of regressing focus order and landmark structure.
+> **Revised — the original guidance was wrong.** This table previously read
+> "Existing starter-kit auth shells — **reuse, do not rebuild**" and "Existing
+> starter-kit sidebar shell — **extend the nav, do not replace the shell**",
+> justified on the grounds that the starter kit "already ships accessible auth
+> and app shells **with working theme handling**".
+>
+> That premise was false. All three starter-kit auth layouts (and the app
+> shells) hardcoded `class="dark"` on `<html>`, **overriding the visitor's theme
+> choice**. Someone who had selected the light theme was shown a dark sign-in
+> page and then dropped into a light dashboard. The shells also rendered the
+> framework's placeholder branding (a random `Inspiring` quote) rather than
+> product copy, and only two of the three auth layouts were referenced at all —
+> the third was dead weight with the same bug.
+>
+> Rebuilding was therefore the correct call, not churn. The lesson worth
+> recording: "the framework starter kit handles this" is an assumption that
+> needs verifying, not a rationale. The `app` sidebar shell *was* worth
+> extending rather than replacing; the `auth` shells were not.
+
+**Current auth layout structure.** A two-column grid at `lg` and above — an
+editorial panel carrying the product's own copy, and the form column. Below
+`lg` the panel is dropped and the form is centred, because there is no room for
+a second column and no reason to make someone scroll past a manifesto to reach a
+password field.
+
+The layout is theme-neutral: it reads the visitor's preference through
+`@fluxAppearance` like every other page, and hardcodes nothing. `AuthLayoutTest`
+asserts this, because it is a regression that renders a perfectly usable form
+and is therefore invisible without a test.
+
+### 3.1.1 The dashboard sidebar
+
+The sidebar is the densest navigational surface in the product, so its behaviour
+is specified rather than left to the implementation.
+
+**Structure.** Three levels, and no deeper, because a fourth is where sidebars
+stop being readable:
+
+| Level | Interactive? | Notes |
+| --- | --- | --- |
+| **Section** | No | A labelled band (`Home`, `Writing`, `Workspaces`, `Manage`). Dropped entirely — heading included — when permission filtering empties it |
+| **Group** | No | A labelled cluster with an icon in the definition; its items render flat under the section heading |
+| **Item** | Yes | A leaf link |
+
+Nothing is hidden behind a click. An earlier design gave multi-item groups a
+disclosure control that collapsed their links; it is gone, because a chevron
+between a section heading and three links is a navigation step with no
+information in it. A group that filters down to a single destination is still marked `static` in the data, and the navigation tests still pin the shape down.
+
+**Desktop — collapsible sidenav.** The sidebar animates between a 264 px expanded
+state and a 68 px icon-only strip. The collapsed strip is built from the same
+navigation data, flattened; labels are replaced by icons but every link keeps a
+`title` and an `aria-label`, because an icon with no accessible name is
+unusable to a screen reader. The preference persists per account
+(`df.sidenav-collapsed.{userId}`), so two people sharing a browser do not fight over it.
+The toggle is an icon button in the brand row, beside the wordmark; at icon
+width the brand link yields the row to it, because a rail you cannot widen back
+is a trap.
+
+**Below `lg` — off-canvas drawer.** The sidebar leaves the flow entirely and
+becomes a drawer over a backdrop. It is a `role="dialog" aria-modal="true"` and
+implements all three modal obligations: scroll lock on `<html>`, focus trapped
+within the drawer, and focus restored to the trigger on close. Escape closes it.
+
+**No group collapse state.** With the disclosure gone there is nothing to
+persist per group: `df.sidenav-collapsed.{userId}` (the rail width) is the
+sidebar's only stored preference.
+
+**Active state** is carried by three signals, never by colour alone: a
+signal-coloured left spine on the item, a filled background, and
+`aria-current="page"` in the markup.
+
+**Mobile drawer internals.** The scrolling nav region is separate from the pinned
+footer, so the utility links never scroll out of reach. The collapse toggle is
+not in the footer at all — it is the icon button in the sidenav's brand row.
 
 ### 3.2 Public header behaviour
 
@@ -143,8 +217,8 @@ The header never hides on scroll-down. A portfolio reader frequently wants to ju
 | --- | --- | --- |
 | `xs` | 360 px | Single column; reduced section padding; TOC becomes a drawer |
 | `sm` | 640 px | Two-column post grid |
-| `md` | 768 px | Nav collapses to full menu; editorial two-column layouts activate |
-| `lg` | 1024 px | Three-column post grid; sticky TOC appears beside articles |
+| `md` | 768 px | Nav collapses to full menu; editorial two-column layouts activate; settings nav becomes a horizontal tab strip |
+| `lg` | 1024 px | Three-column post grid; sticky TOC appears beside articles; **dashboard sidebar leaves the drawer and becomes a persistent sidenav** |
 | `xl` | 1280 px | Editor splits into form + preview panes |
 | `2xl` | 1536 px | Content width stops growing; only whitespace increases |
 
